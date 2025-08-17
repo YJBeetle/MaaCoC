@@ -59,8 +59,9 @@
         "next": "DeploySoldier",
     },
     "DeploySoldier": {
-        "action": "Click",
+        "action": "LongPress",
         "target": [111,317,43,50],
+        "duration": 4000,
         "next": "FindSoldier",
         "timeout": 0,
         "on_error": "Deploy",
