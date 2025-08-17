@@ -28,7 +28,7 @@ int main([[maybe_unused]] int argc, char **argv) {
 
         LOG_INFO("main", "Creating Resource...");
         auto resource = Maa::Resource();
-        std::string resourceDir = R"(../resource)";
+        std::string resourceDir = R"(./assets)";
         LOG_DEBUG("main", "Resource directory: %s", resourceDir.c_str());
         auto resId = resource.postBundle(resourceDir.c_str());
 
