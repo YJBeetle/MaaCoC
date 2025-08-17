@@ -16,7 +16,7 @@
             "GiveUp",
             "BackHome",
         ],
-        "timeout": 5000,
+        "timeout": 10000,
         "on_error": "Main",
     },
     "AttackStart": {
