@@ -120,6 +120,13 @@
         "template": "GiveUp.png",
         "roi": [20,483,218,107],
         "action": "Click",
+        "next": ["GiveUpYes","TryBackHome"],
+    },
+    "GiveUpYes": {
+        "recognition": "TemplateMatch",
+        "template": "GiveUpYes.png",
+        "roi": [631,389,308,153],
+        "action": "Click",
         "next": "TryBackHome",
     },
 
