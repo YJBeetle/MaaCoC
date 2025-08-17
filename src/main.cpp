@@ -14,9 +14,6 @@ int main([[maybe_unused]] int argc, char **argv) {
 
     LOG_INFO("main", "MaaFramework Version: %s", MaaVersion());
 
-    auto debugMode = true;
-    MaaSetGlobalOption(MaaGlobalOption_DebugMode, &debugMode, sizeof(debugMode));
-
     std::string user_path = "./";
     LOG_DEBUG("main", "User path: %s", user_path.c_str());
     MaaToolkitConfigInitOption(user_path.c_str(), "{}");

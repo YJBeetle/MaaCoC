@@ -5,6 +5,7 @@
         ],
     },
     "AttackLoop": {
+        "focus": "AttackLoop!",
         "next": [
             "AttackStart",
             "SearchOpponent",
@@ -16,6 +17,7 @@
         "on_error": "AttackLoop",
     },
     "AttackStart": {
+        "focus": "AttackStart!",
         "recognition": "TemplateMatch",
         "template": "AttackStart.png",
         "roi": [33,543,178,176],
@@ -26,6 +28,7 @@
         "on_error": "AttackLoop",
     },
     "SearchOpponent": {
+        "focus": "SearchOpponent!",
         "recognition": "TemplateMatch",
         "template": "SearchOpponent.png",
         "roi": [756,314,317,193],
@@ -42,6 +45,7 @@
     },
 
     "Deploy": {
+        "focus": "Deploy!",
         "next": [
             "FindSoldier",
             "FindHero",
@@ -51,6 +55,7 @@
         "on_error": "WaitingEndLoop",
     },
     "FindSoldier": {
+        "focus": "FindSoldier!",
         "recognition": "TemplateMatch",
         "template": "Soldier",
         "roi": [46,584,1191,135],
@@ -67,6 +72,7 @@
         "on_error": "Deploy",
     },
     "FindHero": {
+        "focus": "FindHero!",
         "recognition": "TemplateMatch",
         "template": "Hero",
         "roi": [46,584,1191,135],
@@ -92,6 +98,7 @@
         "on_error": "Deploy",
     },
     "FindSpell": {
+        "focus": "FindSpell!",
         "recognition": "TemplateMatch",
         "template": "Spell",
         "roi": [46,584,1191,135],
@@ -108,6 +115,7 @@
     },
 
     "GiveUp": {
+        "focus": "GiveUp!",
         "recognition": "TemplateMatch",
         "template": "GiveUp.png",
         "roi": [20,483,218,107],
@@ -116,6 +124,7 @@
     },
 
     "WaitingEndLoop": {
+        "focus": "WaitingEndLoop!",
         "next": "WaitingEnd",
         "timeout": 2000,
         "on_error": "TryBackHome",
@@ -134,6 +143,7 @@
         "on_error": "AttackLoop",
     },
     "BackHome": {
+        "focus": "BackHome!",
         "recognition": "TemplateMatch",
         "template": "BackHome.png",
         "roi": [528,546,228,139],
