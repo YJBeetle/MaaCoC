@@ -2,6 +2,12 @@
 
 The CoC Powered by MaaFramework
 
+## Build and Run
+
+    cmake -B ./build
+    cmake --build ./build
+    ./build/MaaCoC
+
 ## Notice
 
 The device must be set to a resolution of 1080x1920.
