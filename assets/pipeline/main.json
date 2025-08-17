@@ -47,9 +47,9 @@
     "Deploy": {
         "focus": "Deploy!",
         "next": [
+            "FindSpell",
             "FindSoldier",
             "FindHero",
-            "FindSpell",
         ],
         "timeout": 0,
         "on_error": "WaitingEndLoop",
