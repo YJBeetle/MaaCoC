@@ -47,6 +47,7 @@
     "Deploy": {
         "focus": "Deploy!",
         "next": [
+            "ActivateHero",
             "FindSoldier",
             "FindHero",
             "FindSpell",
@@ -67,9 +68,7 @@
         "action": "LongPress",
         "target": [111,317,43,50],
         "duration": 4000,
-        "next": "FindSoldier",
-        "timeout": 0,
-        "on_error": "Deploy",
+        "next": "Deploy",
     },
     "FindHero": {
         "focus": "FindHero!",
@@ -93,9 +92,7 @@
         "roi": [65,560,1163,160],
         "threshold": 0.85,
         "action": "Click",
-        "next": "FindHero",
-        "timeout": 0,
-        "on_error": "Deploy",
+        "next": "Deploy",
     },
     "FindSpell": {
         "focus": "FindSpell!",
@@ -109,9 +106,7 @@
     "DeploySpell": {
         "action": "Click",
         "target": [327,60,369,410],
-        "next": "FindSpell",
-        "timeout": 0,
-        "on_error": "Deploy",
+        "next": "Deploy",
     },
 
     "GiveUp": {
