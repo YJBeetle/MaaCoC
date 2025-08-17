@@ -9,7 +9,8 @@
             "AttackStart",
             "SearchOpponent",
             "FindNext",
-            "WaitingEnd",
+            "GiveUp",
+            "BackHome",
         ],
         "timeout": 1000,
         "on_error": "Main",
@@ -105,7 +106,15 @@
         "timeout": 0,
         "on_error": "Deploy",
     },
-    
+
+    "GiveUp": {
+        "recognition": "TemplateMatch",
+        "template": "GiveUp.png",
+        "roi": [20,483,218,107],
+        "action": "Click",
+        "next": "TryBackHome",
+    },
+
     "WaitingEndLoop": {
         "next": "WaitingEnd",
         "timeout": 2000,
