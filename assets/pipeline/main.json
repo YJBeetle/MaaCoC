@@ -38,7 +38,6 @@
         "template": "Next.png",
         "roi": [1005,440,253,146],
         "next": "Deploy",
-        "on_error": "Attack",
     },
 
     "Deploy": {
