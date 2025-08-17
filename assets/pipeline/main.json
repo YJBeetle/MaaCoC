@@ -1,10 +1,10 @@
 {
     "Main": {
         "next": [
-            "Attack",
+            "AttackLoop",
         ],
     },
-    "Attack": {
+    "AttackLoop": {
         "next": [
             "AttackStart",
             "SearchOpponent",
@@ -13,7 +13,7 @@
             "BackHome",
         ],
         "timeout": 1000,
-        "on_error": "Main",
+        "on_error": "AttackLoop",
     },
     "AttackStart": {
         "recognition": "TemplateMatch",
@@ -23,7 +23,7 @@
         "action": "Click",
         "next": "SearchOpponent",
         "timeout": 1000,
-        "on_error": "Attack",
+        "on_error": "AttackLoop",
     },
     "SearchOpponent": {
         "recognition": "TemplateMatch",
@@ -32,7 +32,7 @@
         "action": "Click",
         "next": "FindNext",
         "timeout": 10000,
-        "on_error": "Attack",
+        "on_error": "AttackLoop",
     },
     "FindNext": {
         "recognition": "TemplateMatch",
@@ -131,7 +131,7 @@
     "TryBackHome": {
         "next": "BackHome",
         "timeout": 2000,
-        "on_error": "Attack",
+        "on_error": "AttackLoop",
     },
     "BackHome": {
         "recognition": "TemplateMatch",
@@ -140,6 +140,6 @@
         "action": "Click",
         "next": "AttackStart",
         "timeout": 10000,
-        "on_error": "Attack",
+        "on_error": "AttackLoop",
     },
 }
