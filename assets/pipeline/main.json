@@ -58,13 +58,13 @@
         "threshold": 0.9,
         "action": "Click",
         "next": "DeploySoldier",
-        "on_error": "FindHero",
     },
     "DeploySoldier": {
         "action": "Click",
         "target": [111,317,43,50],
         "next": "FindSoldier",
         "timeout": 0,
+        "on_error": "Deploy",
     },
     "FindHero": {
         "recognition": "TemplateMatch",
@@ -73,13 +73,13 @@
         "threshold": 0.9,
         "action": "Click",
         "next": "DeployHero",
-        "on_error": "FindSpell",
     },
     "DeployHero": {
         "action": "Click",
         "target": [111,317,43,50],
         "next": "FindHero",
         "timeout": 0,
+        "on_error": "Deploy",
     },
     "FindSpell": {
         "recognition": "TemplateMatch",
@@ -88,13 +88,13 @@
         "threshold": 0.9,
         "action": "Click",
         "next": "DeploySpell",
-        "on_error": "ActivateHero",
     },
     "DeploySpell": {
         "action": "Click",
         "target": [327,60,369,410],
         "next": "FindSpell",
         "timeout": 0,
+        "on_error": "Deploy",
     },
     "ActivateHero": {
         "recognition": "TemplateMatch",
@@ -104,7 +104,7 @@
         "action": "Click",
         "next": "ActivateHero",
         "timeout": 0,
-        "on_error": "WaitingEnd",
+        "on_error": "Deploy",
     },
     
     "WaitingEnd": {
