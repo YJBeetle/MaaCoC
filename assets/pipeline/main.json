@@ -134,7 +134,7 @@
         "focus": "WaitingEndLoop!",
         "next": "WaitingEnd",
         "timeout": 2000,
-        "on_error": "TryBackHome",
+        "on_error": "WaitingEndLoop",
     },
     "WaitingEnd": {
         "recognition": "TemplateMatch",
