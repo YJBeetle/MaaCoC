@@ -53,10 +53,7 @@
     },
     "FindSoldier": {
         "recognition": "TemplateMatch",
-        "template": [
-            "SoldierBabyDragon.png",
-            "SoldierSuperDragon.png",
-        ],
+        "template": "Soldier",
         "roi": [46,584,1191,135],
         "threshold": 0.9,
         "action": "Click",
@@ -71,12 +68,7 @@
     },
     "FindHero": {
         "recognition": "TemplateMatch",
-        "template": [
-            "HeroKing.png",
-            "HeroQueen.png",
-            "HeroGuardian.png",
-            "HeroMars.png",
-        ],
+        "template": "Hero",
         "roi": [46,584,1191,135],
         "threshold": 0.9,
         "action": "Click",
@@ -91,12 +83,7 @@
     },
     "FindSpell": {
         "recognition": "TemplateMatch",
-        "template": [
-            "SpellRage.png",
-            "HeroQueen.png",
-            "HeroGuardian.png",
-            "HeroMars.png",
-        ],
+        "template": "Spell",
         "roi": [46,584,1191,135],
         "threshold": 0.9,
         "action": "Click",
@@ -111,12 +98,7 @@
     },
     "ActivateHero": {
         "recognition": "TemplateMatch",
-        "template": [
-            "HeroExcitedKing.png",
-            "HeroExcitedQueen.png",
-            "HeroExcitedGuardian.png",
-            "HeroExcitedMars.png",
-        ],
+        "template": "HeroExcited",
         "roi": [65,560,1163,160],
         "threshold": 0.9,
         "action": "Click",
