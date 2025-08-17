@@ -1,10 +1,17 @@
 {
     "Main": {
+        "next": "SetScreen",
+    },
+    "SetScreen": {
+        "action": "Command",
+        "exec": "adb",
+        "args": ["shell", "wm", "size", "1080x1920"],
+        "next": "Launch",
+    },
+    "Launch": {
         "action": "StartApp",
         "package": "com.supercell.clashofclans",
-        "next": [
-            "AttackLoop",
-        ],
+        "next": "AttackLoop",
     },
     "AttackLoop": {
         "focus": "AttackLoop!",
@@ -124,7 +131,7 @@
     },
     "DeploySpell": {
         "action": "Click",
-        "target": [327,60,369,410],
+        "target": [297,199,341,318],
         "next": "Deploy",
         "rate_limit": 10,
         "pre_delay": 0,
