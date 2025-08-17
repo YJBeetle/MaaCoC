@@ -47,7 +47,6 @@
     "Deploy": {
         "focus": "Deploy!",
         "next": [
-            "ActivateHero",
             "FindSoldier",
             "FindHero",
             "FindSpell",
@@ -84,15 +83,10 @@
         "action": "Click",
         "target": [111,317,43,50],
         "next": "ActivateHero",
-        "timeout": 0,
-        "on_error": "Deploy",
     },
     "ActivateHero": {
-        "recognition": "TemplateMatch",
-        "template": "HeroExcited",
-        "roi": [65,560,1163,160],
-        "threshold": 0.85,
         "action": "Click",
+        "target": "FindHero",
         "next": "Deploy",
     },
     "FindSpell": {
