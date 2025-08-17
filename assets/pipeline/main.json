@@ -29,7 +29,7 @@
     "AttackStart": {
         "focus": "AttackStart!",
         "recognition": "TemplateMatch",
-        "template": "AttackStart.png",
+        "template": ["AttackStart.png","AttackStartWithStar.png"],
         "green_mask": true,
         "roi": [33,543,178,176],
         "threshold": 0.85,
