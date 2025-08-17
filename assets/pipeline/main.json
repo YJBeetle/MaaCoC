@@ -51,6 +51,9 @@
             "FindSoldier",
             "FindHero",
         ],
+        "rate_limit": 10,
+        "pre_delay": 0,
+        "post_delay": 0,
         "timeout": 0,
         "on_error": "WaitingEndLoop",
     },
@@ -62,12 +65,18 @@
         "threshold": 0.95,
         "action": "Click",
         "next": "DeploySoldier",
+        "rate_limit": 10,
+        "pre_delay": 0,
+        "post_delay": 0,
     },
     "DeploySoldier": {
         "action": "LongPress",
         "target": [111,317,43,50],
         "duration": 4000,
         "next": "Deploy",
+        "rate_limit": 10,
+        "pre_delay": 0,
+        "post_delay": 0,
     },
     "FindHero": {
         "focus": "FindHero!",
@@ -78,16 +87,25 @@
         "action": "Click",
         "target_offset": [0,0,0,-30],
         "next": "DeployHero",
+        "rate_limit": 10,
+        "pre_delay": 0,
+        "post_delay": 0,
     },
     "DeployHero": {
         "action": "Click",
         "target": [111,317,43,50],
         "next": "ActivateHero",
+        "rate_limit": 10,
+        "pre_delay": 0,
+        "post_delay": 0,
     },
     "ActivateHero": {
         "action": "Click",
         "target": "FindHero",
         "next": "Deploy",
+        "rate_limit": 10,
+        "pre_delay": 0,
+        "post_delay": 0,
     },
     "FindSpell": {
         "focus": "FindSpell!",
@@ -97,11 +115,17 @@
         "threshold": 0.85,
         "action": "Click",
         "next": "DeploySpell",
+        "rate_limit": 10,
+        "pre_delay": 0,
+        "post_delay": 0,
     },
     "DeploySpell": {
         "action": "Click",
         "target": [327,60,369,410],
         "next": "Deploy",
+        "rate_limit": 10,
+        "pre_delay": 0,
+        "post_delay": 0,
     },
 
     "GiveUp": {
@@ -123,7 +147,7 @@
     "WaitingEndLoop": {
         "focus": "WaitingEndLoop!",
         "next": "WaitingEnd",
-        "timeout": 2000,
+        "timeout": 1000,
         "on_error": "WaitingEndLoop",
     },
     "WaitingEnd": {
@@ -136,7 +160,7 @@
 
     "TryBackHome": {
         "next": "BackHome",
-        "timeout": 2000,
+        "timeout": 1000,
         "on_error": "AttackLoop",
     },
     "BackHome": {
