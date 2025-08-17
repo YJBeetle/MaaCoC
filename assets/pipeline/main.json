@@ -104,12 +104,12 @@
     "DeployHero": {
         "action": "Click",
         "target": [111,317,43,50],
-        "next": "ActivateHero",
+        "next": "SkillHero",
         "rate_limit": 10,
         "pre_delay": 0,
         "post_delay": 0,
     },
-    "ActivateHero": {
+    "SkillHero": {
         "action": "Click",
         "target": "FindHero",
         "next": "Deploy",
