@@ -183,6 +183,11 @@
         "recognition": "TemplateMatch",
         "template": "Exception",
         "threshold": 0.9,
+        "next": "ExceptionConfirmation",
+    },
+    "ExceptionConfirmation": {
+        "recognition": "TemplateMatch",
+        "template": "ExceptionConfirmation",
         "action": "Click",
         "next": "Main",
     },
