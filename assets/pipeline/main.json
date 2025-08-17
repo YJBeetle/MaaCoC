@@ -1,5 +1,7 @@
 {
     "Main": {
+        "action": "StartApp",
+        "package": "com.supercell.clashofclans",
         "next": [
             "AttackLoop",
         ],
@@ -14,8 +16,8 @@
             "GiveUp",
             "BackHome",
         ],
-        "timeout": 1000,
-        "on_error": "AttackLoop",
+        "timeout": 5000,
+        "on_error": "Main",
     },
     "AttackStart": {
         "focus": "AttackStart!",
