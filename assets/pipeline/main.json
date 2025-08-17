@@ -48,7 +48,7 @@
             "ActivateHero",
         ],
         "timeout": 0,
-        "on_error": "WaitingEnd",
+        "on_error": "WaitingEndLoop",
     },
     "FindSoldier": {
         "recognition": "TemplateMatch",
@@ -106,14 +106,23 @@
         "on_error": "Deploy",
     },
     
+    "WaitingEndLoop": {
+        "next": "WaitingEnd",
+        "timeout": 2000,
+        "on_error": "TryBackHome",
+    },
     "WaitingEnd": {
         "recognition": "TemplateMatch",
         "template": "GiveUp.png",
         "roi": [20,483,218,107],
         "inverse": true,
+        "next": "TryBackHome",
+    },
+
+    "TryBackHome": {
         "next": "BackHome",
         "timeout": 2000,
-        "on_error": "WaitingEnd",
+        "on_error": "Attack",
     },
     "BackHome": {
         "recognition": "TemplateMatch",
