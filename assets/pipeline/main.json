@@ -101,6 +101,7 @@
         "roi": [46,584,1191,135],
         "threshold": 0.95,
         "action": "Click",
+        "target_offset": [0,0,0,-30],
         "next": "DeployVehicle",
         "rate_limit": 10,
         "pre_delay": 0,
