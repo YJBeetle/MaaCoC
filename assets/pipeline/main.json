@@ -22,6 +22,7 @@
             "FindNext",
             "GiveUp",
             "BackHome",
+            "CloseDialog",
         ],
         "timeout": 10000,
         "on_error": "Main",
@@ -198,5 +199,14 @@
         "template": "ExceptionConfirmation",
         "action": "Click",
         "next": "Main",
+    },
+
+    "CloseDialog": {
+        "focus": "CloseDialog!",
+        "recognition": "TemplateMatch",
+        "template": "CloseButton",
+        "threshold": 0.8,
+        "action": "Click",
+        "next": "AttackLoop",
     },
 }
