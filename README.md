@@ -4,9 +4,9 @@ The CoC Powered by MaaFramework
 
 ## Build and Run
 
-    cmake -B ./build
-    cmake --build ./build
-    ./build/MaaCoC
+    mkdir build
+    cmake .. && cmake --build .
+    ./MaaCoC
 
 ## Notice
 

@@ -10,6 +10,11 @@ file(COPY ${maaagentbinary_SOURCE_DIR}/ DESTINATION ${CMAKE_BINARY_DIR}/MaaAgent
 include(${PROJECT_SOURCE_DIR}/cmake/FetchMaaFramework.cmake)
 find_package(MaaFramework CONFIG REQUIRED)
 
+file(GLOB_RECURSE ASSET_FILES RELATIVE "${PROJECT_SOURCE_DIR}" "${PROJECT_SOURCE_DIR}/assets/*")
+foreach(asset_file ${ASSET_FILES})
+    configure_file("${PROJECT_SOURCE_DIR}/${asset_file}" "${CMAKE_BINARY_DIR}/${asset_file}" COPYONLY)
+endforeach()
+
 file(GLOB_RECURSE SRC_LIST
     ${PROJECT_SOURCE_DIR}/src/*.cpp
     ${PROJECT_SOURCE_DIR}/src/*.hpp
