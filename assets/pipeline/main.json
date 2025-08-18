@@ -53,22 +53,13 @@
         "recognition": "TemplateMatch",
         "template": "Next.png",
         "roi": [1005,440,253,146],
-    //     "next": "ZoomOut",
-    // },
-    // "ZoomOut": {
-    //     "action": "MultiSwipe",
-    //     "swipes": [
-    //         {
-    //             "begin": [200,250,50,50],
-    //             "end": [700,250,50,50],
-    //             "duration": 200,
-    //         },
-    //         {
-    //             "begin": [1200,250,50,50],
-    //             "end": [800,250,50,50],
-    //             "duration": 200,
-    //         },
-    //     ],
+        "next": "SlideLeft",
+    },
+    "SlideLeft": {
+        "action": "Swipe",
+        "begin": [200,250,50,50],
+        "end": [1200,250,50,50],
+        "duration": 100,
         "next": "Deploy",
     },
 
