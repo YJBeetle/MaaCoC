@@ -43,6 +43,7 @@
         "focus": "SearchOpponent!",
         "recognition": "TemplateMatch",
         "template": "SearchOpponent.png",
+        "green_mask": true,
         "roi": [756,314,317,193],
         "action": "Click",
         "next": "FindNext",
@@ -52,6 +53,7 @@
     "FindNext": {
         "recognition": "TemplateMatch",
         "template": "Next.png",
+        "green_mask": true,
         "roi": [1005,440,253,146],
         "next": "Deploy",
     },
