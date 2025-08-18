@@ -66,6 +66,7 @@
     "Deploy": {
         "focus": "Deploy!",
         "next": [
+            "BackHome",
             "FindSpell",
             "FindSoldier",
             "FindHero",
