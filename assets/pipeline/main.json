@@ -21,7 +21,7 @@
             "FindMatch",
             "FindNext",
             "GiveUp",
-            "BackHome",
+            "ReturnHome",
             "CloseDialog",
         ],
         "timeout": 10000,
@@ -61,7 +61,7 @@
     "Deploy": {
         "focus": "Deploy!",
         "next": [
-            "BackHome",
+            "ReturnHome",
             "FindSpell",
             "FindSoldier",
             "FindVehicle",
@@ -207,14 +207,14 @@
         "template": "GiveUp.png",
         "roi": [20,483,218,107],
         "action": "Click",
-        "next": ["GiveUpYes","TryBackHome"],
+        "next": ["GiveUpYes","TryReturnHome"],
     },
     "GiveUpYes": {
         "recognition": "TemplateMatch",
         "template": "GiveUpYes.png",
         "roi": [631,389,308,153],
         "action": "Click",
-        "next": "TryBackHome",
+        "next": "TryReturnHome",
     },
 
     "WaitingEndLoop": {
@@ -228,18 +228,18 @@
         "template": "GiveUp.png",
         "roi": [20,483,218,107],
         "inverse": true,
-        "next": "TryBackHome",
+        "next": "TryReturnHome",
     },
 
-    "TryBackHome": {
-        "next": "BackHome",
+    "TryReturnHome": {
+        "next": "ReturnHome",
         "timeout": 1000,
         "on_error": "AttackLoop",
     },
-    "BackHome": {
-        "focus": "BackHome!",
+    "ReturnHome": {
+        "focus": "ReturnHome!",
         "recognition": "TemplateMatch",
-        "template": "BackHome.png",
+        "template": "ReturnHome",
         "roi": [528,546,228,139],
         "threshold": 0.8,
         "action": "Click",
