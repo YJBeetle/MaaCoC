@@ -18,7 +18,7 @@
         "next": [
             "Exception",
             "AttackStart",
-            "SearchOpponent",
+            "FindMatch",
             "FindNext",
             "GiveUp",
             "BackHome",
@@ -35,14 +35,14 @@
         "roi": [33,543,178,176],
         "threshold": 0.85,
         "action": "Click",
-        "next": "SearchOpponent",
+        "next": "FindMatch",
         "timeout": 1000,
         "on_error": "AttackLoop",
     },
-    "SearchOpponent": {
-        "focus": "SearchOpponent!",
+    "FindMatch": {
+        "focus": "FindMatch!",
         "recognition": "TemplateMatch",
-        "template": "SearchOpponent.png",
+        "template": "FindMatch",
         "green_mask": true,
         "roi": [756,314,317,193],
         "action": "Click",
@@ -52,7 +52,7 @@
     },
     "FindNext": {
         "recognition": "TemplateMatch",
-        "template": "Next.png",
+        "template": "Next",
         "green_mask": true,
         "roi": [1005,440,253,146],
         "next": "Deploy",
