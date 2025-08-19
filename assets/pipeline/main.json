@@ -20,7 +20,7 @@
             "AttackStart",
             "FindMatch",
             "FindNext",
-            "GiveUp",
+            "Surrender",
             "ReturnHome",
             "CloseDialog",
         ],
@@ -201,17 +201,17 @@
         "post_delay": 0,
     },
 
-    "GiveUp": {
-        "focus": "GiveUp!",
+    "Surrender": {
+        "focus": "Surrender!",
         "recognition": "TemplateMatch",
-        "template": "GiveUp.png",
+        "template": "Surrender",
         "roi": [20,483,218,107],
         "action": "Click",
-        "next": ["GiveUpYes","TryReturnHome"],
+        "next": ["SurrenderConfirmation","TryReturnHome"],
     },
-    "GiveUpYes": {
+    "SurrenderConfirmation": {
         "recognition": "TemplateMatch",
-        "template": "GiveUpYes.png",
+        "template": "Okay",
         "roi": [631,389,308,153],
         "action": "Click",
         "next": "TryReturnHome",
@@ -225,7 +225,7 @@
     },
     "WaitingEnd": {
         "recognition": "TemplateMatch",
-        "template": "GiveUp.png",
+        "template": "Surrender",
         "roi": [20,483,218,107],
         "inverse": true,
         "next": "TryReturnHome",
