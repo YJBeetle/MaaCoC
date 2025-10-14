@@ -242,9 +242,17 @@
         "roi": [528,546,228,139],
         "threshold": 0.8,
         "action": "Click",
-        "next": "AttackStart",
+        "next": ["RewardOkay","AttackStart"],
         "timeout": 10000,
         "on_error": "AttackLoop",
+    },
+    "RewardOkay": {
+        "recognition": "TemplateMatch",
+        "template": "RewardOkay",
+        "roi": [521,558,255,116],
+        "threshold": 0.8,
+        "action": "Click",
+        "next": "AttackStart",
     },
 
     "Exception": {
