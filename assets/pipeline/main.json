@@ -22,6 +22,8 @@
             "FindNext",
             "Surrender",
             "ReturnHome",
+            "OpenBox",
+            "OpenBoxTap",
             "CloseDialog",
         ],
         "timeout": 10000,
