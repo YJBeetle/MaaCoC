@@ -274,7 +274,16 @@
         "threshold": 0.8,
         "action": "Click",
         "target": [525,290,214,200],
-        "next": ["OpenBoxTap","AttackStart"],
+        "next": ["OpenBoxTap","OpenBoxContinue"],
+        "on_error": "AttackLoop",
+    },
+    "OpenBoxContinue": {
+        "recognition": "TemplateMatch",
+        "template": "OpenBoxContinue",
+        "roi": [515,535,255,102],
+        "threshold": 0.8,
+        "action": "Click",
+        "next": "AttackStart",
         "on_error": "AttackLoop",
     },
 
