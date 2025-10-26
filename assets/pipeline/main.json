@@ -271,6 +271,7 @@
         "roi": [480,530,300,140],
         "threshold": 0.8,
         "action": "Click",
+        "target": [525,290,214,200],
         "next": ["OpenBoxTap","AttackStart"],
         "on_error": "AttackLoop",
     },
