@@ -231,7 +231,7 @@
     },
 
     "TryReturnHome": {
-        "next": "ReturnHome",
+        "next": ["ReturnHome","OpenBox"],
         "timeout": 1000,
         "on_error": "AttackLoop",
     },
@@ -253,6 +253,26 @@
         "threshold": 0.8,
         "action": "Click",
         "next": "AttackStart",
+        "on_error": "AttackLoop",
+    },
+    "OpenBox": {
+        "focus": "OpenBox!",
+        "recognition": "TemplateMatch",
+        "template": "OpenBox",
+        "roi": [500,546,300,139],
+        "threshold": 0.8,
+        "action": "Click",
+        "next": ["OpenBoxTap"],
+        "on_error": "AttackLoop",
+    },
+    "OpenBoxTap": {
+        "recognition": "TemplateMatch",
+        "template": "OpenBoxTap",
+        "roi": [480,530,300,140],
+        "threshold": 0.8,
+        "action": "Click",
+        "next": ["OpenBoxTap","AttackStart"],
+        "on_error": "AttackLoop",
     },
 
     "Exception": {
