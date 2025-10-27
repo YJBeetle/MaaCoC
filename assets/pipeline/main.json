@@ -56,6 +56,13 @@
         "template": "Next",
         "green_mask": true,
         "roi": [1005,440,253,146],
+        "next": "SlideLeft",
+    },
+    "SlideLeft": {
+        "action": "Swipe",
+        "begin": [200,250,50,1],
+        "end": [1200,250,50,1],
+        "duration": 100,
         "next": "Deploy",
     },
 
