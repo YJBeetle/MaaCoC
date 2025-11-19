@@ -47,8 +47,17 @@
         "template": "FindMatch",
         "roi": [79,459,342,155],
         "action": "Click",
-        "next": "FindNext",
+        "next": "AttackStartAgain",
         "timeout": 10000,
+        "on_error": "AttackLoop",
+    },
+    "AttackStartAgain": {
+        "recognition": "TemplateMatch",
+        "template": "AttackStartAgain",
+        "roi": [961,572,292,119],
+        "action": "Click",
+        "next": "FindNext",
+        "timeout": 1000,
         "on_error": "AttackLoop",
     },
     "FindNext": {
