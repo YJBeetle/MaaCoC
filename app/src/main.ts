@@ -1,3 +1,8 @@
+/* Bundled, not a CDN link: the shipped .app has to render offline, and a missing
+   icon font shows the literal glyph names ("play_arrow") instead of icons. */
+import "@material-symbols/font-400/outlined.css";
+import "@fontsource/roboto/400.css";
+import "@fontsource/roboto/500.css";
 import "./styles.css";
 import "@material/web/button/filled-button.js";
 import "@material/web/button/filled-tonal-button.js";
@@ -544,11 +549,19 @@ function probeLayout() {
     const node = document.querySelector(selector);
     return node ? Math.round(node.getBoundingClientRect().height) : null;
   };
+  const rect = (selector: string) => {
+    const node = document.querySelector(selector);
+    if (!node) return null;
+    const box = node.getBoundingClientRect();
+    return [Math.round(box.top), Math.round(box.bottom)];
+  };
   document.title = JSON.stringify({
     viewport: [innerWidth, innerHeight],
     column: height(".column"),
     stage: height(".card.grow"),
     timeline: height(".timeline"),
+    columnRect: rect(".column"),
+    actionsRect: rect(".actions"),
     scrolling: (document.querySelector(".page")?.scrollHeight ?? 0) > (document.querySelector(".page")?.clientHeight ?? 0),
   });
 }
