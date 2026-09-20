@@ -20,6 +20,7 @@
             "AttackStart",
             "FindMatch",
             "FindNext",
+            "Deploy",
             "Surrender",
             "ReturnHome",
             "OpenBox",
