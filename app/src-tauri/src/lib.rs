@@ -145,6 +145,16 @@ fn devices() -> Result<Vec<DeviceItem>, String> {
     Ok(found.into_iter().map(|(name, address)| DeviceItem { label: name, address }).collect())
 }
 
+/// Pipeline node names, for the entry selector. Empty until resources load.
+#[tauri::command]
+fn nodes(state: State<'_, AppState>) -> Result<Vec<String>, String> {
+    let inner = state.inner.lock().unwrap();
+    match inner.runner.as_ref().map(|r| r.resource().node_list()) {
+        Some(list) => list.map_err(|e| e.to_string()),
+        None => Ok(Vec::new()),
+    }
+}
+
 #[tauri::command]
 fn connect<R: Runtime>(
     app: AppHandle<R>,
@@ -259,6 +269,7 @@ pub fn run() {
             settings,
             save_settings,
             devices,
+            nodes,
             connect,
             start,
             stop,
