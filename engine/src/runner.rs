@@ -175,8 +175,14 @@ impl Runner {
         self.bus.drain()
     }
 
+    /// Events lost because nobody polled fast enough.
     pub fn dropped_events(&self) -> usize {
         self.bus.dropped()
+    }
+
+    /// Notifications that are not per-node events and are not surfaced.
+    pub fn ignored_events(&self) -> usize {
+        self.bus.ignored()
     }
 
     /// The PNG the framework actually captured, in the 1280x720 match space.

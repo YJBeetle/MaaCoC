@@ -185,7 +185,8 @@ fn battle(assets: &Path, args: &[String], preferred: Option<&str>) -> Result<(),
     }
     runner.stop(Duration::from_secs(15));
     println!(
-        "完成: 开局 {starts} 次，事件 {total} 条，丢弃 {} 条",
+        "完成: 开局 {starts} 次，事件 {total} 条，忽略 {} 条，丢弃 {} 条",
+        runner.ignored_events(),
         runner.dropped_events()
     );
     Ok(())

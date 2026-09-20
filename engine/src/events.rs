@@ -165,6 +165,9 @@ pub fn parse_event(msg: &str, details: &str, at: f64, wall: f64) -> Option<NodeE
 #[derive(Default)]
 struct State {
     queue: VecDeque<NodeEvent>,
+    /// Notifications we recognise but do not turn into events (step/controller chatter).
+    ignored: usize,
+    /// Events that never reached a reader because the queue hit its cap.
     dropped: usize,
     started: Option<Instant>,
 }
@@ -192,6 +195,7 @@ impl EventBus {
         let mut state = self.state.lock().unwrap();
         state.queue.clear();
         state.dropped = 0;
+        state.ignored = 0;
         state.started = Some(Instant::now());
     }
 
@@ -209,14 +213,14 @@ impl EventBus {
                 Some(event) => {
                     let mut guard = state.lock().unwrap();
                     guard.queue.push_back(event);
-                    guard.dropped += 0;
                     while guard.queue.len() > 2000 {
                         guard.queue.pop_front();
+                        guard.dropped += 1;
                     }
                 }
                 None => {
                     let mut guard = state.lock().unwrap();
-                    guard.dropped += 1;
+                    guard.ignored += 1;
                 }
             }
         }
@@ -228,8 +232,14 @@ impl EventBus {
         state.queue.drain(..).collect()
     }
 
+    /// Events lost to the queue cap. Non-zero means the reader is too slow.
     pub fn dropped(&self) -> usize {
         self.state.lock().unwrap().dropped
+    }
+
+    /// Notifications seen and deliberately not turned into events.
+    pub fn ignored(&self) -> usize {
+        self.state.lock().unwrap().ignored
     }
 }
 
@@ -322,7 +332,20 @@ mod tests {
         assert_eq!(first.len(), 1);
         assert_eq!(first[0].node, "FindSoldier");
         assert!(bus.drain().is_empty(), "drain must not replay events");
-        assert_eq!(bus.dropped(), 1);
+        assert_eq!(bus.ignored(), 1);
+        assert_eq!(bus.dropped(), 0, "nothing was lost, only not understood");
+    }
+
+    #[test]
+    fn an_unread_queue_fills_up_and_reports_what_it_lost() {
+        let bus = EventBus::new();
+        bus.restart();
+        let sink = bus.handle();
+        for _ in 0..2500 {
+            sink("Node.Recognition.Succeeded", HIT);
+        }
+        assert_eq!(bus.dropped(), 500);
+        assert_eq!(bus.drain().len(), 2000);
     }
 
     #[test]
