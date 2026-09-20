@@ -100,6 +100,7 @@ function buildShell() {
   const actions = el("div", { class: "actions", id: "actions" });
   ui.connectBtn.appendChild(el("span", { text: "连接设备" }));
   ui.fab.setAttribute("label", "开始战斗");
+  ui.fab.setAttribute("variant", "primary");
   const fabIcon = el("md-icon", { slot: "icon", text: "play_arrow" });
   ui.fab.appendChild(fabIcon);
   ui.connectBtn.addEventListener("click", () => void connect());
@@ -111,19 +112,16 @@ function buildShell() {
   ui.pages.settings = buildSettingsPage();
 
   const body = el("div", { class: "page", id: "page-run" });
-  const column = el("div", { class: "column" });
-  column.append(ui.pages.run);
-  body.appendChild(column);
-  ui.pages.run.dataset.host = "1";
+  body.appendChild(ui.pages.run);
   main.append(topbar, body, actions);
   app.append(rail, main);
   document.body.appendChild(app);
-  go("run");
+  go(state.page);
 }
 
 function buildRunPage(): HTMLElement {
-  const wrap = el("div", { class: "column" });
-  const card = el("div", { class: "card bordered" });
+  const wrap = el("div", { class: "column fill" });
+  const card = el("div", { class: "card bordered grow" });
   card.appendChild(ui.stage);
   const tlCard = el("div", { class: "card bordered" });
   tlCard.append(el("div", { class: "card-title", text: "节点" }), ui.timeline);
@@ -163,39 +161,90 @@ function buildSettingsPage(): HTMLElement {
   return wrap;
 }
 
-function makeSwitch(id: string, title: string, hint: string | undefined, value: boolean, onChange: (v: boolean) => void) {
-  const sw = el("md-switch");
-  sw.selected = value;
-  sw.addEventListener("change", () => onChange(sw.selected));
+/** Controls are created the first time they are needed and only updated
+    afterwards. Rebuilding them on every 250 ms poll made the outlined selects
+    visibly flicker. */
+function fieldOf(id: string, title: string, hint?: string): HTMLElement | null {
   const field = document.getElementById(id);
-  if (field) {
+  if (!field) return null;
+  if (!field.firstElementChild) {
     const left = el("div");
     left.append(el("div", { class: "k", text: title }), ...(hint ? [el("div", { class: "hint", text: hint })] : []));
-    field.replaceChildren(left, sw);
+    field.appendChild(left);
   }
-  return sw;
+  return field;
 }
 
-function makeSelect(id: string, title: string, hint: string | undefined, options: string[], value: string, onChange: (v: string) => void) {
-  const select = el("md-outlined-select");
-  select.setAttribute("label", title);
-  for (const option of options) {
-    const item = el("md-select-option");
-    item.value = option;
-    item.setAttribute("headline", option);
-    const slot = el("div", { slot: "headline", text: option });
-    item.appendChild(slot);
-    select.appendChild(item);
-  }
-  select.value = value;
-  select.addEventListener("change", () => onChange(select.value));
-  const field = document.getElementById(id);
-  if (field) {
-    const left = el("div");
-    left.append(el("div", { class: "k", text: title }), ...(hint ? [el("div", { class: "hint", text: hint })] : []));
-    field.replaceChildren(left, select);
+interface Option {
+  value: string;
+  label: string;
+}
+
+/** The MWC custom elements we touch, narrowed to the properties used here. */
+interface Select extends HTMLElement {
+  value: string;
+  disabled: boolean;
+}
+interface Switch extends HTMLElement {
+  selected: boolean;
+}
+
+const asOptions = (values: string[]): Option[] => values.map((value) => ({ value, label: value }));
+
+/** The field's own heading is the visible label, so the select only carries an
+    accessible one — a second copy inside the notch read as a duplicate.
+    MWC derives the displayed text when the field first renders and does not
+    refresh it for a later programmatic selection, so a select whose option list
+    changed is rebuilt off-DOM with the choice already applied. MWC has no
+    placeholder, so an unavailable choice shows as a disabled stand-in row. */
+function syncSelect(
+  id: string,
+  title: string,
+  hint: string | undefined,
+  options: Option[],
+  value: string,
+  onChange: (v: string) => void,
+  emptyLabel: string,
+) {
+  const field = fieldOf(id, title, hint);
+  if (!field) return null;
+  const items = options.length ? options : [{ value: "-", label: emptyLabel }];
+  const wanted = options.length ? value : "-";
+  const signature = items.map((o) => o.value).join("\n");
+  let select = field.querySelector<Select>("md-outlined-select");
+  if (select?.dataset.items !== signature) {
+    const fresh = el("md-outlined-select") as Select;
+    fresh.setAttribute("aria-label", title);
+    fresh.style.minWidth = "260px";
+    fresh.disabled = !options.length;
+    fresh.dataset.items = signature;
+    fresh.addEventListener("change", () => onChange(fresh.value));
+    for (const option of items) {
+      const item = el("md-select-option");
+      item.value = option.value;
+      item.appendChild(el("div", { slot: "headline", text: option.label }));
+      fresh.appendChild(item);
+    }
+    fresh.value = wanted;
+    if (select) select.replaceWith(fresh);
+    else field.appendChild(fresh);
+    select = fresh;
   }
   return select;
+}
+
+function syncSwitch(id: string, title: string, hint: string | undefined, value: boolean, onChange: (v: boolean) => void) {
+  const field = fieldOf(id, title, hint);
+  if (!field) return null;
+  let sw = field.querySelector<Switch>("md-switch");
+  if (!sw) {
+    sw = el("md-switch") as Switch;
+    sw.setAttribute("aria-label", title);
+    sw.addEventListener("change", () => onChange(sw!.selected));
+    field.appendChild(sw);
+  }
+  if (sw.selected !== value) sw.selected = value;
+  return sw;
 }
 
 async function persist(next: Partial<Settings>) {
@@ -237,7 +286,7 @@ function go(page: string) {
   }
   const titles: Record<string, string> = { run: "挂机", stats: "战果", settings: "设置" };
   ui.title.textContent = titles[page];
-  const host = document.querySelector(".page > .column");
+  const host = document.querySelector(".page");
   if (host) host.replaceChildren(ui.pages[page]);
   const actions = document.getElementById("actions");
   if (actions) actions.hidden = page !== "run";
@@ -333,64 +382,79 @@ function renderStats() {
   );
 }
 
+const REFRESH_RATES: Option[] = [
+  { value: "500", label: "0.5 秒" },
+  { value: "1000", label: "1 秒" },
+  { value: "2000", label: "2 秒" },
+  { value: "0", label: "关闭" },
+];
+
+const THEME_MODES: Option[] = [
+  { value: "system", label: "跟随系统" },
+  { value: "light", label: "浅色" },
+  { value: "dark", label: "深色" },
+];
+
 function renderSettings() {
-  const theme = state.status.phase;
-  makeSelect(
+  syncSelect(
     "f-device",
     "设备",
     "仅一个设备时自动选中",
-    state.devices.length ? state.devices.map((d) => d.label) : ["未检测到设备"],
-    state.settings.preferredDevice ?? state.devices[0]?.label ?? "未检测到设备",
-    (value) => void persist({ preferredDevice: value }),
+    state.devices.length ? asOptions(state.devices.map((d) => d.label)) : [],
+    state.settings.preferredDevice ?? state.devices[0]?.label ?? "",
+    (value) => void persist({ preferredDevice: value || null }),
+    "未检测到设备",
   );
-  makeSelect(
+  syncSelect(
     "f-entry",
     "任务入口",
     undefined,
-    state.nodes.length ? state.nodes : ["Main"],
+    asOptions(state.nodes.length ? state.nodes : ["Main"]),
     state.settings.entry,
     (value) => void persist({ entry: value }),
+    "未加载资源",
   );
-  makeSelect(
-    "f-interval",
-    "画面刷新",
-    undefined,
-    ["500", "1000", "2000", "0"],
-    String(state.settings.frameIntervalMs),
-    (value) => void persist({ frameIntervalMs: Number(value) }),
+  syncSelect("f-interval", "画面刷新", undefined, REFRESH_RATES, String(state.settings.frameIntervalMs), (value) =>
+    void persist({ frameIntervalMs: Number(value) }),
+    "—",
   );
-  makeSwitch("f-misses", "显示未命中节点", undefined, state.settings.showMisses, (v) => void persist({ showMisses: v }));
-  makeSwitch("f-overlay", "画面叠加命中框", undefined, state.settings.overlayHits, (v) => void persist({ overlayHits: v }));
-  makeSwitch("f-record", "记录节点画面", undefined, state.settings.recordFrames, (v) => void persist({ recordFrames: v }));
-  makeSelect("f-theme", "外观", "默认跟随系统", ["system", "light", "dark"], state.settings.themeMode, (value) => {
+  syncSwitch("f-misses", "显示未命中节点", undefined, state.settings.showMisses, (v) => void persist({ showMisses: v }));
+  syncSwitch("f-overlay", "画面叠加命中框", undefined, state.settings.overlayHits, (v) => void persist({ overlayHits: v }));
+  syncSwitch("f-record", "记录节点画面", undefined, state.settings.recordFrames, (v) => void persist({ recordFrames: v }));
+  syncSelect("f-theme", "外观", undefined, THEME_MODES, state.settings.themeMode, (value) => {
     applyTheme(value as ThemeMode);
     void persist({ themeMode: value as ThemeMode });
-  });
+  }, "跟随系统");
 
-  const version = document.getElementById("f-version");
-  version?.replaceChildren(
-    el("div", { class: "k", text: "版本" }),
-    el("code", { text: `0.1.0 · ${api.mode}${theme === "error" ? ` · ${state.error}` : ""}` }),
-  );
-  const reset = document.getElementById("f-reset");
-  if (reset) {
-    const left = el("div", { class: "k", text: "恢复默认设置" });
+  const version = fieldOf("f-version", "版本");
+  if (version) {
+    let text = version.querySelector("code");
+    if (!text) {
+      text = el("code");
+      version.appendChild(text);
+    }
+    const textValue = `0.1.0 · ${api.mode}`;
+    if (text.textContent !== textValue) text.textContent = textValue;
+  }
+  const reset = fieldOf("f-reset", "恢复默认设置");
+  if (reset && !reset.querySelector("md-text-button")) {
     const btn = el("md-text-button");
     btn.appendChild(el("span", { text: "重置" }));
     btn.addEventListener("click", () => {
-      void persist({ ...DEFAULT_SETTINGS });
-      applyTheme(state.settings.themeMode);
+      void persist({ ...DEFAULT_SETTINGS }).then(() => applyTheme(state.settings.themeMode));
     });
-    reset.replaceChildren(left, btn);
+    reset.appendChild(btn);
   }
 }
 
 function render() {
   const phase = state.status.phase;
   const chipLabels: Record<string, string> = { idle: "未连接", connecting: "连接中", ready: "已连接", running: "战斗中", error: "出错" };
-  ui.chip.setAttribute("label", state.error ? `${chipLabels[phase]} · ${state.error}` : chipLabels[phase]);
+  const problem = state.error || (phase === "error" ? state.status.detail : "");
+  ui.chip.setAttribute("label", problem ? `${chipLabels[phase]} · ${problem}` : chipLabels[phase]);
   ui.chip.toggleAttribute("data-running", phase === "running");
-  ui.meta.textContent = phase === "running" ? `${formatUptime(state.status.uptimeMs)} · 第 ${state.status.battles + 1} 局` : state.status.detail;
+  ui.meta.textContent =
+    phase === "running" ? `${formatUptime(state.status.uptimeMs)} · 第 ${state.status.battles + 1} 局` : phase === "error" ? "" : state.status.detail;
 
   const connected = phase === "ready" || phase === "running";
   ui.connectBtn.toggleAttribute("disabled", phase === "connecting" || phase === "running");
@@ -424,15 +488,29 @@ async function tick() {
       if (frame) state.frame = frame;
       else state.frame = null;
     }
+    state.error = "";
   } catch (err) {
     state.error = String(err);
   }
   render();
 }
 
+/** Dev-only URL overrides so a headless screenshot run can target one page and
+    one appearance without a pointer. */
+function devOverrides() {
+  if (!import.meta.env.DEV) return false;
+  const params = new URLSearchParams(location.search);
+  const page = params.get("page");
+  if (page === "run" || page === "stats" || page === "settings") state.page = page;
+  const theme = params.get("theme");
+  if (theme === "light" || theme === "dark" || theme === "system") state.settings.themeMode = theme;
+  return params.get("run") === "1";
+}
+
 async function boot() {
   api = await loadApi();
   state.settings = await api.settings();
+  const startImmediately = devOverrides();
   applyTheme(state.settings.themeMode);
   window.matchMedia("(prefers-color-scheme: dark)").addEventListener("change", () => {
     if (state.settings.themeMode === "system") applyTheme("system");
@@ -441,6 +519,10 @@ async function boot() {
   state.devices = await api.devices();
   state.nodes = await api.nodes();
   render();
+  if (startImmediately) {
+    await connect();
+    await toggleRun();
+  }
   window.setInterval(() => void tick(), 250);
 }
 
@@ -454,5 +536,27 @@ if (import.meta.env.DEV) {
   };
 }
 
-void boot();
+/** `?probe=1` publishes the layout metrics as the document title, which a
+    headless `--dump-dom` run can read without a developer console. */
+function probeLayout() {
+  if (!import.meta.env.DEV || new URLSearchParams(location.search).get("probe") !== "1") return;
+  const height = (selector: string) => {
+    const node = document.querySelector(selector);
+    return node ? Math.round(node.getBoundingClientRect().height) : null;
+  };
+  document.title = JSON.stringify({
+    viewport: [innerWidth, innerHeight],
+    column: height(".column"),
+    stage: height(".card.grow"),
+    timeline: height(".timeline"),
+    scrolling: (document.querySelector(".page")?.scrollHeight ?? 0) > (document.querySelector(".page")?.clientHeight ?? 0),
+  });
+}
+
+boot()
+  .then(probeLayout)
+  .catch((err) => {
+    // A silent exception here leaves a blank window with nothing to read.
+    document.body.textContent = `界面启动失败: ${String(err)}`;
+  });
 export { prefersDark };
