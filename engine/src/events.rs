@@ -125,14 +125,14 @@ pub fn parse_event(msg: &str, details: &str, at: f64, wall: f64) -> Option<NodeE
         score: 0.0,
         candidates: 0,
         filtered: 0,
-        error: state == "Failed",
+        // A recognition that did not match is a miss, not an error; only a
+        // failed action means something actually went wrong.
+        error: !succeeded && kind == "action",
     };
 
     if kind == "recognition" {
         if let Some(reco) = payload.get("reco_details") {
             event.box_rect = reco.get("box").and_then(parse_box);
-            // A recognition that ran but found nothing reports no usable box.
-            event.hit = event.box_rect.is_some();
             if let Some(detail) = reco.get("detail") {
                 let count = |key: &str| {
                     detail.get(key).and_then(|v| v.as_array()).map(Vec::len).unwrap_or(0)
@@ -245,11 +245,26 @@ mod tests {
     fn a_run_without_a_box_is_a_miss_not_an_error() {
         let event = parse_event("Node.Recognition.Failed", MISS, 0.1, 0.0).unwrap();
         assert!(!event.hit);
-        assert!(event.error);
+        assert!(!event.error, "未命中不是异常");
         assert_eq!(event.candidates, 1);
         assert_eq!(event.filtered, 0);
         assert!((event.score - 0.668).abs() < 1e-6);
         assert_eq!(event.label(), "FindNext");
+    }
+
+    #[test]
+    fn direct_hit_nodes_are_hits_even_without_a_box() {
+        let details = r#"{"task_id":1,"reco_id":2,"name":"Main","focus":null}"#;
+        let event = parse_event("Node.Recognition.Succeeded", details, 0.0, 0.0).unwrap();
+        assert!(event.hit, "DirectHit 节点没有框，但确实是命中");
+        assert!(!event.error);
+    }
+
+    #[test]
+    fn a_failed_action_is_an_error() {
+        let details = r#"{"task_id":1,"action_id":2,"name":"SetScreen","focus":null}"#;
+        let event = parse_event("Node.Action.Failed", details, 0.0, 0.0).unwrap();
+        assert!(event.error);
     }
 
     #[test]

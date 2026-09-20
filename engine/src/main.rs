@@ -4,7 +4,10 @@
 //! is reachable here without a window, so it can be verified headlessly.
 
 use maacoc_engine::{
-    frames::FrameStore, trial::trial_node, DeviceTarget, Error, NodeEvent, Runner,
+    frames::FrameStore,
+    pipeline::{Edit, PipelineDoc},
+    trial::trial_node,
+    DeviceTarget, Error, NodeEvent, Runner,
 };
 use maa_framework::toolkit::Toolkit;
 use std::{
@@ -30,7 +33,9 @@ fn usage() {
   load [assets]                  加载资源并列出节点
   run [--minutes N] [--entry E]  跑自动战斗循环并打印节点时间轴
   reco <节点> <帧.png> [阈值]     在一张静态帧上试跑该节点的识别
-  regress [语料目录]              对已录制的帧重跑识别，检查资产退化"
+  regress [语料目录]              对已录制的帧重跑识别，检查资产退化
+  patch <节点> <字段> <JSON> [--write]
+                                 定点改写 pipeline；默认只打印 diff，加 --write 才落盘"
     );
 }
 
@@ -53,6 +58,7 @@ fn run() -> Result<(), Error> {
         Some("run") => battle(assets, &args, preferred.as_deref()),
         Some("reco") => reco(assets, &args),
         Some("regress") => regress(assets, args.get(1).cloned()),
+        Some("patch") => patch(assets, &args),
         _ => {
             usage();
             Ok(())
@@ -191,6 +197,25 @@ fn regress(assets: &Path, dir: Option<String>) -> Result<(), Error> {
     if failed > 0 {
         std::io::stdout().flush().ok();
         return Err("识别回归失败".into());
+    }
+    Ok(())
+}
+
+fn patch(assets: &Path, args: &[String]) -> Result<(), Error> {
+    let (Some(node), Some(field), Some(value)) = (args.get(1), args.get(2), args.get(3)) else {
+        return Err("用法: patch <节点> <字段> <JSON> [--write]".into());
+    };
+    let parsed: serde_json::Value = serde_json::from_str(value)
+        .map_err(|e| format!("第三个参数必须是合法 JSON（数组要写成 [\"a\"]）: {e}"))?;
+    let file = assets.join("pipeline/main.json");
+    let mut doc = PipelineDoc::open(&file)?;
+    let edits = [Edit::new(node.clone(), field.clone(), parsed)];
+    print!("{}", doc.diff(&edits)?);
+    if args.iter().any(|a| a == "--write") {
+        doc.write(&edits)?;
+        println!("已写入 {}", file.display());
+    } else {
+        println!("（未写入；加 --write 落盘）");
     }
     Ok(())
 }

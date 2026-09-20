@@ -2,6 +2,7 @@
 
 pub mod events;
 pub mod frames;
+pub mod pipeline;
 pub mod runner;
 pub mod trial;
 
