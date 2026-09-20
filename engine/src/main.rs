@@ -1,11 +1,18 @@
-//! MaaCoC engine probes.
+//! MaaCoC engine command line.
 //!
-//! Three commands that together prove the risky seam works on this platform:
-//! the vendored SDK loads, a device can be driven, and the existing
-//! `assets/` bundle parses. UI comes after this is green.
+//! Doubles as the engine's smoke test: every capability reachable from the UI
+//! is reachable here without a window, so it can be verified headlessly.
 
-use maa_framework::{common, controller::Controller, resource::Resource, toolkit::Toolkit};
-use std::{error::Error, path::Path};
+use maacoc_engine::{
+    frames::FrameStore, trial::trial_node, DeviceTarget, Error, NodeEvent, Runner,
+};
+use maa_framework::toolkit::Toolkit;
+use std::{
+    io::Write,
+    path::{Path, PathBuf},
+    thread,
+    time::{Duration, Instant},
+};
 
 fn main() {
     if let Err(err) = run() {
@@ -14,31 +21,46 @@ fn main() {
     }
 }
 
-fn run() -> Result<(), Box<dyn Error>> {
+fn usage() {
+    println!(
+        "用法: maacoc-engine <命令> [参数]
+
+  devices                        列出 ADB 设备
+  snap [输出.png]                 截一帧，报告设备与匹配空间尺寸
+  load [assets]                  加载资源并列出节点
+  run [--minutes N] [--entry E]  跑自动战斗循环并打印节点时间轴
+  reco <节点> <帧.png> [阈值]     在一张静态帧上试跑该节点的识别
+  regress [语料目录]              对已录制的帧重跑识别，检查资产退化"
+    );
+}
+
+fn run() -> Result<(), Error> {
     let args: Vec<String> = std::env::args().skip(1).collect();
-    // MaaFramework's own option file drives logging/stdout level.
     Toolkit::init_option("var", "{}")?;
+    let assets_arg = args
+        .iter()
+        .position(|a| a == "--assets")
+        .and_then(|i| args.get(i + 1))
+        .cloned()
+        .unwrap_or_else(|| "assets".to_string());
+    let assets = Path::new(&assets_arg);
+    let preferred = args.iter().position(|a| a == "--device").and_then(|i| args.get(i + 1)).cloned();
 
     match args.first().map(String::as_str) {
         Some("devices") => devices(),
-        Some("snap") => snap(args.get(1).map(String::as_str)),
-        Some("load") => load(args.get(1).map(String::as_str).unwrap_or("assets")),
+        Some("snap") => snap(assets, args.get(1).map(String::as_str), preferred.as_deref()),
+        Some("load") => load(assets),
+        Some("run") => battle(assets, &args, preferred.as_deref()),
+        Some("reco") => reco(assets, &args),
+        Some("regress") => regress(assets, args.get(1).cloned()),
         _ => {
-            println!("用法: maacoc-engine <devices|snap [out.png]|load [assets目录]>");
+            usage();
             Ok(())
         }
     }
 }
 
-fn first_device() -> Result<maa_framework::toolkit::AdbDevice, Box<dyn Error>> {
-    let devices = Toolkit::find_adb_devices()?;
-    devices
-        .into_iter()
-        .next()
-        .ok_or_else(|| "没有找到 ADB 设备".into())
-}
-
-fn devices() -> Result<(), Box<dyn Error>> {
+fn devices() -> Result<(), Error> {
     let devices = Toolkit::find_adb_devices()?;
     if devices.is_empty() {
         println!("没有找到 ADB 设备");
@@ -50,56 +72,125 @@ fn devices() -> Result<(), Box<dyn Error>> {
     Ok(())
 }
 
-fn snap(output: Option<&str>) -> Result<(), Box<dyn Error>> {
-    let device = first_device()?;
-    let config = serde_json::to_string(&device.config)?;
-    let controller = Controller::new_adb(
-        device.adb_path.to_str().ok_or("adb 路径无效")?,
-        &device.address,
-        &config,
-        "",
-    )?;
-
-    controller.wait(controller.post_connection()?);
-    if !controller.connected() {
-        return Err(format!("连接 {} 失败", device.address).into());
-    }
-
-    // Resolution is only meaningful after the first frame has been captured.
-    let cap_id = controller.post_screencap()?;
-    let cap_status = controller.wait(cap_id);
-    let (raw_w, raw_h) = controller.resolution()?;
-
-    let image = controller.cached_image()?;
-    let width = image.width();
-    let height = image.height();
-    println!("截图任务状态: {:?}", cap_status);
-
-    // The whole project's coordinates live in MaaFramework's downscaled
-    // screenshot space (short side 720), not the device's native pixels.
-    println!("设备原始分辨率 {raw_w}x{raw_h}；匹配用截图 {width}x{height} 通道 {}", image.channels());
-
+fn snap(assets: &Path, output: Option<&str>, preferred: Option<&str>) -> Result<(), Error> {
+    let runner = Runner::connect(assets, DeviceTarget::Adb, preferred)?;
+    let png = runner.screencap_png()?;
     let target = output.unwrap_or("var/snap.png");
-    if let Some(png) = image.to_vec() {
-        if let Some(parent) = Path::new(&target).parent() {
-            std::fs::create_dir_all(parent).ok();
-        }
-        std::fs::write(&target, png)?;
-        println!("已保存 {target}");
-    } else {
-        println!("截图为空（未取到编码数据）");
+    if let Some(parent) = Path::new(target).parent() {
+        std::fs::create_dir_all(parent).ok();
     }
+    std::fs::write(target, &png)?;
+    println!("{} 已保存 {}（{} 字节，匹配空间 1280x720）", runner.label, target, png.len());
     Ok(())
 }
 
-fn load(assets: &str) -> Result<(), Box<dyn Error>> {
-    let resource = Resource::new()?;
-    let status = resource.post_bundle(assets)?.wait();
-    println!("bundle 加载状态: {:?}", status);
-    if status != common::MaaStatus::SUCCEEDED || !resource.loaded() {
-        return Err("资源加载失败".into());
+fn load(assets: &Path) -> Result<(), Error> {
+    let runner = Runner::connect(assets, DeviceTarget::Headless, None)?;
+    println!("资源哈希: {}", runner.resource().hash()?);
+    println!("节点数: {}", runner.resource().node_list()?.len());
+    println!("Tasker 就绪: {}", runner.inited());
+    Ok(())
+}
+
+fn print_event(event: &NodeEvent) {
+    println!("[{:7.1}s] {}", event.at, event.summary());
+}
+
+fn battle(assets: &Path, args: &[String], preferred: Option<&str>) -> Result<(), Error> {
+    let minutes: f64 = args
+        .iter()
+        .position(|a| a == "--minutes")
+        .and_then(|i| args.get(i + 1))
+        .and_then(|v| v.parse().ok())
+        .unwrap_or(5.0);
+    let entry = args
+        .iter()
+        .position(|a| a == "--entry")
+        .and_then(|i| args.get(i + 1))
+        .map(String::as_str)
+        .unwrap_or("Main");
+
+    let runner = Runner::connect(assets, DeviceTarget::Adb, preferred)?;
+    println!("{} 资源就绪，投递任务 {entry}", runner.label);
+    runner.start(entry)?;
+
+    let deadline = Instant::now() + Duration::from_secs_f64(minutes * 60.0);
+    let mut total = 0usize;
+    let mut starts = 0usize;
+    let mut last: Option<(String, String)> = None;
+    let mut repeat = 0usize;
+
+    while Instant::now() < deadline {
+        for event in runner.poll() {
+            total += 1;
+            if event.kind == "action" && event.node == "AttackStart" {
+                starts += 1;
+            }
+            let key = (event.node.clone(), event.kind.to_string());
+            if last.as_ref() == Some(&key) {
+                repeat += 1;
+                continue;
+            }
+            if repeat > 0 {
+                if let Some((previous, _)) = &last {
+                    println!("  {previous} x{}", repeat + 1);
+                }
+            }
+            last = Some(key);
+            repeat = 0;
+            print_event(&event);
+        }
+        if !runner.running() {
+            println!("任务已结束");
+            break;
+        }
+        thread::sleep(Duration::from_millis(100));
     }
-    println!("节点数: {}", resource.node_list()?.len());
-    println!("资源哈希: {}", resource.hash()?);
+    runner.stop(Duration::from_secs(15));
+    println!("完成: 开局 {starts} 次，事件 {total} 条，丢弃 {} 条", runner.dropped_events());
+    Ok(())
+}
+
+fn open_offline_runner(assets: &Path, _frame: &Path) -> Result<Runner, Error> {
+    Runner::connect(assets, DeviceTarget::Headless, None)
+}
+
+fn reco(assets: &Path, args: &[String]) -> Result<(), Error> {
+    let (Some(node), Some(frame)) = (args.get(1), args.get(2)) else {
+        return Err("用法: reco <节点> <帧.png> [阈值]".into());
+    };
+    let threshold: Option<f64> = args.get(3).and_then(|v| v.parse().ok());
+    let frame_path = Path::new(frame);
+    let png = std::fs::read(frame_path)?;
+    let runner = open_offline_runner(assets, frame_path)?;
+    let trial = trial_node(runner.resource(), runner.tasker(), runner.bus(), node, &png, threshold, None)?;
+    println!("{}", trial.summary());
+    Ok(())
+}
+
+fn regress(assets: &Path, dir: Option<String>) -> Result<(), Error> {
+    let root = PathBuf::from(dir.unwrap_or_else(|| "tests/fixtures/frames".to_string()));
+    let store = FrameStore::open(&root);
+    let frames = store.frames()?;
+    if frames.is_empty() {
+        return Err(format!("{} 里没有语料帧", root.display()).into());
+    }
+    let runner = Runner::connect(assets, DeviceTarget::Headless, None)?;
+
+    let mut failed = 0usize;
+    for record in &frames {
+        let png = store.load_png(record)?;
+        let trial = trial_node(runner.resource(), runner.tasker(), runner.bus(), &record.node, &png, None, None)?;
+        let ok = trial.hit && trial.error.is_none();
+        if !ok {
+            failed += 1;
+        }
+        println!("{} {} {}", if ok { "OK  " } else { "失败" }, record.file, trial.summary());
+    }
+    println!("共 {} 帧，失败 {failed}", frames.len());
+    if failed > 0 {
+        std::io::stdout().flush().ok();
+        return Err("识别回归失败".into());
+    }
     Ok(())
 }

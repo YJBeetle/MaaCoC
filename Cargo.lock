@@ -38,6 +38,7 @@ name = "maacoc-engine"
 version = "0.1.0"
 dependencies = [
  "maa-framework",
+ "serde",
  "serde_json",
 ]
 
