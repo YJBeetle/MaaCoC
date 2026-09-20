@@ -6,7 +6,7 @@
   "build": {
     "beforeDevCommand": "npm run dev",
     "devUrl": "http://localhost:5173",
-    "beforeBuildCommand": "npm run build && ../scripts/stage-native.sh",
+    "beforeBuildCommand": "npm run build && bash ../scripts/stage-native.sh",
     "frontendDist": "../dist"
   },
   "app": {

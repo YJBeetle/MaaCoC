@@ -8,6 +8,9 @@ on:
 
 env:
   MAA_VERSION: v5.14.0-beta.1
+  # GitHub runners have no FUSE, so linuxdeploy has to unpack the AppImage
+  # tooling instead of mounting it.
+  APPIMAGE_EXTRACT_AND_RUN: "1"
 
 permissions:
   contents: write
