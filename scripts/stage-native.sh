@@ -6,8 +6,8 @@ set -euo pipefail
 cd "$(dirname "$0")/.."
 
 DEST=app/src-tauri/native
-rm -rf "$DEST"
 mkdir -p "$DEST"
+find "$DEST" -type f ! -name .gitkeep -delete
 
 copied=0
 for file in vendor/bin/*; do

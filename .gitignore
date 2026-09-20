@@ -12,4 +12,5 @@
 scratch/
 app/node_modules/
 app/dist/
-/app/src-tauri/native/
+/app/src-tauri/native/*
+!/app/src-tauri/native/.gitkeep

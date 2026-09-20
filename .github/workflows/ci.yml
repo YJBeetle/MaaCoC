@@ -34,6 +34,9 @@ jobs:
       - name: 拉取 MaaFramework
         run: ./scripts/fetch-sdk.sh
 
+      - name: 收集待打包的运行库
+        run: ./scripts/stage-native.sh
+
       - name: 检查格式
         run: cargo fmt --all --check
 

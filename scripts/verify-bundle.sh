@@ -5,22 +5,23 @@
 set -euo pipefail
 cd "$(dirname "$0")/.."
 
-BUNDLE=app/src-tauri/target/release/bundle
+BUNDLE=target/release/bundle
 fail() { echo "打包检查失败: $*" >&2; exit 1; }
 
-ls app/src-tauri/native/* >/dev/null 2>&1 || fail "app/src-tauri/native 是空的，运行库没有进包"
+staged=$(find app/src-tauri/native -type f ! -name .gitkeep | wc -l | tr -d ' ')
+[ "${staged:-0}" -gt 0 ] || fail "app/src-tauri/native 里没有运行库，scripts/stage-native.sh 没跑或没拷到东西"
 
 case "$(uname -s)" in
   Darwin)
     APP="$BUNDLE/macos/MaaCoC.app"
     [ -d "$APP" ] || fail "找不到 $APP"
-    BIN="$APP/Contents/MacOS/MaaCoC"
+    BIN=$(ls "$APP"/Contents/MacOS/* | head -1)
     [ -x "$BIN" ] || fail "可执行文件缺失: $BIN"
     [ -f "$APP/Contents/Resources/assets/pipeline/main.json" ] || fail "包里缺 assets/pipeline/main.json"
     [ -f "$APP/Contents/Resources/libMaaFramework.dylib" ] || fail "包里缺 libMaaFramework.dylib"
     otool -L "$BIN" | grep -q MaaFramework || fail "可执行文件没有链接 MaaFramework"
-    otool -l "$BIN" | grep -q "path @executable_path/../Resources" || fail "缺少指向 Resources 的 rpath"
-    echo "macOS 包检查通过: $(du -sh "$APP" | cut -f1)"
+    otool -l "$BIN" | grep -q "path @executable_path/../Resources " || fail "缺少指向 Resources 的 rpath"
+    echo "macOS 包检查通过: $APP ($(du -sh "$APP" | cut -f1))"
     ;;
   Linux)
     deb=$(ls "$BUNDLE"/deb/*.deb 2>/dev/null | head -1)
