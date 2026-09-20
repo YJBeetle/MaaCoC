@@ -1,0 +1,76 @@
+/* Layout and typography only. Every colour comes from the generated
+   --md-sys-color-* roles, so nothing here can drift from the theme. */
+
+* { box-sizing: border-box; }
+
+html, body {
+  margin: 0;
+  height: 100%;
+  background: var(--md-sys-color-background);
+  color: var(--md-sys-color-on-surface);
+  font-family: Roboto, "PingFang SC", "Noto Sans SC", system-ui, sans-serif;
+  -webkit-font-smoothing: antialiased;
+}
+body { overflow: hidden; user-select: none; }
+
+.shell { display: grid; grid-template-columns: 80px 1fr; height: 100vh; }
+
+.rail {
+  background: var(--md-sys-color-surface-container-low);
+  border-right: 1px solid var(--md-sys-color-outline-variant);
+  display: flex; flex-direction: column; align-items: center; gap: 2px; padding-top: 14px;
+}
+.rail-item {
+  width: 64px; height: 56px; border: 0; background: transparent; color: inherit;
+  border-radius: 999px; display: flex; flex-direction: column; align-items: center;
+  justify-content: center; gap: 3px; font: inherit; font-size: 11px; cursor: pointer;
+}
+.rail-item .icon { width: 32px; height: 28px; border-radius: 999px; display: grid; place-items: center; }
+.rail-item:hover { background: color-mix(in srgb, var(--md-sys-color-on-surface) 8%, transparent); }
+.rail-item[aria-current="true"] { color: var(--md-sys-color-on-surface); }
+.rail-item[aria-current="true"] .icon { background: var(--md-sys-color-secondary-container); color: var(--md-sys-color-on-secondary-container); }
+
+.main { display: flex; flex-direction: column; min-width: 0; }
+.topbar { height: 64px; flex: none; display: flex; align-items: center; gap: 12px; padding: 0 24px; border-bottom: 1px solid var(--md-sys-color-outline-variant); }
+.topbar h1 { margin: 0; font-size: 20px; font-weight: 500; }
+.grow { flex: 1; }
+.meta { font: 12px/1 ui-monospace, Menlo, monospace; color: var(--md-sys-color-on-surface-variant); }
+
+.page { flex: 1; overflow: auto; padding: 20px 24px 96px; }
+.page[hidden] { display: none; }
+.column { max-width: 1080px; margin: 0 auto; display: flex; flex-direction: column; gap: 16px; }
+
+.card { background: var(--md-sys-color-surface-container); border-radius: 16px; overflow: hidden; }
+.card.bordered { border: 1px solid var(--md-sys-color-outline-variant); }
+.card-title { padding: 14px 18px 0; font-size: 13px; color: var(--md-sys-color-on-surface-variant); }
+.card-body { padding: 12px 18px 16px; }
+
+.stage { position: relative; aspect-ratio: 16 / 9; background: var(--md-sys-color-surface-container-lowest); display: grid; place-items: center; }
+.stage img { width: 100%; height: 100%; object-fit: contain; display: block; }
+.stage .void { display: grid; place-items: center; gap: 8px; color: var(--md-sys-color-on-surface-variant); font-size: 13px; }
+.stage .res { position: absolute; top: 10px; right: 10px; padding: 3px 8px; border-radius: 6px; background: rgb(0 0 0 / 0.6); font: 11px ui-monospace, Menlo, monospace; color: var(--md-sys-color-surface-bright); }
+.stage canvas { position: absolute; inset: 0; width: 100%; height: 100%; pointer-events: none; }
+
+.timeline { height: 240px; overflow: auto; font-size: 12px; }
+.tl-row { display: grid; grid-template-columns: 46px 12px 1fr auto; gap: 10px; align-items: center; padding: 6px 18px; border-bottom: 1px solid color-mix(in srgb, var(--md-sys-color-outline-variant) 55%, transparent); }
+.tl-row .t { font: 11px ui-monospace, Menlo, monospace; color: var(--md-sys-color-on-surface-variant); }
+.tl-row .dot { width: 7px; height: 7px; border-radius: 50%; background: var(--md-sys-color-tertiary); }
+.tl-row .dot.miss { background: var(--md-sys-color-error); }
+.tl-row .dot.act { background: var(--md-sys-color-on-surface-variant); }
+.tl-row .v { font: 11px ui-monospace, Menlo, monospace; color: var(--md-sys-color-on-surface-variant); white-space: nowrap; }
+.tl-empty { padding: 16px 18px; color: var(--md-sys-color-on-surface-variant); font-size: 12px; }
+
+.actions { position: fixed; right: 28px; bottom: 24px; display: flex; align-items: center; gap: 12px; }
+
+.sect { padding: 14px 18px 4px; font-size: 11.5px; letter-spacing: .5px; color: var(--md-sys-color-primary); }
+.field { display: flex; align-items: center; justify-content: space-between; gap: 16px; padding: 12px 18px; border-bottom: 1px solid var(--md-sys-color-outline-variant); }
+.field:last-child { border-bottom: 0; }
+.field .k { font-size: 14px; }
+.field .hint { margin-top: 3px; font-size: 12px; color: var(--md-sys-color-on-surface-variant); }
+.field.danger .k { color: var(--md-sys-color-error); }
+code { font: 12px ui-monospace, Menlo, monospace; color: var(--md-sys-color-on-surface-variant); }
+
+.stats { display: grid; grid-template-columns: repeat(3, 1fr); gap: 12px; padding: 16px 18px; }
+.stat { background: var(--md-sys-color-surface-container-high); border-radius: 12px; padding: 14px; }
+.stat .n { font-size: 26px; font-weight: 500; }
+.stat .l { font-size: 12px; color: var(--md-sys-color-on-surface-variant); margin-top: 2px; }
