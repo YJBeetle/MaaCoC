@@ -1,0 +1,295 @@
+//! Tauri shell: a thin command layer over the engine.
+//!
+//! Deliberately dumb — no game logic and no layout decisions live here, so
+//! everything that matters is either unit-tested in Rust or verifiable in a
+//! browser against the same commands.
+
+use base64::Engine as _;
+use maacoc_engine::{DeviceTarget, NodeEvent, Runner};
+use serde::{Deserialize, Serialize};
+use std::{
+    collections::VecDeque,
+    path::PathBuf,
+    sync::Mutex,
+    time::{Duration, Instant},
+};
+use tauri::{
+    path::BaseDirectory, AppHandle, Manager, Runtime, State,
+};
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase", default)]
+pub struct Settings {
+    pub entry: String,
+    pub preferred_device: Option<String>,
+    pub auto_start: bool,
+    pub frame_interval_ms: u64,
+    pub overlay_hits: bool,
+    pub record_frames: bool,
+}
+
+impl Default for Settings {
+    fn default() -> Self {
+        Self {
+            entry: "Main".into(),
+            preferred_device: None,
+            auto_start: false,
+            frame_interval_ms: 1000,
+            overlay_hits: false,
+            record_frames: false,
+        }
+    }
+}
+
+#[derive(Debug, Clone, Copy, Serialize, PartialEq, Eq)]
+#[serde(rename_all = "lowercase")]
+pub enum Phase {
+    Idle,
+    Connecting,
+    Ready,
+    Running,
+    Error,
+}
+
+#[derive(Debug, Clone, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct Status {
+    pub phase: Phase,
+    pub detail: String,
+    pub battles: usize,
+    pub uptime_ms: u64,
+    pub current_node: String,
+}
+
+#[derive(Debug, Clone, Serialize)]
+pub struct DeviceItem {
+    pub label: String,
+    pub address: String,
+}
+
+#[derive(Debug, Clone, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct Frame {
+    pub data_url: String,
+    pub width: u32,
+    pub height: u32,
+}
+
+struct Inner {
+    runner: Option<Runner>,
+    settings: Settings,
+    events: VecDeque<NodeEvent>,
+    started: Option<Instant>,
+    battles: usize,
+    phase: Phase,
+    detail: String,
+}
+
+pub struct AppState {
+    inner: Mutex<Inner>,
+}
+
+impl AppState {
+    fn new(settings: Settings) -> Self {
+        Self {
+            inner: Mutex::new(Inner {
+                runner: None,
+                settings,
+                events: VecDeque::new(),
+                started: None,
+                battles: 0,
+                phase: Phase::Idle,
+                detail: String::new(),
+            }),
+        }
+    }
+}
+
+fn assets_dir<R: Runtime>(app: &AppHandle<R>) -> PathBuf {
+    app.path()
+        .resolve("assets", BaseDirectory::Resource)
+        .unwrap_or_else(|_| PathBuf::from("../../assets"))
+}
+
+fn settings_file<R: Runtime>(app: &AppHandle<R>) -> Result<PathBuf, String> {
+    let dir = app.path().app_config_dir().map_err(|e| e.to_string())?;
+    std::fs::create_dir_all(&dir).map_err(|e| e.to_string())?;
+    Ok(dir.join("settings.json"))
+}
+
+fn load_settings<R: Runtime>(app: &AppHandle<R>) -> Settings {
+    settings_file(app)
+        .ok()
+        .and_then(|path| std::fs::read_to_string(path).ok())
+        .and_then(|text| serde_json::from_str(&text).ok())
+        .unwrap_or_default()
+}
+
+#[tauri::command]
+fn settings(state: State<'_, AppState>) -> Result<Settings, String> {
+    Ok(state.inner.lock().unwrap().settings.clone())
+}
+
+#[tauri::command]
+fn save_settings<R: Runtime>(app: AppHandle<R>, state: State<'_, AppState>, next: Settings) -> Result<Settings, String> {
+    state.inner.lock().unwrap().settings = next.clone();
+    let path = settings_file(&app)?;
+    std::fs::write(path, serde_json::to_string_pretty(&next).unwrap())
+        .map_err(|e| e.to_string())?;
+    Ok(next)
+}
+
+#[tauri::command]
+fn devices() -> Result<Vec<DeviceItem>, String> {
+    let found = maacoc_engine::list_devices().map_err(|e| e.to_string())?;
+    Ok(found.into_iter().map(|(name, address)| DeviceItem { label: name, address }).collect())
+}
+
+#[tauri::command]
+fn connect<R: Runtime>(
+    app: AppHandle<R>,
+    state: State<'_, AppState>,
+) -> Result<Status, String> {
+    {
+        let mut inner = state.inner.lock().unwrap();
+        inner.phase = Phase::Connecting;
+    }
+    let assets = assets_dir(&app);
+    let preferred = state.inner.lock().unwrap().settings.preferred_device.clone();
+    let runner = Runner::connect(&assets, DeviceTarget::Adb, preferred.as_deref())
+        .map_err(|e| e.to_string())?;
+    let mut inner = state.inner.lock().unwrap();
+    inner.detail = runner.label.clone();
+    inner.phase = Phase::Ready;
+    inner.runner = Some(runner);
+    Ok(status_of(&inner))
+}
+
+#[tauri::command]
+fn start(state: State<'_, AppState>) -> Result<Status, String> {
+    let mut inner = state.inner.lock().unwrap();
+    let runner = inner.runner.as_ref().ok_or("尚未连接设备")?;
+    let entry = inner.settings.entry.clone();
+    runner.start(&entry).map_err(|e| e.to_string())?;
+    inner.phase = Phase::Running;
+    inner.started = Some(Instant::now());
+    inner.events.clear();
+    Ok(status_of(&inner))
+}
+
+#[tauri::command]
+fn stop(state: State<'_, AppState>) -> Result<Status, String> {
+    let mut inner = state.inner.lock().unwrap();
+    if let Some(runner) = inner.runner.as_ref() {
+        runner.stop(Duration::from_secs(15));
+    }
+    inner.phase = Phase::Ready;
+    inner.started = None;
+    Ok(status_of(&inner))
+}
+
+#[tauri::command]
+fn disconnect(state: State<'_, AppState>) -> Result<Status, String> {
+    let mut inner = state.inner.lock().unwrap();
+    if let Some(runner) = inner.runner.take() {
+        runner.stop(Duration::from_secs(10));
+    }
+    inner.phase = Phase::Idle;
+    inner.detail = String::new();
+    inner.started = None;
+    Ok(status_of(&inner))
+}
+
+fn status_of(inner: &Inner) -> Status {
+    Status {
+        phase: inner.phase,
+        detail: inner.detail.clone(),
+        battles: inner.battles,
+        uptime_ms: inner.started.map(|t| t.elapsed().as_millis() as u64).unwrap_or(0),
+        current_node: inner.events.back().map(|e| e.label().to_string()).unwrap_or_default(),
+    }
+}
+
+#[tauri::command]
+fn status(state: State<'_, AppState>) -> Result<Status, String> {
+    let inner = state.inner.lock().unwrap();
+    Ok(status_of(&inner))
+}
+
+#[tauri::command]
+fn events(state: State<'_, AppState>) -> Result<Vec<NodeEvent>, String> {
+    let mut inner = state.inner.lock().unwrap();
+    let fresh = match inner.runner.as_ref() {
+        Some(runner) => runner.poll(),
+        None => Vec::new(),
+    };
+    for event in &fresh {
+        if event.kind == "action" && event.node == "AttackStart" {
+            inner.battles += 1;
+        }
+        inner.events.push_back(event.clone());
+        while inner.events.len() > 300 {
+            inner.events.pop_front();
+        }
+    }
+    Ok(fresh)
+}
+
+#[tauri::command]
+fn frame(state: State<'_, AppState>) -> Result<Option<Frame>, String> {
+    let inner = state.inner.lock().unwrap();
+    let Some(runner) = inner.runner.as_ref() else { return Ok(None) };
+    let png = runner.screencap_png().map_err(|e| e.to_string())?;
+    Ok(Some(Frame {
+        data_url: format!("data:image/png;base64,{}", base64::engine::general_purpose::STANDARD.encode(&png)),
+        width: 1280,
+        height: 720,
+    }))
+}
+
+#[cfg_attr(mobile, tauri::mobile_entry_point)]
+pub fn run() {
+    tauri::Builder::default()
+        .setup(|app| {
+            let settings = load_settings(app.handle());
+            app.manage(AppState::new(settings));
+            Ok(())
+        })
+        .invoke_handler(tauri::generate_handler![
+            settings,
+            save_settings,
+            devices,
+            connect,
+            start,
+            stop,
+            disconnect,
+            status,
+            events,
+            frame
+        ])
+        .run(tauri::generate_context!())
+        .expect("启动 MaaCoC 失败");
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn settings_defaults_are_conservative() {
+        let settings = Settings::default();
+        assert_eq!(settings.entry, "Main");
+        assert!(!settings.auto_start, "打开界面不应自动开始战斗");
+        assert!(!settings.overlay_hits);
+        assert!(!settings.record_frames);
+    }
+
+    #[test]
+    fn settings_round_trip_through_json() {
+        let settings = Settings { auto_start: true, ..Default::default() };
+        let text = serde_json::to_string(&settings).unwrap();
+        let back: Settings = serde_json::from_str(&text).unwrap();
+        assert!(back.auto_start);
+        assert_eq!(back.entry, "Main");
+    }
+}
