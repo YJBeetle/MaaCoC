@@ -188,7 +188,10 @@ fn devices() -> Result<Vec<DeviceItem>, String> {
     let found = maacoc_engine::list_devices().map_err(|e| e.to_string())?;
     Ok(found
         .into_iter()
-        .map(|(name, address)| DeviceItem { label: name, address })
+        .map(|d| DeviceItem {
+            label: format!("{} · {}", d.label, d.address),
+            address: d.address,
+        })
         .collect())
 }
 
