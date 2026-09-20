@@ -5,7 +5,7 @@
 //! browser against the same commands.
 
 use base64::Engine as _;
-use maacoc_engine::{DeviceTarget, NodeEvent, Runner};
+use maacoc_engine::{frames::FrameStore, DeviceTarget, NodeEvent, Runner};
 use serde::{Deserialize, Serialize};
 use std::{
     collections::VecDeque,
@@ -80,6 +80,7 @@ pub struct Frame {
 struct Inner {
     runner: Option<Runner>,
     settings: Settings,
+    recorder: Option<FrameStore>,
     events: VecDeque<NodeEvent>,
     started: Option<Instant>,
     battles: usize,
@@ -97,6 +98,7 @@ impl AppState {
             inner: Mutex::new(Inner {
                 runner: None,
                 settings,
+                recorder: None,
                 events: VecDeque::new(),
                 started: None,
                 battles: 0,
@@ -137,6 +139,29 @@ fn load_settings<R: Runtime>(app: &AppHandle<R>) -> Settings {
         .unwrap_or_default()
 }
 
+/// Where recorded frames go. Created only when the user turns recording on.
+fn frames_dir<R: Runtime>(app: &AppHandle<R>) -> Result<PathBuf, String> {
+    let dir = app.path().app_data_dir().map_err(|e| e.to_string())?.join("frames");
+    std::fs::create_dir_all(&dir).map_err(|e| e.to_string())?;
+    Ok(dir)
+}
+
+/// Follow the 记录节点画面 switch: the framework only keeps the frame behind a
+/// recognition when debug mode is on, so the toggle drives both the store and
+/// the global option.
+fn apply_recording<R: Runtime>(inner: &mut Inner, app: &AppHandle<R>) -> Result<(), String> {
+    let on = inner.settings.record_frames;
+    if let Some(runner) = inner.runner.as_ref() {
+        runner.set_debug_mode(on).map_err(|e| e.to_string())?;
+    }
+    inner.recorder = if on {
+        Some(FrameStore::open(frames_dir(app)?))
+    } else {
+        None
+    };
+    Ok(())
+}
+
 #[tauri::command]
 fn settings(state: State<'_, AppState>) -> Result<Settings, String> {
     Ok(state.inner.lock().unwrap().settings.clone())
@@ -148,7 +173,11 @@ fn save_settings<R: Runtime>(
     state: State<'_, AppState>,
     next: Settings,
 ) -> Result<Settings, String> {
-    state.inner.lock().unwrap().settings = next.clone();
+    {
+        let mut inner = state.inner.lock().unwrap();
+        inner.settings = next.clone();
+        apply_recording(&mut inner, &app)?;
+    }
     let path = settings_file(&app)?;
     std::fs::write(path, serde_json::to_string_pretty(&next).unwrap()).map_err(|e| e.to_string())?;
     Ok(next)
@@ -190,6 +219,7 @@ fn connect<R: Runtime>(app: AppHandle<R>, state: State<'_, AppState>) -> Result<
             inner.detail = runner.label.clone();
             inner.phase = Phase::Ready;
             inner.runner = Some(runner);
+            apply_recording(&mut inner, &app)?;
             if inner.settings.auto_start {
                 // 连接成功就开跑；起不来仍然算连上了，把原因显示出来供手动重试。
                 if let Err(err) = begin(&mut inner) {
@@ -277,6 +307,17 @@ fn events(state: State<'_, AppState>) -> Result<Vec<NodeEvent>, String> {
         inner.events.push_back(event.clone());
         while inner.events.len() > 300 {
             inner.events.pop_front();
+        }
+    }
+    if let (Some(store), Some(runner)) = (inner.recorder.as_ref(), inner.runner.as_ref()) {
+        for event in &fresh {
+            if !(event.hit && event.kind == "recognition") {
+                continue;
+            }
+            // Best effort: a failed frame write must never break the timeline.
+            if let Some(png) = runner.recognition_png(event.reco_id) {
+                let _ = store.save(&png, &event.node, &event.focus);
+            }
         }
     }
     Ok(fresh)

@@ -426,7 +426,7 @@ function renderSettings() {
   syncSwitch("f-autostart", "连接后开始战斗", undefined, state.settings.autoStart, (v) => void persist({ autoStart: v }));
   syncSwitch("f-misses", "显示未命中节点", undefined, state.settings.showMisses, (v) => void persist({ showMisses: v }));
   syncSwitch("f-overlay", "画面叠加命中框", undefined, state.settings.overlayHits, (v) => void persist({ overlayHits: v }));
-  syncSwitch("f-record", "记录节点画面", undefined, state.settings.recordFrames, (v) => void persist({ recordFrames: v }));
+  syncSwitch("f-record", "记录节点画面", "保存到应用数据目录下的 frames", state.settings.recordFrames, (v) => void persist({ recordFrames: v }));
   syncSelect("f-theme", "外观", undefined, THEME_MODES, state.settings.themeMode, (value) => {
     applyTheme(value as ThemeMode);
     void persist({ themeMode: value as ThemeMode });
