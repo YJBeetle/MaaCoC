@@ -4,7 +4,6 @@ import "@material-symbols/font-400/outlined.css";
 import "@fontsource/roboto/400.css";
 import "@fontsource/roboto/500.css";
 import "./styles.css";
-import "@material/web/button/filled-button.js";
 import "@material/web/button/filled-tonal-button.js";
 import "@material/web/button/text-button.js";
 import "@material/web/fab/fab.js";
@@ -16,7 +15,7 @@ import "@material/web/select/select-option.js";
 
 import type { EngineApi, Frame, NodeEvent, Settings, Status } from "./api";
 import { DEFAULT_SETTINGS, eventLabel, eventValue, formatUptime } from "./api";
-import { applyTheme, prefersDark, type ThemeMode } from "./theme";
+import { applyTheme, type ThemeMode } from "./theme";
 
 const idle: Status = { phase: "idle", detail: "", battles: 0, uptimeMs: 0, currentNode: "" };
 
@@ -573,4 +572,3 @@ boot()
     // A silent exception here leaves a blank window with nothing to read.
     document.body.textContent = `界面启动失败: ${String(err)}`;
   });
-export { prefersDark };
