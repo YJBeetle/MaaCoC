@@ -1,6 +1,7 @@
 #!/usr/bin/env bash
-# Put the MaaFramework dylibs next to the built binary, matching how the
-# shipped app lays them out (the binary carries an @executable_path rpath).
+# Put the MaaFramework libraries next to the built binary, matching how the
+# shipped app lays them out (the binary carries an rpath pointing at its own
+# directory, and on Windows the loader only looks there).
 set -euo pipefail
 cd "$(dirname "$0")/.."
 
@@ -11,5 +12,15 @@ if [ ! -d "$DEST" ]; then
     exit 1
 fi
 
-cp -f vendor/bin/*.dylib "$DEST"/ 2>/dev/null || true
-echo "已同步 $(ls "$DEST"/*.dylib | wc -l | tr -d ' ') 个 dylib 到 $DEST"
+copied=0
+for file in vendor/bin/*; do
+    case "$file" in
+        *.dylib|*.so|*.so.*|*.dll) cp -f "$file" "$DEST"/ && copied=$((copied + 1)) ;;
+        *) ;;
+    esac
+done
+if [ "$copied" = 0 ]; then
+    echo "vendor/bin 里没有动态库，先跑 scripts/fetch-sdk.sh" >&2
+    exit 1
+fi
+echo "已同步 $copied 个动态库到 $DEST"
