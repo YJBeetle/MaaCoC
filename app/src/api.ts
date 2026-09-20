@@ -50,6 +50,11 @@ export interface Frame {
   height: number;
 }
 
+/** Where the app keeps its own files — the address to ask for when reporting a bug. */
+export interface Paths {
+  logDir: string;
+}
+
 export interface EngineApi {
   readonly mode: "tauri" | "mock";
   devices(): Promise<DeviceItem[]>;
@@ -61,6 +66,7 @@ export interface EngineApi {
   start(): Promise<Status>;
   stop(): Promise<Status>;
   status(): Promise<Status>;
+  paths(): Promise<Paths>;
   frame(): Promise<Frame | null>;
   events(): Promise<NodeEvent[]>;
 }

@@ -13,7 +13,7 @@ import "@material/web/switch/switch.js";
 import "@material/web/select/outlined-select.js";
 import "@material/web/select/select-option.js";
 
-import type { EngineApi, Frame, NodeEvent, Settings, Status } from "./api";
+import type { EngineApi, Frame, NodeEvent, Paths, Settings, Status } from "./api";
 import { DEFAULT_SETTINGS, eventLabel, eventValue, formatUptime } from "./api";
 import { applyTheme, type ThemeMode } from "./theme";
 
@@ -26,6 +26,7 @@ const state = {
   events: [] as NodeEvent[],
   frame: null as Frame | null,
   devices: [] as { label: string; address: string }[],
+  paths: { logDir: "" } as Paths,
   nodes: [] as string[],
   busy: false,
   error: "",
@@ -41,6 +42,7 @@ async function loadApi(): Promise<EngineApi> {
       devices: () => call("devices"),
       nodes: () => call("nodes"),
       settings: () => call("settings"),
+      paths: () => call<Paths>("paths"),
       saveSettings: (next) => call("save_settings", { next }),
       connect: () => call("connect"),
       disconnect: () => call("disconnect"),
@@ -173,6 +175,7 @@ function buildSettingsPage(): HTMLElement {
   const about = el("div", { class: "card bordered" });
   about.append(
     el("div", { class: "sect", text: "关于" }),
+    el("div", { class: "field", id: "f-log" }),
     el("div", { class: "field", id: "f-version" }),
     el("div", { class: "field danger", id: "f-reset" }),
   );
@@ -492,6 +495,8 @@ function renderSettings() {
     btn.toggleAttribute("disabled", !connected);
   }
 
+  fieldOf("f-log", "日志目录", state.paths.logDir || "未知");
+
   const version = fieldOf("f-version", "版本");
   if (version) {
     let text = version.querySelector("code");
@@ -582,6 +587,7 @@ async function boot() {
     if (state.settings.themeMode === "system") applyTheme("system");
   });
   buildShell();
+  state.paths = await api.paths();
   state.devices = await api.devices();
   state.nodes = await api.nodes();
   render();

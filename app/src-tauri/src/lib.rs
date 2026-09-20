@@ -81,6 +81,7 @@ struct Inner {
     runner: Option<Runner>,
     settings: Settings,
     recorder: Option<FrameStore>,
+    log_dir: String,
     events: VecDeque<NodeEvent>,
     started: Option<Instant>,
     battles: usize,
@@ -88,17 +89,24 @@ struct Inner {
     detail: String,
 }
 
+#[derive(Debug, Clone, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct Paths {
+    pub log_dir: String,
+}
+
 pub struct AppState {
     inner: Mutex<Inner>,
 }
 
 impl AppState {
-    fn new(settings: Settings) -> Self {
+    fn new(settings: Settings, log_dir: String) -> Self {
         Self {
             inner: Mutex::new(Inner {
                 runner: None,
                 settings,
                 recorder: None,
+                log_dir,
                 events: VecDeque::new(),
                 started: None,
                 battles: 0,
@@ -165,6 +173,15 @@ fn apply_recording<R: Runtime>(inner: &mut Inner, app: &AppHandle<R>) -> Result<
 #[tauri::command]
 fn settings(state: State<'_, AppState>) -> Result<Settings, String> {
     Ok(state.inner.lock().unwrap().settings.clone())
+}
+
+/// Where the app keeps its own files, for the 关于 panel and for bug reports.
+#[tauri::command]
+fn paths(state: State<'_, AppState>) -> Result<Paths, String> {
+    let inner = state.inner.lock().unwrap();
+    Ok(Paths {
+        log_dir: inner.log_dir.clone(),
+    })
 }
 
 #[tauri::command]
@@ -348,13 +365,26 @@ fn frame(state: State<'_, AppState>) -> Result<Option<Frame>, String> {
 pub fn run() {
     tauri::Builder::default()
         .setup(|app| {
+            // MaaFramework would otherwise log next to the working directory,
+            // which for a double-clicked .app is somewhere unwritable.
+            let log_dir = app
+                .path()
+                .app_log_dir()
+                .ok()
+                .filter(|dir| std::fs::create_dir_all(dir).is_ok())
+                .map(|dir| {
+                    let _ = maacoc_engine::set_log_dir(&dir);
+                    dir.to_string_lossy().into_owned()
+                })
+                .unwrap_or_default();
             let settings = load_settings(app.handle());
-            app.manage(AppState::new(settings));
+            app.manage(AppState::new(settings, log_dir));
             Ok(())
         })
         .invoke_handler(tauri::generate_handler![
             settings,
             save_settings,
+            paths,
             devices,
             nodes,
             connect,

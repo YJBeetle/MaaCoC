@@ -43,6 +43,9 @@ export function createMockApi(): EngineApi {
     async settings() {
       return settings;
     },
+    async paths() {
+      return { logDir: "~/Library/Logs/com.maacoc.client" };
+    },
     async saveSettings(next) {
       settings = next;
       return settings;

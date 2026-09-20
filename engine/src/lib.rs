@@ -14,6 +14,14 @@ pub use runner::{DeviceTarget, Runner};
 /// is authored there. Never switch the controller to raw screenshots.
 pub const MATCH_SIZE: (u32, u32) = (1280, 720);
 
+/// Where MaaFramework writes its own log file. Left unset it writes to
+/// `./debug`, which is neither writable nor findable from a bundled app.
+pub fn set_log_dir(dir: &std::path::Path) -> Result<()> {
+    let text = dir.to_str().ok_or("日志路径不是有效 UTF-8")?;
+    maa_framework::configure_logging(text).map_err(|e| e.to_string())?;
+    Ok(())
+}
+
 /// A device the shell can offer the user.
 #[derive(Debug, Clone, serde::Serialize)]
 #[serde(rename_all = "camelCase")]
