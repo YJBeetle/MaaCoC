@@ -26,8 +26,18 @@ case "$(uname -s)" in
   Linux)
     deb=$(ls "$BUNDLE"/deb/*.deb 2>/dev/null | head -1)
     [ -n "${deb:-}" ] || fail "没有生成 .deb"
-    dpkg -c "$deb" | grep -q "assets/pipeline/main.json" || fail ".deb 里缺 assets/pipeline"
-    dpkg -c "$deb" | grep -q "libMaaFramework.so" || fail ".deb 里缺 libMaaFramework.so"
+    # Read the whole listing first: piping dpkg into `grep -q` makes grep close
+    # the pipe early, tar then dies on a write error and dpkg-deb reports that
+    # instead of the answer.
+    listing=$(dpkg -c "$deb")
+    case "$listing" in
+      *assets/pipeline/main.json*) ;;
+      *) fail ".deb 里缺 assets/pipeline" ;;
+    esac
+    case "$listing" in
+      *libMaaFramework.so*) ;;
+      *) fail ".deb 里缺 libMaaFramework.so" ;;
+    esac
     echo "Linux 包检查通过: $deb"
     ;;
   MINGW*|MSYS*|CYGWIN*)
