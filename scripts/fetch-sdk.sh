@@ -34,12 +34,16 @@ rm -rf vendor && mkdir -p vendor
 curl -sSLf --retry 3 -o vendor/sdk.zip "$url"
 unzip -q vendor/sdk.zip -d vendor
 rm vendor/sdk.zip
-# Zips extract to a single top-level directory; flatten it.
-top=$(find vendor -mindepth 1 -maxdepth 1 -type d | head -1)
-if [ -n "${top:-}" ]; then
-    mv "$top"/* vendor/ 2>/dev/null || true
-    rmdir "$top"
+# Some archives wrap everything in a single directory named after the build,
+# others (the Windows one) already have bin/ at the top level. Only flatten the
+# wrapper when it is actually there — guessing with "the first directory"
+# dismembers the tree.
+if [ -d "vendor/$name/bin" ]; then
+    mv "vendor/$name"/* vendor/
+    rm -rf "vendor/$name"
 fi
+rm -rf vendor/__MACOSX
+find vendor -name .DS_Store -delete
 echo "$name" > vendor/.sdk-version
 test -d vendor/bin || { echo "SDK 解压后缺少 bin/，实际内容：$(ls vendor)" >&2; exit 1; }
-echo "SDK 就绪: $name（$(ls vendor/bin | wc -l | tr -d ' ') 个文件）"
+echo "SDK 就绪: ${name}（$(ls vendor/bin | wc -l | tr -d ' ') 个文件）"
