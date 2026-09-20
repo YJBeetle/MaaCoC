@@ -362,8 +362,21 @@ pub fn run() {
             events,
             frame
         ])
-        .run(tauri::generate_context!())
-        .expect("启动 MaaCoC 失败");
+        // A battle is a resident task that keeps tapping the phone. Stopping it
+        // on the way out is the difference between closing a window and a
+        // device that clicks forever.
+        .build(tauri::generate_context!())
+        .expect("启动 MaaCoC 失败")
+        .run(|app, event| {
+            if matches!(event, tauri::RunEvent::ExitRequested { .. }) {
+                if let Some(state) = app.try_state::<AppState>() {
+                    let inner = state.inner.lock().unwrap();
+                    if let Some(runner) = inner.runner.as_ref() {
+                        runner.stop(Duration::from_secs(5));
+                    }
+                }
+            }
+        });
 }
 
 #[cfg(test)]
