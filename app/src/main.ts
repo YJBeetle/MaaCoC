@@ -156,6 +156,7 @@ function buildSettingsPage(): HTMLElement {
     el("div", { class: "field", id: "f-entry" }),
     el("div", { class: "field", id: "f-interval" }),
     el("div", { class: "field", id: "f-autostart" }),
+    el("div", { class: "field", id: "f-disconnect" }),
   );
 
   const diag = el("div", { class: "card bordered" });
@@ -190,6 +191,10 @@ function fieldOf(id: string, title: string, hint?: string): HTMLElement | null {
     const left = el("div");
     left.append(el("div", { class: "k", text: title }), ...(hint ? [el("div", { class: "hint", text: hint })] : []));
     field.appendChild(left);
+  } else if (hint !== undefined) {
+    // The hint can be live text (which device is connected), so it updates too.
+    const node = field.querySelector(".hint");
+    if (node && node.textContent !== hint) node.textContent = hint;
   }
   return field;
 }
@@ -455,10 +460,37 @@ function renderSettings() {
   syncSwitch("f-misses", "显示未命中节点", undefined, state.settings.showMisses, (v) => void persist({ showMisses: v }));
   syncSwitch("f-overlay", "画面叠加命中框", undefined, state.settings.overlayHits, (v) => void persist({ overlayHits: v }));
   syncSwitch("f-record", "记录节点画面", "保存到应用数据目录下的 frames", state.settings.recordFrames, (v) => void persist({ recordFrames: v }));
-  syncSelect("f-theme", "外观", undefined, THEME_MODES, state.settings.themeMode, (value) => {
-    applyTheme(value as ThemeMode);
-    void persist({ themeMode: value as ThemeMode });
-  }, "跟随系统");
+  syncSelect(
+    "f-theme",
+    "外观",
+    undefined,
+    THEME_MODES,
+    state.settings.themeMode,
+    (value) => {
+      applyTheme(value as ThemeMode);
+      void persist({ themeMode: value as ThemeMode });
+    },
+    "跟随系统",
+  );
+
+  // 断开属于管理动作，放在设置里而不是挂机页的操作条上。
+  const connected = state.status.phase === "ready" || state.status.phase === "running";
+  const disconnect = fieldOf("f-disconnect", "断开当前连接", connected ? state.status.detail : "当前没有连接设备");
+  if (disconnect) {
+    let btn = disconnect.querySelector<HTMLElement>("md-text-button");
+    if (!btn) {
+      btn = el("md-text-button");
+      btn.appendChild(el("span", { text: "断开" }));
+      btn.addEventListener("click", async () => {
+        state.error = "";
+        state.frame = null;
+        state.status = await api.disconnect();
+        render();
+      });
+      disconnect.appendChild(btn);
+    }
+    btn.toggleAttribute("disabled", !connected);
+  }
 
   const version = fieldOf("f-version", "版本");
   if (version) {
