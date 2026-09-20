@@ -416,4 +416,27 @@ mod tests {
         assert_eq!(back.theme_mode, "system");
         assert!(!back.show_misses);
     }
+
+    /// The frontend's `Settings` interface must carry exactly these keys. A
+    /// field that only exists on one side is silently dropped by serde, which
+    /// is how the theme setting stopped working.
+    #[test]
+    fn settings_wire_format_is_the_contract() {
+        let value = serde_json::to_value(Settings::default()).unwrap();
+        let mut keys: Vec<_> = value.as_object().unwrap().keys().cloned().collect();
+        keys.sort();
+        assert_eq!(
+            keys,
+            [
+                "autoStart",
+                "entry",
+                "frameIntervalMs",
+                "overlayHits",
+                "preferredDevice",
+                "recordFrames",
+                "showMisses",
+                "themeMode"
+            ]
+        );
+    }
 }
