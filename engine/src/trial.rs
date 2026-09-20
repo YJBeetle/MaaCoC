@@ -90,11 +90,7 @@ pub fn recognition_of(node: &Value) -> Option<(String, Map<String, Value>)> {
     }
 }
 
-fn apply_overrides(
-    params: &mut Map<String, Value>,
-    threshold: Option<f64>,
-    roi: Option<[i32; 4]>,
-) {
+fn apply_overrides(params: &mut Map<String, Value>, threshold: Option<f64>, roi: Option<[i32; 4]>) {
     if let Some(value) = threshold {
         // A list threshold must be as long as the template list.
         let count = match params.get("template") {
@@ -152,7 +148,11 @@ pub fn trial_node(
 ) -> Result<Trial> {
     let raw = resource.get_node_data(node)?;
     let Some(raw) = raw else {
-        return Ok(Trial { node: node.to_string(), error: Some("节点不存在".into()), ..Default::default() });
+        return Ok(Trial {
+            node: node.to_string(),
+            error: Some("节点不存在".into()),
+            ..Default::default()
+        });
     };
     let parsed: Value = serde_json::from_str(&raw)?;
     let Some((algorithm, mut params)) = recognition_of(&parsed) else {
@@ -231,8 +231,7 @@ mod tests {
 
     #[test]
     fn scalar_template_still_gets_one_threshold() {
-        let mut params: Map<String, Value> =
-            serde_json::from_str(r#"{"template":"Next","threshold":0.7}"#).unwrap();
+        let mut params: Map<String, Value> = serde_json::from_str(r#"{"template":"Next","threshold":0.7}"#).unwrap();
         apply_overrides(&mut params, Some(0.4), None);
         assert_eq!(params["threshold"], serde_json::json!([0.4]));
     }

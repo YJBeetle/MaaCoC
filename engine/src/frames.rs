@@ -34,20 +34,21 @@ pub struct FrameStore {
 
 impl FrameStore {
     pub fn open(root: impl AsRef<Path>) -> Self {
-        Self { root: root.as_ref().to_path_buf() }
+        Self {
+            root: root.as_ref().to_path_buf(),
+        }
     }
 
     pub fn frames(&self) -> Result<Vec<FrameRecord>> {
         let index = self.root.join("index.jsonl");
-        let text = std::fs::read_to_string(&index)
-            .map_err(|e| format!("读不到 {} : {e}", index.display()))?;
+        let text = std::fs::read_to_string(&index).map_err(|e| format!("读不到 {} : {e}", index.display()))?;
         let mut out = Vec::new();
         for (line_no, line) in text.lines().enumerate() {
             if line.trim().is_empty() {
                 continue;
             }
-            let record: FrameRecord = serde_json::from_str(line)
-                .map_err(|e| format!("第 {} 行索引损坏: {e}", line_no + 1))?;
+            let record: FrameRecord =
+                serde_json::from_str(line).map_err(|e| format!("第 {} 行索引损坏: {e}", line_no + 1))?;
             if self.root.join(&record.file).is_file() {
                 out.push(record);
             }
@@ -66,7 +67,13 @@ impl FrameStore {
         let existing = self.frames().unwrap_or_default().len();
         let safe: String = node
             .chars()
-            .map(|c| if c.is_alphanumeric() || matches!(c, '-' | '_' | '.') { c } else { '_' })
+            .map(|c| {
+                if c.is_alphanumeric() || matches!(c, '-' | '_' | '.') {
+                    c
+                } else {
+                    '_'
+                }
+            })
             .collect();
         let file = format!("{:04}-{safe}.png", existing + 1);
         let path = self.root.join(&file);

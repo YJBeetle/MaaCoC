@@ -40,7 +40,13 @@ impl NodeEvent {
         if self.kind == "action" {
             return format!("action {}", self.label());
         }
-        let state = if self.error { "失败" } else if self.hit { "命中" } else { "未中" };
+        let state = if self.error {
+            "失败"
+        } else if self.hit {
+            "命中"
+        } else {
+            "未中"
+        };
         format!(
             "{} {state} 分数={:.3} 框={:?} 候选={}/{}",
             self.label(),
@@ -61,14 +67,19 @@ pub(crate) fn parse_box(value: &serde_json::Value) -> Option<[i32; 4]> {
     if nums.len() != 4 {
         return None;
     }
-    [nums[2], nums[3]].iter().all(|v| *v > 0).then_some([nums[0], nums[1], nums[2], nums[3]])
+    [nums[2], nums[3]]
+        .iter()
+        .all(|v| *v > 0)
+        .then_some([nums[0], nums[1], nums[2], nums[3]])
 }
 
 /// Score to surface: the winner if there is one, otherwise the best rejected
 /// candidate — a miss is far more useful showing "0.668 vs 阈值 0.7" than "0".
 pub(crate) fn best_score(detail: &serde_json::Value) -> f64 {
-    if let Some(score) =
-        detail.get("best").and_then(|best| best.get("score")).and_then(Value::as_f64)
+    if let Some(score) = detail
+        .get("best")
+        .and_then(|best| best.get("score"))
+        .and_then(Value::as_f64)
     {
         return score;
     }
@@ -112,7 +123,11 @@ pub fn parse_event(msg: &str, details: &str, at: f64, wall: f64) -> Option<NodeE
         return None;
     };
     let payload: serde_json::Value = serde_json::from_str(details).ok()?;
-    let node = payload.get("name").and_then(|v| v.as_str()).unwrap_or_default().to_string();
+    let node = payload
+        .get("name")
+        .and_then(|v| v.as_str())
+        .unwrap_or_default()
+        .to_string();
     let focus = focus_text(payload.get("focus"));
     let succeeded = state == "Succeeded";
 
@@ -137,9 +152,7 @@ pub fn parse_event(msg: &str, details: &str, at: f64, wall: f64) -> Option<NodeE
         if let Some(reco) = payload.get("reco_details") {
             event.box_rect = reco.get("box").and_then(parse_box);
             if let Some(detail) = reco.get("detail") {
-                let count = |key: &str| {
-                    detail.get(key).and_then(|v| v.as_array()).map(Vec::len).unwrap_or(0)
-                };
+                let count = |key: &str| detail.get(key).and_then(|v| v.as_array()).map(Vec::len).unwrap_or(0);
                 event.candidates = count("all");
                 event.filtered = count("filtered");
                 event.score = best_score(detail);
@@ -163,7 +176,10 @@ pub struct EventBus {
 }
 
 fn now_wall() -> f64 {
-    SystemTime::now().duration_since(UNIX_EPOCH).map(|d| d.as_secs_f64()).unwrap_or_default()
+    SystemTime::now()
+        .duration_since(UNIX_EPOCH)
+        .map(|d| d.as_secs_f64())
+        .unwrap_or_default()
 }
 
 impl EventBus {
@@ -184,7 +200,10 @@ impl EventBus {
         move |msg: &str, details: &str| {
             let (at, wall) = {
                 let guard = state.lock().unwrap();
-                (guard.started.map(|t| t.elapsed().as_secs_f64()).unwrap_or(0.0), now_wall())
+                (
+                    guard.started.map(|t| t.elapsed().as_secs_f64()).unwrap_or(0.0),
+                    now_wall(),
+                )
             };
             match parse_event(msg, details, at, wall) {
                 Some(event) => {

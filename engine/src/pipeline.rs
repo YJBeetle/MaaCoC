@@ -27,7 +27,11 @@ pub struct Edit {
 
 impl Edit {
     pub fn new(node: impl Into<String>, field: impl Into<String>, value: Value) -> Self {
-        Self { node: node.into(), field: field.into(), value }
+        Self {
+            node: node.into(),
+            field: field.into(),
+            value,
+        }
     }
 }
 
@@ -78,9 +82,9 @@ pub fn blank_jsonc(text: &str) -> String {
             while j + 1 < n && !(bytes[j] == b'*' && bytes[j + 1] == b'/') {
                 j += 1;
             }
-            for k in i..(j + 2).min(n) {
-                if out[k] != b'\n' {
-                    out[k] = b' ';
+            for byte in &mut out[i..(j + 2).min(n)] {
+                if *byte != b'\n' {
+                    *byte = b' ';
                 }
             }
             i = j + 2;
@@ -130,9 +134,7 @@ impl<'a> Scanner<'a> {
                 b'\\' => self.i += 2,
                 b'"' => {
                     self.i += 1;
-                    return Ok(serde_json::from_str(
-                        std::str::from_utf8(&self.text[start..self.i])?,
-                    )?);
+                    return Ok(serde_json::from_str(std::str::from_utf8(&self.text[start..self.i])?)?);
                 }
                 _ => self.i += 1,
             }
@@ -252,11 +254,17 @@ pub struct PipelineDoc {
 impl PipelineDoc {
     pub fn open(path: impl AsRef<Path>) -> Result<Self> {
         let path = path.as_ref().to_path_buf();
-        Ok(Self { path: Some(path.clone()), text: std::fs::read_to_string(path)? })
+        Ok(Self {
+            path: Some(path.clone()),
+            text: std::fs::read_to_string(path)?,
+        })
     }
 
     pub fn from_text(text: impl Into<String>) -> Self {
-        Self { path: None, text: text.into() }
+        Self {
+            path: None,
+            text: text.into(),
+        }
     }
 
     pub fn text(&self) -> &str {
@@ -269,7 +277,11 @@ impl PipelineDoc {
 
     fn scan(&self) -> Result<(Value, Spans)> {
         let blanked = blank_jsonc(&self.text);
-        let mut scanner = Scanner { text: blanked.as_bytes(), i: 0, spans: Spans::default() };
+        let mut scanner = Scanner {
+            text: blanked.as_bytes(),
+            i: 0,
+            spans: Spans::default(),
+        };
         let value = scanner.value(Vec::new())?;
         Ok((value, scanner.spans))
     }
@@ -293,7 +305,10 @@ impl PipelineDoc {
 
     fn line_indent(&self, offset: usize) -> String {
         let start = self.text[..offset].rfind('\n').map(|i| i + 1).unwrap_or(0);
-        self.text[start..offset].chars().take_while(|c| *c == ' ' || *c == '\t').collect()
+        self.text[start..offset]
+            .chars()
+            .take_while(|c| *c == ' ' || *c == '\t')
+            .collect()
     }
 
     /// Apply edits at byte offsets, leaving every other byte untouched.
@@ -307,15 +322,18 @@ impl PipelineDoc {
             if let Some((start, end)) = spans.values.get(&field_path) {
                 let original = &self.text[*start..*end];
                 let anchor = spans.keys.get(&field_path).map(|key| key.0).unwrap_or(*start);
-                let rendered =
-                    self.render_value(edit, original, &self.line_indent(anchor))?;
+                let rendered = self.render_value(edit, original, &self.line_indent(anchor))?;
                 replacements.push((*start, *end, rendered));
             } else {
                 let (_, node_end) = *spans
                     .values
                     .get(&node_path)
                     .ok_or_else(|| format!("未知节点: {}", edit.node))?;
-                replacements.push((node_end - 1, node_end - 1, self.render_insert(&spans, &node_path, edit)?));
+                replacements.push((
+                    node_end - 1,
+                    node_end - 1,
+                    self.render_insert(&spans, &node_path, edit)?,
+                ));
             }
         }
 
@@ -422,7 +440,10 @@ mod tests {
     use std::path::PathBuf;
 
     fn repo_pipeline() -> PathBuf {
-        PathBuf::from(env!("CARGO_MANIFEST_DIR")).parent().unwrap().join("assets/pipeline/main.json")
+        PathBuf::from(env!("CARGO_MANIFEST_DIR"))
+            .parent()
+            .unwrap()
+            .join("assets/pipeline/main.json")
     }
 
     #[test]
@@ -452,7 +473,9 @@ mod tests {
     #[test]
     fn scalar_edit_changes_exactly_one_line() {
         let doc = PipelineDoc::from_text(std::fs::read_to_string(repo_pipeline()).unwrap());
-        let patched = doc.patched(&[Edit::new("FindSoldier", "threshold", serde_json::json!(0.8))]).unwrap();
+        let patched = doc
+            .patched(&[Edit::new("FindSoldier", "threshold", serde_json::json!(0.8))])
+            .unwrap();
         let changed: Vec<_> = doc
             .text()
             .lines()
@@ -460,7 +483,10 @@ mod tests {
             .filter(|(a, b)| a != b)
             .collect();
         assert_eq!(changed.len(), 1, "只该有一行不同，实际 {changed:?}");
-        assert_eq!(load(&patched).unwrap()["FindSoldier"]["threshold"], serde_json::json!(0.8));
+        assert_eq!(
+            load(&patched).unwrap()["FindSoldier"]["threshold"],
+            serde_json::json!(0.8)
+        );
     }
 
     #[test]
@@ -469,16 +495,31 @@ mod tests {
         let before = doc.node("AttackLoop").unwrap()["next"].as_array().unwrap().clone();
         let mut after = before.clone();
         after.push(serde_json::json!("Deploy"));
-        let patched = doc.patched(&[Edit::new("AttackLoop", "next", serde_json::json!(after))]).unwrap();
+        let patched = doc
+            .patched(&[Edit::new("AttackLoop", "next", serde_json::json!(after))])
+            .unwrap();
         let diff = unified_diff(doc.text(), &patched, "a", "b");
-        assert_eq!(diff.lines().filter(|l| l.starts_with('-') && !l.starts_with("---")).count(), 0, "不该有删除行:\n{diff}");
-        assert_eq!(diff.lines().filter(|l| l.starts_with('+') && !l.starts_with("+++")).count(), 1);
+        assert_eq!(
+            diff.lines()
+                .filter(|l| l.starts_with('-') && !l.starts_with("---"))
+                .count(),
+            0,
+            "不该有删除行:\n{diff}"
+        );
+        assert_eq!(
+            diff.lines()
+                .filter(|l| l.starts_with('+') && !l.starts_with("+++"))
+                .count(),
+            1
+        );
     }
 
     #[test]
     fn missing_field_is_inserted_after_the_last_one() {
         let doc = PipelineDoc::from_text("{\n  \"Node\": {\n    \"action\": \"Click\",\n  },\n}\n");
-        let patched = doc.patched(&[Edit::new("Node", "threshold", serde_json::json!(0.9))]).unwrap();
+        let patched = doc
+            .patched(&[Edit::new("Node", "threshold", serde_json::json!(0.9))])
+            .unwrap();
         let node = load(&patched).unwrap()["Node"].clone();
         assert_eq!(node["threshold"], serde_json::json!(0.9));
         assert_eq!(node["action"], serde_json::json!("Click"));
@@ -487,7 +528,9 @@ mod tests {
     #[test]
     fn unknown_node_is_an_error_not_a_silent_write() {
         let doc = PipelineDoc::from_text(std::fs::read_to_string(repo_pipeline()).unwrap());
-        assert!(doc.patched(&[Edit::new("NoSuchNode", "threshold", serde_json::json!(0.5))]).is_err());
+        assert!(doc
+            .patched(&[Edit::new("NoSuchNode", "threshold", serde_json::json!(0.5))])
+            .is_err());
     }
 
     #[test]

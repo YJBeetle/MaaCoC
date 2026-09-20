@@ -2,9 +2,7 @@
 
 use crate::events::{EventBus, NodeEvent};
 use crate::Result;
-use maa_framework::{
-    common::MaaStatus, controller::Controller, resource::Resource, tasker::Tasker, toolkit::Toolkit,
-};
+use maa_framework::{common::MaaStatus, controller::Controller, resource::Resource, tasker::Tasker, toolkit::Toolkit};
 use std::{
     path::Path,
     thread,
@@ -38,7 +36,10 @@ impl Runner {
     pub fn connect(assets: &Path, target: DeviceTarget, preferred: Option<&str>) -> Result<Self> {
         if matches!(target, DeviceTarget::Headless) {
             let resource = Resource::new()?;
-            check(resource.post_bundle(assets.to_str().ok_or("资源路径无效")?)?.wait(), "加载资源")?;
+            check(
+                resource.post_bundle(assets.to_str().ok_or("资源路径无效")?)?.wait(),
+                "加载资源",
+            )?;
             if !resource.loaded() {
                 return Err("资源未就绪".into());
             }
@@ -76,7 +77,10 @@ impl Runner {
         }
         let controller = Some(controller);
         let resource = Resource::new()?;
-        check(resource.post_bundle(assets.to_str().ok_or("资源路径无效")?)?.wait(), "加载资源")?;
+        check(
+            resource.post_bundle(assets.to_str().ok_or("资源路径无效")?)?.wait(),
+            "加载资源",
+        )?;
         if !resource.loaded() {
             return Err("资源未就绪".into());
         }
@@ -92,7 +96,13 @@ impl Runner {
         let bus = EventBus::new();
         // Context sinks carry the per-node recognition/action notifications.
         let _ = tasker.add_context_sink(bus.handle());
-        Self { controller, resource, tasker, bus, label }
+        Self {
+            controller,
+            resource,
+            tasker,
+            bus,
+            label,
+        }
     }
 
     pub fn inited(&self) -> bool {

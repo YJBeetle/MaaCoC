@@ -13,9 +13,7 @@ use std::{
     sync::Mutex,
     time::{Duration, Instant},
 };
-use tauri::{
-    path::BaseDirectory, AppHandle, Manager, Runtime, State,
-};
+use tauri::{path::BaseDirectory, AppHandle, Manager, Runtime, State};
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase", default)]
@@ -145,18 +143,24 @@ fn settings(state: State<'_, AppState>) -> Result<Settings, String> {
 }
 
 #[tauri::command]
-fn save_settings<R: Runtime>(app: AppHandle<R>, state: State<'_, AppState>, next: Settings) -> Result<Settings, String> {
+fn save_settings<R: Runtime>(
+    app: AppHandle<R>,
+    state: State<'_, AppState>,
+    next: Settings,
+) -> Result<Settings, String> {
     state.inner.lock().unwrap().settings = next.clone();
     let path = settings_file(&app)?;
-    std::fs::write(path, serde_json::to_string_pretty(&next).unwrap())
-        .map_err(|e| e.to_string())?;
+    std::fs::write(path, serde_json::to_string_pretty(&next).unwrap()).map_err(|e| e.to_string())?;
     Ok(next)
 }
 
 #[tauri::command]
 fn devices() -> Result<Vec<DeviceItem>, String> {
     let found = maacoc_engine::list_devices().map_err(|e| e.to_string())?;
-    Ok(found.into_iter().map(|(name, address)| DeviceItem { label: name, address }).collect())
+    Ok(found
+        .into_iter()
+        .map(|(name, address)| DeviceItem { label: name, address })
+        .collect())
 }
 
 /// Pipeline node names, for the entry selector. Empty until resources load.
@@ -269,10 +273,15 @@ fn events(state: State<'_, AppState>) -> Result<Vec<NodeEvent>, String> {
 #[tauri::command]
 fn frame(state: State<'_, AppState>) -> Result<Option<Frame>, String> {
     let inner = state.inner.lock().unwrap();
-    let Some(runner) = inner.runner.as_ref() else { return Ok(None) };
+    let Some(runner) = inner.runner.as_ref() else {
+        return Ok(None);
+    };
     let png = runner.screencap_png().map_err(|e| e.to_string())?;
     Ok(Some(Frame {
-        data_url: format!("data:image/png;base64,{}", base64::engine::general_purpose::STANDARD.encode(&png)),
+        data_url: format!(
+            "data:image/png;base64,{}",
+            base64::engine::general_purpose::STANDARD.encode(&png)
+        ),
         width: 1280,
         height: 720,
     }))
@@ -319,7 +328,11 @@ mod tests {
 
     #[test]
     fn settings_round_trip_through_json() {
-        let settings = Settings { auto_start: true, theme_mode: "dark".into(), ..Default::default() };
+        let settings = Settings {
+            auto_start: true,
+            theme_mode: "dark".into(),
+            ..Default::default()
+        };
         let text = serde_json::to_string(&settings).unwrap();
         let back: Settings = serde_json::from_str(&text).unwrap();
         assert!(back.auto_start);

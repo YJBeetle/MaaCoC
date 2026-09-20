@@ -3,13 +3,13 @@
 //! Doubles as the engine's smoke test: every capability reachable from the UI
 //! is reachable here without a window, so it can be verified headlessly.
 
+use maa_framework::toolkit::Toolkit;
 use maacoc_engine::{
     frames::FrameStore,
     pipeline::{Edit, PipelineDoc},
     trial::trial_node,
     DeviceTarget, Error, NodeEvent, Runner,
 };
-use maa_framework::toolkit::Toolkit;
 use std::{
     io::Write,
     path::{Path, PathBuf},
@@ -49,7 +49,11 @@ fn run() -> Result<(), Error> {
         .cloned()
         .unwrap_or_else(|| "assets".to_string());
     let assets = Path::new(&assets_arg);
-    let preferred = args.iter().position(|a| a == "--device").and_then(|i| args.get(i + 1)).cloned();
+    let preferred = args
+        .iter()
+        .position(|a| a == "--device")
+        .and_then(|i| args.get(i + 1))
+        .cloned();
 
     match args.first().map(String::as_str) {
         Some("devices") => devices(),
@@ -73,7 +77,12 @@ fn devices() -> Result<(), Error> {
         return Ok(());
     }
     for device in &devices {
-        println!("{} @ {} (adb={})", device.name, device.address, device.adb_path.display());
+        println!(
+            "{} @ {} (adb={})",
+            device.name,
+            device.address,
+            device.adb_path.display()
+        );
     }
     Ok(())
 }
@@ -86,7 +95,12 @@ fn snap(assets: &Path, output: Option<&str>, preferred: Option<&str>) -> Result<
         std::fs::create_dir_all(parent).ok();
     }
     std::fs::write(target, &png)?;
-    println!("{} 已保存 {}（{} 字节，匹配空间 1280x720）", runner.label, target, png.len());
+    println!(
+        "{} 已保存 {}（{} 字节，匹配空间 1280x720）",
+        runner.label,
+        target,
+        png.len()
+    );
     Ok(())
 }
 
@@ -122,7 +136,7 @@ fn battle(assets: &Path, args: &[String], preferred: Option<&str>) -> Result<(),
         .unwrap_or("Main");
 
     let runner = Runner::connect(assets, DeviceTarget::Adb, preferred)?;
-    let recorder = record_dir.as_ref().map(|dir| FrameStore::open(dir));
+    let recorder = record_dir.as_ref().map(FrameStore::open);
     if recorder.is_some() {
         runner.set_debug_mode(true)?;
     }
@@ -170,7 +184,10 @@ fn battle(assets: &Path, args: &[String], preferred: Option<&str>) -> Result<(),
         thread::sleep(Duration::from_millis(100));
     }
     runner.stop(Duration::from_secs(15));
-    println!("完成: 开局 {starts} 次，事件 {total} 条，丢弃 {} 条", runner.dropped_events());
+    println!(
+        "完成: 开局 {starts} 次，事件 {total} 条，丢弃 {} 条",
+        runner.dropped_events()
+    );
     Ok(())
 }
 
@@ -186,7 +203,15 @@ fn reco(assets: &Path, args: &[String]) -> Result<(), Error> {
     let frame_path = Path::new(frame);
     let png = std::fs::read(frame_path)?;
     let runner = open_offline_runner(assets, frame_path)?;
-    let trial = trial_node(runner.resource(), runner.tasker(), runner.bus(), node, &png, threshold, None)?;
+    let trial = trial_node(
+        runner.resource(),
+        runner.tasker(),
+        runner.bus(),
+        node,
+        &png,
+        threshold,
+        None,
+    )?;
     println!("{}", trial.summary());
     Ok(())
 }
@@ -203,12 +228,25 @@ fn regress(assets: &Path, dir: Option<String>) -> Result<(), Error> {
     let mut failed = 0usize;
     for record in &frames {
         let png = store.load_png(record)?;
-        let trial = trial_node(runner.resource(), runner.tasker(), runner.bus(), &record.node, &png, None, None)?;
+        let trial = trial_node(
+            runner.resource(),
+            runner.tasker(),
+            runner.bus(),
+            &record.node,
+            &png,
+            None,
+            None,
+        )?;
         let ok = trial.hit && trial.error.is_none();
         if !ok {
             failed += 1;
         }
-        println!("{} {} {}", if ok { "OK  " } else { "失败" }, record.file, trial.summary());
+        println!(
+            "{} {} {}",
+            if ok { "OK  " } else { "失败" },
+            record.file,
+            trial.summary()
+        );
     }
     println!("共 {} 帧，失败 {failed}", frames.len());
     if failed > 0 {
@@ -222,8 +260,8 @@ fn patch(assets: &Path, args: &[String]) -> Result<(), Error> {
     let (Some(node), Some(field), Some(value)) = (args.get(1), args.get(2), args.get(3)) else {
         return Err("用法: patch <节点> <字段> <JSON> [--write]".into());
     };
-    let parsed: serde_json::Value = serde_json::from_str(value)
-        .map_err(|e| format!("第三个参数必须是合法 JSON（数组要写成 [\"a\"]）: {e}"))?;
+    let parsed: serde_json::Value =
+        serde_json::from_str(value).map_err(|e| format!("第三个参数必须是合法 JSON（数组要写成 [\"a\"]）: {e}"))?;
     let file = assets.join("pipeline/main.json");
     let mut doc = PipelineDoc::open(&file)?;
     let edits = [Edit::new(node.clone(), field.clone(), parsed)];
