@@ -85,9 +85,11 @@ export function createMockApi(): EngineApi {
       const batch = SCRIPT.slice(cursor, cursor + 2);
       cursor += batch.length;
       if (cursor >= SCRIPT.length) cursor = 0;
-      // Mirror the shell: a new AttackStart action is a new battle.
+      // Mirror the shell: a new AttackStart action is a new battle, and the
+      // status carries the node the run is currently sitting on.
       for (const item of batch) {
         if (item.kind === "action" && item.node === "AttackStart") status = { ...status, battles: status.battles + 1 };
+        status = { ...status, currentNode: item.focus || item.node };
       }
       return batch.map((item) => ({
         at: item.at,

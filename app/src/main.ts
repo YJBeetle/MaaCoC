@@ -28,7 +28,6 @@ const state = {
   devices: [] as { label: string; address: string }[],
   paths: { logDir: "" } as Paths,
   nodes: [] as string[],
-  busy: false,
   error: "",
 };
 
@@ -281,7 +280,6 @@ async function persist(next: Partial<Settings>) {
 }
 
 async function connect() {
-  state.busy = true;
   state.error = "";
   render();
   try {
@@ -291,7 +289,6 @@ async function connect() {
   } catch (err) {
     state.error = String(err);
   } finally {
-    state.busy = false;
     render();
   }
 }
@@ -524,8 +521,13 @@ function render() {
   const problem = state.error || (phase === "error" ? state.status.detail : "");
   ui.chip.setAttribute("label", problem ? `${chipLabels[phase]} · ${problem}` : chipLabels[phase]);
   ui.chip.toggleAttribute("data-running", phase === "running");
-  ui.meta.textContent =
-    phase === "running" ? `${formatUptime(state.status.uptimeMs)} · 第 ${state.status.battles + 1} 局` : phase === "error" ? "" : state.status.detail;
+  const running = phase === "running";
+  const node = state.status.currentNode;
+  ui.meta.textContent = running
+    ? `${formatUptime(state.status.uptimeMs)} · 第 ${state.status.battles + 1} 局${node ? ` · ${node}` : ""}`
+    : phase === "error"
+      ? ""
+      : state.status.detail;
 
   const connected = phase === "ready" || phase === "running";
   ui.connectBtn.toggleAttribute("disabled", phase === "connecting" || phase === "running");
