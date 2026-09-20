@@ -24,8 +24,10 @@ pub struct Settings {
     pub preferred_device: Option<String>,
     pub auto_start: bool,
     pub frame_interval_ms: u64,
+    pub show_misses: bool,
     pub overlay_hits: bool,
     pub record_frames: bool,
+    pub theme_mode: String,
 }
 
 impl Default for Settings {
@@ -35,8 +37,10 @@ impl Default for Settings {
             preferred_device: None,
             auto_start: false,
             frame_interval_ms: 1000,
+            show_misses: false,
             overlay_hits: false,
             record_frames: false,
+            theme_mode: "system".into(),
         }
     }
 }
@@ -105,10 +109,20 @@ impl AppState {
     }
 }
 
-fn assets_dir<R: Runtime>(app: &AppHandle<R>) -> PathBuf {
-    app.path()
-        .resolve("assets", BaseDirectory::Resource)
-        .unwrap_or_else(|_| PathBuf::from("../../assets"))
+/// Where the pipeline/image assets live. Bundled apps resolve them next to the
+/// resources; `tauri dev` has no resource dir, so fall back to the source tree.
+fn assets_dir<R: Runtime>(app: &AppHandle<R>) -> Result<PathBuf, String> {
+    let candidates = [
+        app.path().resolve("assets", BaseDirectory::Resource).ok(),
+        std::env::current_dir().ok().map(|dir| dir.join("assets")),
+        Some(PathBuf::from("../../assets")),
+        Some(PathBuf::from("assets")),
+    ];
+    candidates
+        .into_iter()
+        .flatten()
+        .find(|dir| dir.join("pipeline").is_dir())
+        .ok_or_else(|| "找不到资源目录 assets/pipeline，请确认安装完整".to_string())
 }
 
 fn settings_file<R: Runtime>(app: &AppHandle<R>) -> Result<PathBuf, String> {
@@ -156,23 +170,30 @@ fn nodes(state: State<'_, AppState>) -> Result<Vec<String>, String> {
 }
 
 #[tauri::command]
-fn connect<R: Runtime>(
-    app: AppHandle<R>,
-    state: State<'_, AppState>,
-) -> Result<Status, String> {
+fn connect<R: Runtime>(app: AppHandle<R>, state: State<'_, AppState>) -> Result<Status, String> {
+    let preferred = state.inner.lock().unwrap().settings.preferred_device.clone();
     {
         let mut inner = state.inner.lock().unwrap();
         inner.phase = Phase::Connecting;
+        inner.detail = String::new();
     }
-    let assets = assets_dir(&app);
-    let preferred = state.inner.lock().unwrap().settings.preferred_device.clone();
-    let runner = Runner::connect(&assets, DeviceTarget::Adb, preferred.as_deref())
-        .map_err(|e| e.to_string())?;
+    let outcome = assets_dir(&app).and_then(|assets| {
+        Runner::connect(&assets, DeviceTarget::Adb, preferred.as_deref()).map_err(|e| e.to_string())
+    });
     let mut inner = state.inner.lock().unwrap();
-    inner.detail = runner.label.clone();
-    inner.phase = Phase::Ready;
-    inner.runner = Some(runner);
-    Ok(status_of(&inner))
+    match outcome {
+        Ok(runner) => {
+            inner.detail = runner.label.clone();
+            inner.phase = Phase::Ready;
+            inner.runner = Some(runner);
+            Ok(status_of(&inner))
+        }
+        Err(err) => {
+            inner.phase = Phase::Error;
+            inner.detail = err.clone();
+            Err(err)
+        }
+    }
 }
 
 #[tauri::command]
@@ -290,6 +311,7 @@ mod tests {
     fn settings_defaults_are_conservative() {
         let settings = Settings::default();
         assert_eq!(settings.entry, "Main");
+        assert_eq!(settings.theme_mode, "system", "外观默认跟随系统，不预设深浅");
         assert!(!settings.auto_start, "打开界面不应自动开始战斗");
         assert!(!settings.overlay_hits);
         assert!(!settings.record_frames);
@@ -297,10 +319,18 @@ mod tests {
 
     #[test]
     fn settings_round_trip_through_json() {
-        let settings = Settings { auto_start: true, ..Default::default() };
+        let settings = Settings { auto_start: true, theme_mode: "dark".into(), ..Default::default() };
         let text = serde_json::to_string(&settings).unwrap();
         let back: Settings = serde_json::from_str(&text).unwrap();
         assert!(back.auto_start);
         assert_eq!(back.entry, "Main");
+        assert_eq!(back.theme_mode, "dark");
+    }
+
+    #[test]
+    fn older_settings_files_still_load_with_defaults() {
+        let back: Settings = serde_json::from_str(r#"{"entry":"Main"}"#).unwrap();
+        assert_eq!(back.theme_mode, "system");
+        assert!(!back.show_misses);
     }
 }
