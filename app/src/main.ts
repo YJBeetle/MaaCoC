@@ -150,16 +150,31 @@ function buildStatsPage(): HTMLElement {
 function buildSettingsPage(): HTMLElement {
   const wrap = el("div", { class: "column" });
   const device = el("div", { class: "card bordered", id: "card-device" });
-  device.append(el("div", { class: "sect", text: "设备" }), el("div", { class: "field", id: "f-device" }), el("div", { class: "field", id: "f-entry" }), el("div", { class: "field", id: "f-interval" }), el("div", { class: "field", id: "f-autostart" }));
+  device.append(
+    el("div", { class: "sect", text: "设备" }),
+    el("div", { class: "field", id: "f-device" }),
+    el("div", { class: "field", id: "f-entry" }),
+    el("div", { class: "field", id: "f-interval" }),
+    el("div", { class: "field", id: "f-autostart" }),
+  );
 
   const diag = el("div", { class: "card bordered" });
-  diag.append(el("div", { class: "sect", text: "诊断" }), el("div", { class: "field", id: "f-misses" }), el("div", { class: "field", id: "f-overlay" }), el("div", { class: "field", id: "f-record" }));
+  diag.append(
+    el("div", { class: "sect", text: "诊断" }),
+    el("div", { class: "field", id: "f-misses" }),
+    el("div", { class: "field", id: "f-overlay" }),
+    el("div", { class: "field", id: "f-record" }),
+  );
 
   const look = el("div", { class: "card bordered" });
   look.append(el("div", { class: "sect", text: "外观" }), el("div", { class: "field", id: "f-theme" }));
 
   const about = el("div", { class: "card bordered" });
-  about.append(el("div", { class: "sect", text: "关于" }), el("div", { class: "field", id: "f-version" }), el("div", { class: "field danger", id: "f-reset" }));
+  about.append(
+    el("div", { class: "sect", text: "关于" }),
+    el("div", { class: "field", id: "f-version" }),
+    el("div", { class: "field danger", id: "f-reset" }),
+  );
 
   wrap.append(device, diag, look, about);
   return wrap;
@@ -318,21 +333,35 @@ function drawOverlay() {
   const canvas = document.getElementById("overlay") as HTMLCanvasElement | null;
   const frame = state.frame;
   if (!canvas || !frame) return;
+
+  // The frame is letterboxed inside the stage, so the overlay has to cover the
+  // letterboxed rect rather than the stage — otherwise every box lands in the
+  // wrong place. Stroke widths are divided back out so lines stay 2-3 screen px.
+  const stage = ui.stage.getBoundingClientRect();
+  const scale = Math.min(stage.width / frame.width, stage.height / frame.height) || 1;
+  const shown = { width: frame.width * scale, height: frame.height * scale };
+  canvas.style.inset = "auto";
+  canvas.style.left = `${(stage.width - shown.width) / 2}px`;
+  canvas.style.top = `${(stage.height - shown.height) / 2}px`;
+  canvas.style.width = `${shown.width}px`;
+  canvas.style.height = `${shown.height}px`;
   canvas.width = frame.width;
   canvas.height = frame.height;
+
   const ctx = canvas.getContext("2d");
   if (!ctx) return;
+  const px = (size: number) => size / scale;
   ctx.clearRect(0, 0, canvas.width, canvas.height);
   const style = getComputedStyle(document.documentElement);
   ctx.strokeStyle = style.getPropertyValue("--md-sys-color-primary").trim() || "#f5a623";
-  ctx.lineWidth = 3;
-  ctx.font = "20px monospace";
+  ctx.lineWidth = px(2);
+  ctx.font = `${px(12)}px monospace`;
   ctx.fillStyle = ctx.strokeStyle;
   for (const event of state.events.slice(-12)) {
     if (!event.hit || !event.boxRect) continue;
     const [x, y, w, h] = event.boxRect;
     ctx.strokeRect(x, y, w, h);
-    ctx.fillText(`${event.node} ${event.score.toFixed(2)}`, x, Math.max(18, y - 6));
+    ctx.fillText(`${event.node} ${event.score.toFixed(2)}`, x, Math.max(px(12), y - px(4)));
   }
 }
 
