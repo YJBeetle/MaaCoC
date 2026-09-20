@@ -1,0 +1,9 @@
+[env]
+# The maa-framework build script needs the official SDK (headers + dylibs).
+# It is vendored per-platform and never committed.
+MAA_SDK_PATH = { value = "vendor", relative = true }
+
+# Ship-time layout: the MaaFramework dylibs sit next to the executable.
+# `scripts/sync-libs.sh` copies them there after each build.
+[target.aarch64-apple-darwin]
+rustflags = ["-C", "link-arg=-Wl,-rpath,@executable_path"]

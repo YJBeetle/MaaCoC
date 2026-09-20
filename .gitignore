@@ -6,3 +6,6 @@
 /assets/debug/maa.log
 /.idea/
 /.vscode/
+/target/
+/vendor/
+/var/
