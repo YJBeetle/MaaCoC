@@ -38,20 +38,28 @@ body { overflow: hidden; user-select: none; }
 
 .page { flex: 1; overflow: auto; padding: 20px 24px 96px; }
 .page[hidden] { display: none; }
-.column { max-width: 1080px; margin: 0 auto; display: flex; flex-direction: column; gap: 16px; }
+/* `width` must be explicit: a flex item with auto side margins ignores
+   align-self:stretch and would otherwise shrink to its content. */
+.column { width: 100%; max-width: 1080px; margin-inline: auto; display: flex; flex-direction: column; gap: 16px; }
+/* The run page owns the viewport instead of scrolling: the stage takes what the
+   timeline does not. The page's bottom padding leaves a band for the FAB. */
+.column.fill { height: 100%; }
+.card.grow { flex: 1; min-height: 0; display: flex; }
 
 .card { background: var(--md-sys-color-surface-container); border-radius: 16px; overflow: hidden; }
 .card.bordered { border: 1px solid var(--md-sys-color-outline-variant); }
 .card-title { padding: 14px 18px 0; font-size: 13px; color: var(--md-sys-color-on-surface-variant); }
 .card-body { padding: 12px 18px 16px; }
 
-.stage { position: relative; aspect-ratio: 16 / 9; background: var(--md-sys-color-surface-container-lowest); display: grid; place-items: center; }
+/* min-height:0 stops the frame's intrinsic 720px from setting a floor on the
+   flex item, which would otherwise push the timeline below the fold. */
+.stage { position: relative; flex: 1; min-width: 0; min-height: 0; background: var(--md-sys-color-surface-container-lowest); display: grid; place-items: center; }
 .stage img { width: 100%; height: 100%; object-fit: contain; display: block; }
 .stage .void { display: grid; place-items: center; gap: 8px; color: var(--md-sys-color-on-surface-variant); font-size: 13px; }
 .stage .res { position: absolute; top: 10px; right: 10px; padding: 3px 8px; border-radius: 6px; background: rgb(0 0 0 / 0.6); font: 11px ui-monospace, Menlo, monospace; color: var(--md-sys-color-surface-bright); }
 .stage canvas { position: absolute; inset: 0; width: 100%; height: 100%; pointer-events: none; }
 
-.timeline { height: 240px; overflow: auto; font-size: 12px; }
+.timeline { flex: none; height: 200px; overflow: auto; font-size: 12px; }
 .tl-row { display: grid; grid-template-columns: 46px 12px 1fr auto; gap: 10px; align-items: center; padding: 6px 18px; border-bottom: 1px solid color-mix(in srgb, var(--md-sys-color-outline-variant) 55%, transparent); }
 .tl-row .t { font: 11px ui-monospace, Menlo, monospace; color: var(--md-sys-color-on-surface-variant); }
 .tl-row .dot { width: 7px; height: 7px; border-radius: 50%; background: var(--md-sys-color-tertiary); }
@@ -61,6 +69,7 @@ body { overflow: hidden; user-select: none; }
 .tl-empty { padding: 16px 18px; color: var(--md-sys-color-on-surface-variant); font-size: 12px; }
 
 .actions { position: fixed; right: 28px; bottom: 24px; display: flex; align-items: center; gap: 12px; }
+.actions[hidden] { display: none; }
 
 .sect { padding: 14px 18px 4px; font-size: 11.5px; letter-spacing: .5px; color: var(--md-sys-color-primary); }
 .field { display: flex; align-items: center; justify-content: space-between; gap: 16px; padding: 12px 18px; border-bottom: 1px solid var(--md-sys-color-outline-variant); }
