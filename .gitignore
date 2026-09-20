@@ -9,3 +9,6 @@
 /target/
 /vendor/
 /var/
+scratch/
+app/node_modules/
+app/dist/
