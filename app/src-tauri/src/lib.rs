@@ -190,6 +190,13 @@ fn connect<R: Runtime>(app: AppHandle<R>, state: State<'_, AppState>) -> Result<
             inner.detail = runner.label.clone();
             inner.phase = Phase::Ready;
             inner.runner = Some(runner);
+            if inner.settings.auto_start {
+                // 连接成功就开跑；起不来仍然算连上了，把原因显示出来供手动重试。
+                if let Err(err) = begin(&mut inner) {
+                    let label = std::mem::take(&mut inner.detail);
+                    inner.detail = format!("{label}（自动开始失败: {err}）");
+                }
+            }
             Ok(status_of(&inner))
         }
         Err(err) => {
@@ -200,15 +207,20 @@ fn connect<R: Runtime>(app: AppHandle<R>, state: State<'_, AppState>) -> Result<
     }
 }
 
-#[tauri::command]
-fn start(state: State<'_, AppState>) -> Result<Status, String> {
-    let mut inner = state.inner.lock().unwrap();
-    let runner = inner.runner.as_ref().ok_or("尚未连接设备")?;
+fn begin(inner: &mut Inner) -> Result<(), String> {
     let entry = inner.settings.entry.clone();
+    let runner = inner.runner.as_ref().ok_or("尚未连接设备")?;
     runner.start(&entry).map_err(|e| e.to_string())?;
     inner.phase = Phase::Running;
     inner.started = Some(Instant::now());
     inner.events.clear();
+    Ok(())
+}
+
+#[tauri::command]
+fn start(state: State<'_, AppState>) -> Result<Status, String> {
+    let mut inner = state.inner.lock().unwrap();
+    begin(&mut inner)?;
     Ok(status_of(&inner))
 }
 
@@ -277,13 +289,14 @@ fn frame(state: State<'_, AppState>) -> Result<Option<Frame>, String> {
         return Ok(None);
     };
     let png = runner.screencap_png().map_err(|e| e.to_string())?;
+    let (width, height) = maacoc_engine::frames::png_size(&png);
     Ok(Some(Frame {
         data_url: format!(
             "data:image/png;base64,{}",
             base64::engine::general_purpose::STANDARD.encode(&png)
         ),
-        width: 1280,
-        height: 720,
+        width,
+        height,
     }))
 }
 

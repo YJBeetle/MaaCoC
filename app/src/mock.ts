@@ -48,7 +48,7 @@ export function createMockApi(): EngineApi {
       return settings;
     },
     async connect() {
-      status = { ...status, phase: "ready", detail: "K40 @ f5d66ad2" };
+      status = { ...status, phase: settings.autoStart ? "running" : "ready", detail: "K40 @ f5d66ad2" };
       return status;
     },
     async disconnect() {

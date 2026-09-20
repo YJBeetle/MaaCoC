@@ -151,7 +151,7 @@ function buildStatsPage(): HTMLElement {
 function buildSettingsPage(): HTMLElement {
   const wrap = el("div", { class: "column" });
   const device = el("div", { class: "card bordered", id: "card-device" });
-  device.append(el("div", { class: "sect", text: "设备" }), el("div", { class: "field", id: "f-device" }), el("div", { class: "field", id: "f-entry" }), el("div", { class: "field", id: "f-interval" }));
+  device.append(el("div", { class: "sect", text: "设备" }), el("div", { class: "field", id: "f-device" }), el("div", { class: "field", id: "f-entry" }), el("div", { class: "field", id: "f-interval" }), el("div", { class: "field", id: "f-autostart" }));
 
   const diag = el("div", { class: "card bordered" });
   diag.append(el("div", { class: "sect", text: "诊断" }), el("div", { class: "field", id: "f-misses" }), el("div", { class: "field", id: "f-overlay" }), el("div", { class: "field", id: "f-record" }));
@@ -423,6 +423,7 @@ function renderSettings() {
     void persist({ frameIntervalMs: Number(value) }),
     "—",
   );
+  syncSwitch("f-autostart", "连接后开始战斗", undefined, state.settings.autoStart, (v) => void persist({ autoStart: v }));
   syncSwitch("f-misses", "显示未命中节点", undefined, state.settings.showMisses, (v) => void persist({ showMisses: v }));
   syncSwitch("f-overlay", "画面叠加命中框", undefined, state.settings.overlayHits, (v) => void persist({ overlayHits: v }));
   syncSwitch("f-record", "记录节点画面", undefined, state.settings.recordFrames, (v) => void persist({ recordFrames: v }));
