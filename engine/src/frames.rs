@@ -4,10 +4,10 @@
 //! captured, so asset changes fail here instead of mid-battle.
 
 use crate::Result;
-use serde::Deserialize;
+use serde::{Deserialize, Serialize};
 use std::path::{Path, PathBuf};
 
-#[derive(Debug, Clone, Deserialize)]
+#[derive(Debug, Clone, Deserialize, Serialize)]
 pub struct FrameRecord {
     pub file: String,
     pub node: String,
@@ -17,6 +17,15 @@ pub struct FrameRecord {
     pub digest: String,
     pub width: u32,
     pub height: u32,
+}
+
+/// PNG header carries width/height at fixed offsets; avoids an image decode.
+pub fn png_size(png: &[u8]) -> (u32, u32) {
+    if png.len() < 24 || &png[..8] != b"\x89PNG\r\n\x1a\n" {
+        return (0, 0);
+    }
+    let read = |i: usize| u32::from_be_bytes([png[i], png[i + 1], png[i + 2], png[i + 3]]);
+    (read(16), read(20))
 }
 
 pub struct FrameStore {
@@ -48,5 +57,37 @@ impl FrameStore {
 
     pub fn load_png(&self, record: &FrameRecord) -> Result<Vec<u8>> {
         Ok(std::fs::read(self.root.join(&record.file))?)
+    }
+
+    /// Append one frame plus its index line, so a real session can grow the
+    /// offline corpus without a second capture racing the animation.
+    pub fn save(&self, png: &[u8], node: &str, label: &str) -> Result<PathBuf> {
+        std::fs::create_dir_all(&self.root)?;
+        let existing = self.frames().unwrap_or_default().len();
+        let safe: String = node
+            .chars()
+            .map(|c| if c.is_alphanumeric() || matches!(c, '-' | '_' | '.') { c } else { '_' })
+            .collect();
+        let file = format!("{:04}-{safe}.png", existing + 1);
+        let path = self.root.join(&file);
+        std::fs::write(&path, png)?;
+        let (width, height) = png_size(png);
+        let record = FrameRecord {
+            file,
+            node: node.to_string(),
+            label: label.to_string(),
+            digest: String::new(),
+            width,
+            height,
+        };
+        let line = serde_json::to_string(&record)?;
+        use std::io::Write;
+        let mut handle = std::fs::OpenOptions::new()
+            .create(true)
+            .append(true)
+            .open(self.root.join("index.jsonl"))?;
+        handle.write_all(line.as_bytes())?;
+        handle.write_all(b"\n")?;
+        Ok(path)
     }
 }

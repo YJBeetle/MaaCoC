@@ -13,6 +13,7 @@ use std::time::{Instant, SystemTime, UNIX_EPOCH};
 #[derive(Debug, Clone, PartialEq, Serialize)]
 pub struct NodeEvent {
     pub at: f64,
+    pub reco_id: i64,
     pub wall: f64,
     pub kind: &'static str,
     pub node: String,
@@ -117,6 +118,7 @@ pub fn parse_event(msg: &str, details: &str, at: f64, wall: f64) -> Option<NodeE
     let mut event = NodeEvent {
         at,
         wall,
+        reco_id: payload.get("reco_id").and_then(Value::as_i64).unwrap_or(0),
         kind,
         node,
         focus,
@@ -227,6 +229,12 @@ mod tests {
     const MISS: &str = r#"{"task_id":2,"reco_id":3,"name":"FindNext","focus":null,
         "reco_details":{"algorithm":"TemplateMatch","box":null,
             "detail":{"all":[{"box":[1037,466,197,92],"score":0.668}],"filtered":[],"best":null}}}"#;
+
+    #[test]
+    fn carries_the_reco_id_for_frame_lookup() {
+        let event = parse_event("Node.Recognition.Succeeded", HIT, 0.0, 0.0).unwrap();
+        assert_eq!(event.reco_id, 400000001);
+    }
 
     #[test]
     fn extracts_scores_and_counts_from_a_hit() {

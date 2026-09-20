@@ -14,8 +14,6 @@ use std::{
 pub enum DeviceTarget {
     /// A real phone/emulator over ADB.
     Adb,
-    /// A recorded session, replayed with no device attached.
-    Replay(std::path::PathBuf),
     /// Nothing to talk to: enough for node trials, which take the image directly.
     Headless,
 }
@@ -48,10 +46,6 @@ impl Runner {
         }
         let (controller, label) = match target {
             DeviceTarget::Headless => return Err("无设备模式不需要建立连接".into()),
-            DeviceTarget::Replay(dir) => {
-                let path = dir.to_str().ok_or("回放目录路径无效")?;
-                (Controller::new_dbg(path)?, format!("回放 {}", dir.display()))
-            }
             DeviceTarget::Adb => {
                 let mut devices: Vec<_> = Toolkit::find_adb_devices()?;
                 if devices.is_empty() {
@@ -140,6 +134,31 @@ impl Runner {
 
     pub fn running(&self) -> bool {
         self.tasker.running()
+    }
+
+    /// The exact frame a recognition ran on. Free in debug mode, and unlike a
+    /// second screencap it cannot drift from what was actually matched.
+    pub fn recognition_png(&self, reco_id: i64) -> Option<Vec<u8>> {
+        let detail = self.tasker.get_recognition_detail(reco_id).ok().flatten()?;
+        detail.raw_image
+    }
+
+    /// maa-framework 1.25 passes this option as an `i32`; the framework reads a
+    /// `bool` and rejects the size mismatch, so set it with the right width.
+    /// Upstream issue candidate — remove once the binding is fixed.
+    pub fn set_debug_mode(&self, on: bool) -> Result<()> {
+        let value: bool = on;
+        let ok = unsafe {
+            maa_framework::sys::MaaGlobalSetOption(
+                maa_framework::sys::MaaGlobalOptionEnum_MaaGlobalOption_DebugMode as i32,
+                &value as *const bool as *mut std::ffi::c_void,
+                std::mem::size_of::<bool>() as u64,
+            )
+        };
+        if ok == 0 {
+            return Err("设置调试模式失败".into());
+        }
+        Ok(())
     }
 
     pub fn poll(&self) -> Vec<NodeEvent> {

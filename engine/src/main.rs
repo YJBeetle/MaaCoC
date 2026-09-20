@@ -109,6 +109,11 @@ fn battle(assets: &Path, args: &[String], preferred: Option<&str>) -> Result<(),
         .and_then(|i| args.get(i + 1))
         .and_then(|v| v.parse().ok())
         .unwrap_or(5.0);
+    let record_dir = args
+        .iter()
+        .position(|a| a == "--record")
+        .and_then(|i| args.get(i + 1))
+        .cloned();
     let entry = args
         .iter()
         .position(|a| a == "--entry")
@@ -117,6 +122,10 @@ fn battle(assets: &Path, args: &[String], preferred: Option<&str>) -> Result<(),
         .unwrap_or("Main");
 
     let runner = Runner::connect(assets, DeviceTarget::Adb, preferred)?;
+    let recorder = record_dir.as_ref().map(|dir| FrameStore::open(dir));
+    if recorder.is_some() {
+        runner.set_debug_mode(true)?;
+    }
     println!("{} 资源就绪，投递任务 {entry}", runner.label);
     runner.start(entry)?;
 
@@ -145,6 +154,14 @@ fn battle(assets: &Path, args: &[String], preferred: Option<&str>) -> Result<(),
             last = Some(key);
             repeat = 0;
             print_event(&event);
+            if let (Some(store), true) = (recorder.as_ref(), event.hit && event.kind == "recognition") {
+                if let Some(png) = runner.recognition_png(event.reco_id) {
+                    match store.save(&png, &event.node, &event.focus) {
+                        Ok(path) => println!("    记录帧 {}", path.file_name().unwrap_or_default().to_string_lossy()),
+                        Err(err) => println!("    记录失败: {err}"),
+                    }
+                }
+            }
         }
         if !runner.running() {
             println!("任务已结束");

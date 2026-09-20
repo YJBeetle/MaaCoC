@@ -14,5 +14,13 @@ pub use runner::{DeviceTarget, Runner};
 /// is authored there. Never switch the controller to raw screenshots.
 pub const MATCH_SIZE: (u32, u32) = (1280, 720);
 
+/// Device summaries for the shell: (name, address).
+pub fn list_devices() -> Result<Vec<(String, String)>> {
+    Ok(maa_framework::toolkit::Toolkit::find_adb_devices()?
+        .into_iter()
+        .map(|d| (d.name, d.address))
+        .collect())
+}
+
 pub type Error = Box<dyn std::error::Error + Send + Sync>;
 pub type Result<T> = std::result::Result<T, Error>;
