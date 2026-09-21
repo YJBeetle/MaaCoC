@@ -4,7 +4,7 @@ import "@material-symbols/font-400/outlined.css";
 import "@fontsource/roboto/400.css";
 import "@fontsource/roboto/500.css";
 import "./styles.css";
-import "@material/web/button/filled-tonal-button.js";
+import "@material/web/button/filled-button.js";
 import "@material/web/button/text-button.js";
 import "@material/web/fab/fab.js";
 import "@material/web/chips/assist-chip.js";
@@ -76,9 +76,13 @@ const ui = {
   chip: el("md-assist-chip", { label: "未连接", id: "status-chip" }),
   meta: el("span", { class: "meta", id: "run-meta", text: "" }),
   stage: el("div", { class: "stage", id: "stage" }),
+  frameImg: el("img", { id: "frame-img", alt: "设备画面" }),
+  badge: el("span", { class: "res", text: "" }),
+  overlay: el("canvas", { id: "overlay" }) as HTMLCanvasElement,
+  void: el("div", { class: "void", text: "未连接设备" }),
   timeline: el("div", { class: "timeline", id: "timeline" }),
-  connectBtn: el("md-filled-tonal-button", { id: "btn-connect" }),
   fab: el("md-fab", { id: "fab" }),
+  actions: el("div", { class: "actions", id: "actions" }),
   pages: {} as Record<string, HTMLElement>,
 };
 
@@ -102,15 +106,11 @@ function buildShell() {
   topbar.append(ui.title, el("span", { class: "grow" }), ui.meta, ui.chip);
 
   const main = el("div", { class: "main" });
-  const actions = el("div", { class: "actions", id: "actions" });
-  ui.connectBtn.appendChild(el("span", { text: "连接设备" }));
   ui.fab.setAttribute("label", "开始战斗");
   ui.fab.setAttribute("variant", "primary");
-  const fabIcon = el("md-icon", { slot: "icon", text: "play_arrow" });
-  ui.fab.appendChild(fabIcon);
-  ui.connectBtn.addEventListener("click", () => void connect());
+  ui.fab.appendChild(el("md-icon", { slot: "icon", text: "play_arrow" }));
   ui.fab.addEventListener("click", () => void toggleRun());
-  actions.append(ui.connectBtn, ui.fab);
+  ui.actions.appendChild(ui.fab);
 
   ui.pages.run = buildRunPage();
   ui.pages.stats = buildStatsPage();
@@ -118,7 +118,7 @@ function buildShell() {
 
   const body = el("div", { class: "page", id: "page-run" });
   body.appendChild(ui.pages.run);
-  main.append(topbar, body, actions);
+  main.append(topbar, body, ui.actions);
   app.append(rail, main);
   document.body.appendChild(app);
   go(state.page);
@@ -293,6 +293,46 @@ async function connect() {
   }
 }
 
+async function disconnectNow() {
+  state.error = "";
+  state.frame = null;
+  shownFrameSrc = "";
+  try {
+    state.status = await api.disconnect();
+  } catch (err) {
+    state.error = String(err);
+  }
+  render();
+}
+
+/** MD3 keeps exactly one primary action per view, and a FAB is never shown
+    disabled — so before a device is connected the connect button *is* the
+    primary action (Filled) and there is no FAB at all; afterwards the extended
+    FAB takes that role and connecting/dropping becomes a text button. */
+function renderActions() {
+  const phase = state.status.phase;
+  const connected = phase === "ready" || phase === "running";
+  const running = phase === "running";
+
+  ui.fab.hidden = !connected;
+  ui.fab.setAttribute("label", running ? "停止" : "开始战斗");
+  const icon = ui.fab.querySelector("md-icon");
+  if (icon) icon.textContent = running ? "stop" : "play_arrow";
+
+  const wanted = connected ? "disconnect" : "connect";
+  let button = ui.actions.querySelector<HTMLElement>("[data-action]");
+  if (button?.dataset.action !== wanted) {
+    const next: HTMLElement = connected ? el("md-text-button") : el("md-filled-button");
+    next.dataset.action = wanted;
+    next.appendChild(el("span", { text: connected ? "断开连接" : "连接设备" }));
+    next.addEventListener("click", () => void (connected ? disconnectNow() : connect()));
+    if (button) button.replaceWith(next);
+    else ui.actions.insertBefore(next, ui.fab);
+    button = next;
+  }
+  button.toggleAttribute("disabled", phase === "connecting");
+}
+
 async function toggleRun() {
   state.error = "";
   try {
@@ -317,20 +357,39 @@ function go(page: string) {
   render();
 }
 
+/** The stage keeps one long-lived <img>. Recreating it per render — which is
+    what a plain replaceChildren did — leaves the dark background visible until
+    the new data URL decodes, so the picture blinked black four times a second. */
+let shownFrameSrc = "";
+
+function showStageChildren(children: HTMLElement[]) {
+  const current = Array.from(ui.stage.children);
+  if (current.length === children.length && current.every((node, i) => node === children[i])) return;
+  ui.stage.replaceChildren(...children);
+}
+
+function swapFrameSrc(url: string) {
+  if (shownFrameSrc === url) return;
+  shownFrameSrc = url;
+  const next = new Image();
+  next.onload = () => {
+    if (shownFrameSrc === url) ui.frameImg.src = url;
+  };
+  next.src = url;
+}
+
 function renderStage() {
-  if (!state.frame) {
-    ui.stage.replaceChildren(el("div", { class: "void", text: state.status.phase === "connecting" ? "连接中…" : "未连接设备" }));
+  const frame = state.frame;
+  if (!frame) {
+    ui.void.textContent = state.status.phase === "connecting" ? "连接中…" : "未连接设备";
+    showStageChildren([ui.void]);
     return;
   }
-  const img = el("img", { src: state.frame.dataUrl, alt: "设备画面" });
-  img.id = "frame-img";
-  const badge = el("span", { class: "res", text: `${state.frame.width}×${state.frame.height}` });
-  const children: HTMLElement[] = [img, badge];
-  if (state.settings.overlayHits) {
-    const canvas = el("canvas", { id: "overlay" }) as HTMLCanvasElement;
-    children.push(canvas);
-  }
-  ui.stage.replaceChildren(...children);
+  swapFrameSrc(frame.dataUrl);
+  ui.badge.textContent = `${frame.width}×${frame.height}`;
+  const children = [ui.frameImg, ui.badge];
+  if (state.settings.overlayHits) children.push(ui.overlay);
+  showStageChildren(children);
   if (state.settings.overlayHits) drawOverlay();
 }
 
@@ -481,12 +540,7 @@ function renderSettings() {
     if (!btn) {
       btn = el("md-text-button");
       btn.appendChild(el("span", { text: "断开" }));
-      btn.addEventListener("click", async () => {
-        state.error = "";
-        state.frame = null;
-        state.status = await api.disconnect();
-        render();
-      });
+      btn.addEventListener("click", () => void disconnectNow());
       disconnect.appendChild(btn);
     }
     btn.toggleAttribute("disabled", !connected);
@@ -529,12 +583,7 @@ function render() {
       ? ""
       : state.status.detail;
 
-  const connected = phase === "ready" || phase === "running";
-  ui.connectBtn.toggleAttribute("disabled", phase === "connecting" || phase === "running");
-  ui.fab.toggleAttribute("disabled", !connected);
-  ui.fab.setAttribute("label", phase === "running" ? "停止" : "开始战斗");
-  const icon = ui.fab.querySelector("md-icon");
-  if (icon) icon.textContent = phase === "running" ? "stop_circle" : "play_arrow";
+  renderActions();
 
   if (state.page === "run") {
     renderStage();
@@ -558,8 +607,8 @@ async function tick() {
     if (interval > 0 && Date.now() - lastFrameAt > interval) {
       lastFrameAt = Date.now();
       const frame = await api.frame();
+      // A dropped poll keeps the last picture instead of blanking the stage.
       if (frame) state.frame = frame;
-      else state.frame = null;
     }
     state.error = "";
   } catch (err) {
