@@ -118,20 +118,24 @@ function buildShell() {
 
   const body = el("div", { class: "page", id: "page-run" });
   body.appendChild(ui.pages.run);
-  main.append(topbar, body, ui.actions);
+  main.append(topbar, body);
   app.append(rail, main);
   document.body.appendChild(app);
   go(state.page);
 }
 
 function buildRunPage(): HTMLElement {
-  const wrap = el("div", { class: "column fill" });
+  const grid = el("div", { class: "run-grid" });
+  const left = el("div", { class: "run-left" });
   const card = el("div", { class: "card bordered grow" });
   card.appendChild(ui.stage);
-  const tlCard = el("div", { class: "card bordered" });
+  left.append(card, ui.actions);
+
+  const tlCard = el("div", { class: "card bordered timeline-card" });
   tlCard.append(el("div", { class: "card-title", text: "节点" }), ui.timeline);
-  wrap.append(card, tlCard);
-  return wrap;
+
+  grid.append(left, tlCard);
+  return grid;
 }
 
 function buildStatsPage(): HTMLElement {
@@ -350,10 +354,8 @@ function go(page: string) {
   }
   const titles: Record<string, string> = { run: "挂机", stats: "战果", settings: "设置" };
   ui.title.textContent = titles[page];
-  const host = document.querySelector(".page");
-  if (host) host.replaceChildren(ui.pages[page]);
-  const actions = document.getElementById("actions");
-  if (actions) actions.hidden = page !== "run";
+  // The action row lives inside the run page, so switching pages hides it.
+  document.querySelector(".page")?.replaceChildren(ui.pages[page]);
   render();
 }
 
@@ -595,6 +597,8 @@ function render() {
 }
 
 let lastFrameAt = 0;
+let frameInFlight = false;
+
 async function tick() {
   try {
     state.status = await api.status();
@@ -604,11 +608,17 @@ async function tick() {
       if (state.events.length > 400) state.events.splice(0, state.events.length - 400);
     }
     const interval = state.settings.frameIntervalMs;
-    if (interval > 0 && Date.now() - lastFrameAt > interval) {
+    // One capture at a time: a slow screenshot must not queue up behind itself.
+    if (interval > 0 && !frameInFlight && Date.now() - lastFrameAt > interval) {
+      frameInFlight = true;
       lastFrameAt = Date.now();
-      const frame = await api.frame();
-      // A dropped poll keeps the last picture instead of blanking the stage.
-      if (frame) state.frame = frame;
+      try {
+        const frame = await api.frame();
+        // A dropped poll keeps the last picture instead of blanking the stage.
+        if (frame) state.frame = frame;
+      } finally {
+        frameInFlight = false;
+      }
     }
     state.error = "";
   } catch (err) {
@@ -675,10 +685,9 @@ function probeLayout() {
   };
   document.title = JSON.stringify({
     viewport: [innerWidth, innerHeight],
-    column: height(".column"),
     stage: height(".card.grow"),
     timeline: height(".timeline"),
-    columnRect: rect(".column"),
+    logColumn: rect(".timeline-card"),
     actionsRect: rect(".actions"),
     scrolling: (document.querySelector(".page")?.scrollHeight ?? 0) > (document.querySelector(".page")?.clientHeight ?? 0),
   });

@@ -36,15 +36,23 @@ body { overflow: hidden; user-select: none; }
 .grow { flex: 1; }
 .meta { font: 12px/1 ui-monospace, Menlo, monospace; color: var(--md-sys-color-on-surface-variant); }
 
-.page { flex: 1; overflow: auto; padding: 20px 24px 96px; }
+.page { flex: 1; overflow: auto; padding: 20px 24px 24px; }
 .page[hidden] { display: none; }
 /* `width` must be explicit: a flex item with auto side margins ignores
    align-self:stretch and would otherwise shrink to its content. */
 .column { width: 100%; max-width: 1080px; margin-inline: auto; display: flex; flex-direction: column; gap: 16px; }
-/* The run page owns the viewport instead of scrolling: the stage takes what the
-   timeline does not. The page's bottom padding leaves a band for the FAB. */
-.column.fill { height: 100%; }
-.card.grow { flex: 1; min-height: 0; display: flex; }
+/* Run page: picture with its controls underneath on the left, the node log
+   filling the whole right column. Both axes grow with the window, so a bigger
+   window no longer just makes the picture taller and pushes the log away. */
+.run-grid {
+  width: 100%; height: 100%;
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(320px, 420px);
+  gap: 16px;
+}
+.run-left { min-height: 0; display: flex; flex-direction: column; gap: 16px; }
+.card.grow { flex: 1 1 auto; min-height: 200px; display: flex; }
+.card.timeline-card { min-height: 0; display: flex; flex-direction: column; }
 
 .card { background: var(--md-sys-color-surface-container); border-radius: 16px; overflow: hidden; }
 .card.bordered { border: 1px solid var(--md-sys-color-outline-variant); }
@@ -60,7 +68,8 @@ body { overflow: hidden; user-select: none; }
 /* drawOverlay positions this over the letterboxed frame, not the whole stage. */
 .stage canvas { position: absolute; pointer-events: none; }
 
-.timeline { flex: none; height: 200px; overflow: auto; font-size: 12px; }
+/* Fills whatever the card got, and scrolls inside it. */
+.timeline { flex: 1 1 auto; min-height: 0; overflow: auto; font-size: 12px; }
 .tl-row { display: grid; grid-template-columns: 46px 12px 1fr auto; gap: 10px; align-items: center; padding: 6px 18px; border-bottom: 1px solid color-mix(in srgb, var(--md-sys-color-outline-variant) 55%, transparent); }
 .tl-row .t { font: 11px ui-monospace, Menlo, monospace; color: var(--md-sys-color-on-surface-variant); }
 .tl-row .dot { width: 7px; height: 7px; border-radius: 50%; background: var(--md-sys-color-tertiary); }
@@ -69,14 +78,11 @@ body { overflow: hidden; user-select: none; }
 .tl-row .v { font: 11px ui-monospace, Menlo, monospace; color: var(--md-sys-color-on-surface-variant); white-space: nowrap; }
 .tl-empty { padding: 16px 18px; color: var(--md-sys-color-on-surface-variant); font-size: 12px; }
 
-.actions { position: fixed; right: 28px; bottom: 24px; display: flex; align-items: center; gap: 12px; }
-.actions[hidden] {
-  display: none;
-}
+/* In flow at the bottom of the left column, not floating: a fixed overlay was
+   sitting on top of the node log. */
+.actions { flex: none; display: flex; align-items: center; gap: 12px; }
 /* MWC hosts set their own display, so [hidden] needs an explicit override. */
-.actions [hidden] {
-  display: none;
-}
+.actions [hidden] { display: none; }
 
 .sect { padding: 14px 18px 4px; font-size: 11.5px; letter-spacing: .5px; color: var(--md-sys-color-primary); }
 .field { display: flex; align-items: center; justify-content: space-between; gap: 16px; padding: 12px 18px; border-bottom: 1px solid var(--md-sys-color-outline-variant); }
