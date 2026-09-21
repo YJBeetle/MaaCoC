@@ -1,0 +1,98 @@
+/* Layout and typography only. Every colour comes from the generated
+   --md-sys-color-* roles, so nothing here can drift from the theme. */
+
+* { box-sizing: border-box; }
+
+html, body {
+  margin: 0;
+  height: 100%;
+  background: var(--md-sys-color-background);
+  color: var(--md-sys-color-on-surface);
+  font-family: Roboto, "PingFang SC", "Noto Sans SC", system-ui, sans-serif;
+  -webkit-font-smoothing: antialiased;
+}
+body { overflow: hidden; user-select: none; }
+
+.shell { display: grid; grid-template-columns: 80px 1fr; height: 100vh; }
+
+.rail {
+  background: var(--md-sys-color-surface-container-low);
+  border-right: 1px solid var(--md-sys-color-outline-variant);
+  display: flex; flex-direction: column; align-items: center; gap: 2px; padding-top: 14px;
+}
+.rail-item {
+  width: 64px; height: 56px; border: 0; background: transparent; color: inherit;
+  border-radius: 999px; display: flex; flex-direction: column; align-items: center;
+  justify-content: center; gap: 3px; font: inherit; font-size: 11px; cursor: pointer;
+}
+.rail-item .icon { width: 32px; height: 28px; border-radius: 999px; display: grid; place-items: center; }
+.rail-item:hover { background: color-mix(in srgb, var(--md-sys-color-on-surface) 8%, transparent); }
+.rail-item[aria-current="true"] { color: var(--md-sys-color-on-surface); }
+.rail-item[aria-current="true"] .icon { background: var(--md-sys-color-secondary-container); color: var(--md-sys-color-on-secondary-container); }
+
+.main { display: flex; flex-direction: column; min-width: 0; }
+.topbar { height: 64px; flex: none; display: flex; align-items: center; gap: 12px; padding: 0 24px; border-bottom: 1px solid var(--md-sys-color-outline-variant); }
+.topbar h1 { margin: 0; font-size: 20px; font-weight: 500; }
+.grow { flex: 1; }
+.meta { font: 12px/1 ui-monospace, Menlo, monospace; color: var(--md-sys-color-on-surface-variant); }
+
+.page { flex: 1; overflow: auto; padding: 20px 24px 24px; }
+.page[hidden] { display: none; }
+/* `width` must be explicit: a flex item with auto side margins ignores
+   align-self:stretch and would otherwise shrink to its content. */
+.column { width: 100%; max-width: 1080px; margin-inline: auto; display: flex; flex-direction: column; gap: 16px; }
+/* Run page: picture with its controls underneath on the left, the node log
+   filling the whole right column. Both axes grow with the window, so a bigger
+   window no longer just makes the picture taller and pushes the log away. */
+.run-grid {
+  width: 100%; height: 100%;
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(320px, 420px);
+  gap: 16px;
+}
+.run-left { min-height: 0; display: flex; flex-direction: column; gap: 16px; }
+.card.grow { flex: 1 1 auto; min-height: 200px; display: flex; }
+.card.timeline-card { min-height: 0; display: flex; flex-direction: column; }
+
+.card { background: var(--md-sys-color-surface-container); border-radius: 16px; overflow: hidden; }
+.card.bordered { border: 1px solid var(--md-sys-color-outline-variant); }
+.card-title { padding: 14px 18px 0; font-size: 13px; color: var(--md-sys-color-on-surface-variant); }
+.card-body { padding: 12px 18px 16px; }
+
+/* min-height:0 stops the frame's intrinsic 720px from setting a floor on the
+   flex item, which would otherwise push the timeline below the fold. */
+.stage { position: relative; flex: 1; min-width: 0; min-height: 0; background: var(--md-sys-color-surface-container-lowest); display: grid; place-items: center; }
+.stage img { width: 100%; height: 100%; object-fit: contain; display: block; }
+.stage .void { display: grid; place-items: center; gap: 8px; color: var(--md-sys-color-on-surface-variant); font-size: 13px; }
+.stage .res { position: absolute; top: 10px; right: 10px; padding: 3px 8px; border-radius: 6px; background: rgb(0 0 0 / 0.6); font: 11px ui-monospace, Menlo, monospace; color: var(--md-sys-color-surface-bright); }
+/* drawOverlay positions this over the letterboxed frame, not the whole stage. */
+.stage canvas { position: absolute; pointer-events: none; }
+
+/* Fills whatever the card got, and scrolls inside it. */
+.timeline { flex: 1 1 auto; min-height: 0; overflow: auto; font-size: 12px; }
+.tl-row { display: grid; grid-template-columns: 46px 12px 1fr auto; gap: 10px; align-items: center; padding: 6px 18px; border-bottom: 1px solid color-mix(in srgb, var(--md-sys-color-outline-variant) 55%, transparent); }
+.tl-row .t { font: 11px ui-monospace, Menlo, monospace; color: var(--md-sys-color-on-surface-variant); }
+.tl-row .dot { width: 7px; height: 7px; border-radius: 50%; background: var(--md-sys-color-tertiary); }
+.tl-row .dot.miss { background: var(--md-sys-color-error); }
+.tl-row .dot.act { background: var(--md-sys-color-on-surface-variant); }
+.tl-row .v { font: 11px ui-monospace, Menlo, monospace; color: var(--md-sys-color-on-surface-variant); white-space: nowrap; }
+.tl-empty { padding: 16px 18px; color: var(--md-sys-color-on-surface-variant); font-size: 12px; }
+
+/* In flow at the bottom of the left column, not floating: a fixed overlay was
+   sitting on top of the node log. */
+.actions { flex: none; display: flex; align-items: center; gap: 12px; }
+/* MWC hosts set their own display, so [hidden] needs an explicit override. */
+.actions [hidden] { display: none; }
+
+.sect { padding: 14px 18px 4px; font-size: 11.5px; letter-spacing: .5px; color: var(--md-sys-color-primary); }
+.field { display: flex; align-items: center; justify-content: space-between; gap: 16px; padding: 12px 18px; border-bottom: 1px solid var(--md-sys-color-outline-variant); }
+.field:last-child { border-bottom: 0; }
+.field .k { font-size: 14px; }
+.field .hint { margin-top: 3px; font-size: 12px; color: var(--md-sys-color-on-surface-variant); }
+.field.danger .k { color: var(--md-sys-color-error); }
+code { font: 12px ui-monospace, Menlo, monospace; color: var(--md-sys-color-on-surface-variant); }
+
+.stats { display: grid; grid-template-columns: repeat(3, 1fr); gap: 12px; padding: 16px 18px; }
+.stat { background: var(--md-sys-color-surface-container-high); border-radius: 12px; padding: 14px; }
+.stat .n { font-size: 26px; font-weight: 500; }
+.stat .l { font-size: 12px; color: var(--md-sys-color-on-surface-variant); margin-top: 2px; }

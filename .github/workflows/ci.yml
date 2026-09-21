@@ -1,0 +1,70 @@
+name: CI
+
+on:
+  push:
+    branches: [master, main, feat/rust-client]
+  pull_request:
+
+env:
+  MAA_VERSION: v5.14.0-beta.1
+
+jobs:
+  engine:
+    name: 引擎 (${{ matrix.os }})
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-22.04, windows-latest, macos-14]
+    defaults:
+      run:
+        shell: bash
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: 安装 Linux 系统依赖
+        if: runner.os == 'Linux'
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y libwebkit2gtk-4.1-dev libsoup-3.0-dev libjavascriptcoregtk-4.1-dev
+
+      - uses: dtolnay/rust-toolchain@stable
+      - uses: Swatinem/rust-cache@v2
+
+      - name: 拉取 MaaFramework
+        run: ./scripts/fetch-sdk.sh
+
+      - name: 收集待打包的运行库
+        run: ./scripts/stage-native.sh
+
+      - name: 检查格式
+        run: cargo fmt --all --check
+
+      - name: Clippy
+        run: cargo clippy --workspace --all-targets -- -D warnings
+
+      - name: 单元测试
+        run: |
+          cargo test --workspace --no-run
+          ./scripts/sync-libs.sh
+          cargo test --workspace
+
+      - name: 离线识别回归
+        run: cargo run --bin maacoc-engine -- regress
+
+  frontend:
+    name: 前端
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+          cache-dependency-path: app/package-lock.json
+      - run: npm ci
+        working-directory: app
+      - run: npx tsc --noEmit
+        working-directory: app
+      - run: npm run build
+        working-directory: app

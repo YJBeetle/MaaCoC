@@ -1,0 +1,20 @@
+# Keep every text file byte-identical across platforms. The pipeline patcher
+# edits by byte offset and the diff view compares whole lines, so a Windows
+# checkout that turned LF into CRLF made an unchanged file look rewritten.
+* text eol=lf
+
+*.png binary
+*.jpg binary
+*.jpeg binary
+*.gif binary
+*.ico binary
+*.icns binary
+*.woff binary
+*.woff2 binary
+*.ttf binary
+*.otf binary
+*.dylib binary
+*.dll binary
+*.so binary
+*.zip binary
+*.node binary
