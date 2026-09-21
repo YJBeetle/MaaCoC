@@ -201,7 +201,7 @@ fn save_settings<R: Runtime>(
 }
 
 #[tauri::command]
-fn devices() -> Result<Vec<DeviceItem>, String> {
+async fn devices() -> Result<Vec<DeviceItem>, String> {
     let found = maacoc_engine::list_devices().map_err(|e| e.to_string())?;
     Ok(found
         .into_iter()
@@ -214,7 +214,7 @@ fn devices() -> Result<Vec<DeviceItem>, String> {
 
 /// Pipeline node names, for the entry selector. Empty until resources load.
 #[tauri::command]
-fn nodes(state: State<'_, AppState>) -> Result<Vec<String>, String> {
+async fn nodes(state: State<'_, AppState>) -> Result<Vec<String>, String> {
     let inner = state.inner.lock().unwrap();
     match inner.runner.as_ref().map(|r| r.resource().node_list()) {
         Some(list) => list.map_err(|e| e.to_string()),
@@ -223,7 +223,7 @@ fn nodes(state: State<'_, AppState>) -> Result<Vec<String>, String> {
 }
 
 #[tauri::command]
-fn connect<R: Runtime>(app: AppHandle<R>, state: State<'_, AppState>) -> Result<Status, String> {
+async fn connect<R: Runtime>(app: AppHandle<R>, state: State<'_, AppState>) -> Result<Status, String> {
     let preferred = state.inner.lock().unwrap().settings.preferred_device.clone();
     {
         let mut inner = state.inner.lock().unwrap();
@@ -268,14 +268,14 @@ fn begin(inner: &mut Inner) -> Result<(), String> {
 }
 
 #[tauri::command]
-fn start(state: State<'_, AppState>) -> Result<Status, String> {
+async fn start(state: State<'_, AppState>) -> Result<Status, String> {
     let mut inner = state.inner.lock().unwrap();
     begin(&mut inner)?;
     Ok(status_of(&inner))
 }
 
 #[tauri::command]
-fn stop(state: State<'_, AppState>) -> Result<Status, String> {
+async fn stop(state: State<'_, AppState>) -> Result<Status, String> {
     let mut inner = state.inner.lock().unwrap();
     if let Some(runner) = inner.runner.as_ref() {
         runner.stop(Duration::from_secs(15));
@@ -286,7 +286,7 @@ fn stop(state: State<'_, AppState>) -> Result<Status, String> {
 }
 
 #[tauri::command]
-fn disconnect(state: State<'_, AppState>) -> Result<Status, String> {
+async fn disconnect(state: State<'_, AppState>) -> Result<Status, String> {
     let mut inner = state.inner.lock().unwrap();
     if let Some(runner) = inner.runner.take() {
         runner.stop(Duration::from_secs(10));
@@ -314,7 +314,7 @@ fn status(state: State<'_, AppState>) -> Result<Status, String> {
 }
 
 #[tauri::command]
-fn events(state: State<'_, AppState>) -> Result<Vec<NodeEvent>, String> {
+async fn events(state: State<'_, AppState>) -> Result<Vec<NodeEvent>, String> {
     let mut inner = state.inner.lock().unwrap();
     let fresh = match inner.runner.as_ref() {
         Some(runner) => runner.poll(),
@@ -344,12 +344,19 @@ fn events(state: State<'_, AppState>) -> Result<Vec<NodeEvent>, String> {
 }
 
 #[tauri::command]
-fn frame(state: State<'_, AppState>) -> Result<Option<Frame>, String> {
+async fn frame(state: State<'_, AppState>) -> Result<Option<Frame>, String> {
     let inner = state.inner.lock().unwrap();
     let Some(runner) = inner.runner.as_ref() else {
         return Ok(None);
     };
-    let png = runner.screencap_png().map_err(|e| e.to_string())?;
+    // While a battle is running the framework is already screenshotting every
+    // loop; asking for another capture just queues behind it and takes ~1.2s of
+    // adb round trip, which is what made the window stutter.
+    let png = if runner.running() {
+        runner.cached_png().ok_or_else(|| "还没有可用画面".to_string())?
+    } else {
+        runner.screencap_png().map_err(|e| e.to_string())?
+    };
     let (width, height) = maacoc_engine::frames::png_size(&png);
     Ok(Some(Frame {
         data_url: format!(

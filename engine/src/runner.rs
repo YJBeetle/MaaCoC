@@ -186,6 +186,16 @@ impl Runner {
     }
 
     /// The PNG the framework actually captured, in the 1280x720 match space.
+    /// The last frame the framework itself captured. While a task is running
+    /// this is already fresh — the loop screenshots every iteration — and it
+    /// costs nothing, unlike posting a second capture that then has to wait for
+    /// the task's own round trip.
+    pub fn cached_png(&self) -> Option<Vec<u8>> {
+        let controller = self.controller.as_ref()?;
+        let image = controller.cached_image().ok()?;
+        image.to_vec()
+    }
+
     pub fn screencap_png(&self) -> Result<Vec<u8>> {
         let controller = self.controller.as_ref().ok_or("当前无设备，无法截图")?;
         check(controller.wait(controller.post_screencap()?), "截图")?;
