@@ -33,7 +33,11 @@ const state = {
 
 async function loadApi(): Promise<EngineApi> {
   const inTauri = "__TAURI_INTERNALS__" in window;
-  if (inTauri) {
+  // ?mock=1 lets the real Tauri window run on the fake engine, so layout can be
+  // checked in WKWebView (which sizes things differently from Chrome) without a
+  // device and without clicking anything.
+  const forceMock = import.meta.env.DEV && new URLSearchParams(location.search).get("mock") === "1";
+  if (inTauri && !forceMock) {
     const { invoke } = await import("@tauri-apps/api/core");
     const call = <T>(cmd: string, args?: Record<string, unknown>) => invoke<T>(cmd, args);
     return {
@@ -587,6 +591,7 @@ function render() {
 
   renderActions();
 
+  if (probing) probeLayout();
   if (state.page === "run") {
     renderStage();
     renderTimeline();
@@ -632,6 +637,9 @@ async function tick() {
 function devOverrides() {
   if (!import.meta.env.DEV) return false;
   const params = new URLSearchParams(location.search);
+  // With ?probe=1 the live layout numbers go into the window title, so a real
+  // WKWebView screenshot can be measured instead of guessed at from Chrome.
+  probing = params.get("probe") === "1";
   const page = params.get("page");
   if (page === "run" || page === "stats" || page === "settings") state.page = page;
   const theme = params.get("theme");
@@ -671,26 +679,34 @@ if (import.meta.env.DEV) {
 
 /** `?probe=1` publishes the layout metrics as the document title, which a
     headless `--dump-dom` run can read without a developer console. */
+let probing = false;
+
 function probeLayout() {
-  if (!import.meta.env.DEV || new URLSearchParams(location.search).get("probe") !== "1") return;
-  const height = (selector: string) => {
+  if (!probing) return;
+  const box = (selector: string) => {
     const node = document.querySelector(selector);
-    return node ? Math.round(node.getBoundingClientRect().height) : null;
+    if (!node) return "-";
+    const r = node.getBoundingClientRect();
+    return `${Math.round(r.top)}..${Math.round(r.bottom)} (h${Math.round(r.height)})`;
   };
-  const rect = (selector: string) => {
-    const node = document.querySelector(selector);
-    if (!node) return null;
-    const box = node.getBoundingClientRect();
-    return [Math.round(box.top), Math.round(box.bottom)];
-  };
-  document.title = JSON.stringify({
-    viewport: [innerWidth, innerHeight],
-    stage: height(".card.grow"),
-    timeline: height(".timeline"),
-    logColumn: rect(".timeline-card"),
-    actionsRect: rect(".actions"),
-    scrolling: (document.querySelector(".page")?.scrollHeight ?? 0) > (document.querySelector(".page")?.clientHeight ?? 0),
-  });
+  const page = document.querySelector(".page");
+  const timeline = document.getElementById("timeline");
+  let readout = document.getElementById("probe-box");
+  if (!readout) {
+    readout = el("div", { id: "probe-box" });
+    readout.style.cssText =
+      "position:fixed;left:96px;top:70px;z-index:999;padding:6px 9px;border-radius:6px;" +
+      "background:#000c;color:#7cfc00;font:12px/1.45 ui-monospace,Menlo,monospace;white-space:pre;pointer-events:none";
+    document.body.appendChild(readout);
+  }
+  readout.textContent = [
+    `viewport      ${innerWidth} x ${innerHeight}`,
+    `.page         ${box(".page")}  client ${page?.clientHeight} scroll ${page?.scrollHeight}`,
+    `.run-grid     ${box(".run-grid")}`,
+    `.card.grow    ${box(".card.grow")}`,
+    `.timeline-card ${box(".timeline-card")}`,
+    `.timeline     h${timeline?.clientHeight} scrollH ${timeline?.scrollHeight}`,
+  ].join("\n");
 }
 
 boot()
