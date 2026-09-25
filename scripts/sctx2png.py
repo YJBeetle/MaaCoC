@@ -14,6 +14,10 @@ recovered by the geometry identity: a candidate is accepted only when
 ceil(w/b) * ceil(h/b) * 16 equals the payload length exactly, which is what
 keeps a misread header from producing a garbage image.
 
+The `*.sc` sprite collections are read too: each is a name table plus a zstd
+body wrapping whole KTX atlases, and those pages hold the unit info renders
+that the in-game card face is cropped from.
+
 Writes `<dest>/index.html` at the end: every image, grouped by folder, on a
 checkerboard so transparency is visible.
 """
@@ -37,6 +41,10 @@ DEFAULT_DEST = REPO_ROOT / "var" / "coc-unpack" / "png"
 BLOCKS = (4, 5, 6, 8, 10, 12)
 ZSTD = b"\x28\xb5\x2f\xfd"
 SCLZ = b"SCLZ"
+KTX = bytes([0xAB]) + b"KTX 11" + bytes([0xBB, 0x0D, 0x0A, 0x1A, 0x0A])
+# KTX 1.1 names the ASTC block shape as a GL enum, 0x93B0 upwards.
+ASTC_BLOCKS = ((4, 4), (5, 4), (5, 5), (6, 5), (6, 6), (8, 5), (8, 6), (8, 8),
+               (10, 5), (10, 6), (10, 8), (10, 10), (12, 10), (12, 12))
 
 GALLERY_HEAD = """<!doctype html>
 <meta charset="utf-8">
@@ -118,6 +126,55 @@ def out_rel(name: str) -> Path:
     return Path("misc", *parts).with_suffix(".png")
 
 
+def ktx_pages(blob: bytes):
+    """Every KTX page inside a decompressed `.sc` body, as (name-less) images."""
+    pos = blob.find(KTX)
+    while pos >= 0:
+        _, _, _, _, internal, _, width, height, _, _, _, _, kv = struct.unpack_from("<13I", blob, pos + 12)
+        index = internal - 0x93B0
+        if 0 <= index < len(ASTC_BLOCKS):
+            block = ASTC_BLOCKS[index]
+            size = struct.unpack_from("<I", blob, pos + 64 + kv)[0]
+            data = blob[pos + 68 + kv : pos + 68 + kv + size]
+            if ceil(width / block[0]) * ceil(height / block[1]) * 16 == size:
+                rgba = texture2ddecoder.decode_astc(data, width, height, *block)
+                yield Image.frombytes("RGBA", (width, height), rgba, "raw", "BGRA")
+        pos = blob.find(KTX, pos + 64)
+
+
+def extract_sc(archive: Path, out: Path, force: bool, contains: str) -> tuple[int, int, int]:
+    """Sprite collections ship their own texture pages.
+
+    A `.sc` is a name table plus a zstd body, and the body holds whole KTX
+    atlases -- this is where the unit info renders live, which is what the
+    in-game card face is cropped from.
+    """
+    done = skipped = failed = 0
+    with zipfile.ZipFile(archive) as zf:
+        names = [n for n in zf.namelist() if n.endswith(".sc") and (not contains or contains in n)]
+        for name in names:
+            raw = zf.read(name)
+            start = raw.find(ZSTD)
+            stem = Path(name).stem
+            if start < 0:
+                failed += 1
+                continue
+            try:
+                pages = list(ktx_pages(zstandard.decompress(raw[start:])))
+            except Exception:
+                failed += 1
+                continue
+            for index, image in enumerate(pages):
+                target = out / "sc-ktx" / f"{stem}_{index}_{image.width}x{image.height}.png"
+                if target.exists() and not force:
+                    skipped += 1
+                    continue
+                target.parent.mkdir(parents=True, exist_ok=True)
+                image.save(target)
+                done += 1
+    return done, skipped, failed
+
+
 def extract(archive: Path, out: Path, force: bool, contains: str) -> tuple[int, int, list[str]]:
     done, skipped, failed = 0, 0, []
     with zipfile.ZipFile(archive) as zf:
@@ -187,17 +244,22 @@ def main() -> int:
         print("没有可解包的 APK", file=sys.stderr)
         return 1
 
-    total_done = total_skipped = 0
+    total_done = total_skipped = total_sc_failed = 0
     all_failed: list[str] = []
     for archive in archives:
         print(f"解包 {archive}")
         done, skipped, failed = extract(archive, args.dest, args.force, args.contains)
-        print(f"  新写 {done}，已存在 {skipped}，未解析 {len(failed)}")
+        print(f"  sctx  新写 {done}，已存在 {skipped}，未解析 {len(failed)}")
         total_done += done
         total_skipped += skipped
         all_failed += failed
+        done, skipped, failed = extract_sc(archive, args.dest, args.force, args.contains)
+        print(f"  sc    新写 {done}，已存在 {skipped}，无内嵌贴图 {failed}")
+        total_done += done
+        total_skipped += skipped
+        total_sc_failed += failed
 
-    print(f"\n合计：新写 {total_done}，已存在 {total_skipped}，未解析 {len(all_failed)}")
+    print(f"\n合计：新写 {total_done}，已存在 {total_skipped}，sctx 未解析 {len(all_failed)}，sc 无贴图 {total_sc_failed}")
     for item in all_failed[:20]:
         print("  -", item)
     print(f"\n浏览： {write_gallery(args.dest)}")
