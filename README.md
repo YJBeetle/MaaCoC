@@ -22,6 +22,8 @@
 
 ## 准备依赖
 
+根目录没有 `package.json` —— 前端工程在 **`app/`** 子目录，所有 `npm` 命令都要在那儿跑。
+
 MaaFramework 的 SDK 不进仓库，按平台现拉：
 
 ```bash
@@ -44,6 +46,8 @@ cd app
 打开 `http://localhost:5173/?page=run&theme=dark&run=1` 驱动和检查界面。
 
 ## 命令行
+
+只想要引擎和命令行工具、不碰界面，先 `cargo build --workspace`：
 
 ```bash
 cargo run --bin maacoc-engine -- devices                     # 列设备
@@ -79,6 +83,9 @@ cd app
 ./node_modules/.bin/tauri build --bundles deb         # Linux
 ../scripts/verify-bundle.sh                           # 检查包里确实带了资源和动态库
 ```
+
+产物在 `target/release/bundle/` 下按类型分目录：`macos/MaaCoC.app`、`dmg/*.dmg`、
+`nsis/*.exe`、`deb/*.deb`。
 
 构建前会自动把 `assets/` 和 MaaFramework 的运行库收集进包；可执行文件的 rpath
 同时指向自身目录和资源目录，开发和发布两种布局都能加载到库。
