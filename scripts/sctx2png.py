@@ -74,6 +74,17 @@ def dimension_offsets(header: int, size: int) -> list[int]:
     return [offset for offset in candidates if 0 < offset <= limit]
 
 
+def mip_total(width: int, height: int, block: int) -> int:
+    """Full mip-chain byte count for one ASTC block shape."""
+    total = 0
+    level_w, level_h = width, height
+    while True:
+        total += ceil(level_w / block) * ceil(level_h / block) * 16
+        if level_w == 1 and level_h == 1:
+            return total
+        level_w, level_h = max(1, level_w // 2), max(1, level_h // 2)
+
+
 def decode(data: bytes) -> Image.Image | None:
     if data[8:12] != b"SCTX":
         return None
@@ -90,8 +101,13 @@ def decode(data: bytes) -> Image.Image | None:
             need = ceil(width / block) * ceil(height / block) * 16
             if pixels is not None:
                 if need != len(pixels):
-                    continue
-                blob = pixels
+                    # The sc3d model textures store a full mip chain, so only
+                    # the first level is `need` bytes and the rest follows.
+                    if mip_total(width, height, block) != len(pixels):
+                        continue
+                    blob = pixels[:need]
+                else:
+                    blob = pixels
             else:
                 # Uncompressed atlases follow their record table with raw ASTC,
                 # so the payload start is implied by its length.
