@@ -29,6 +29,7 @@ const state = {
   paths: { logDir: "" } as Paths,
   nodes: [] as string[],
   error: "",
+  autoConnect: false,
 };
 
 async function loadApi(): Promise<EngineApi> {
@@ -304,7 +305,7 @@ async function connect() {
 async function disconnectNow() {
   state.error = "";
   state.frame = null;
-  shownFrameSrc = "";
+  releaseFrame();
   try {
     state.status = await api.disconnect();
   } catch (err) {
@@ -363,25 +364,49 @@ function go(page: string) {
   render();
 }
 
-/** The stage keeps one long-lived <img>. Recreating it per render — which is
-    what a plain replaceChildren did — leaves the dark background visible until
-    the new data URL decodes, so the picture blinked black four times a second. */
-let shownFrameSrc = "";
-
+/** The stage keeps one long-lived <img>: recreating it per render left the dark
+    background visible until the new frame decoded, so the picture blinked black. */
 function showStageChildren(children: HTMLElement[]) {
   const current = Array.from(ui.stage.children);
   if (current.length === children.length && current.every((node, i) => node === children[i])) return;
   ui.stage.replaceChildren(...children);
 }
 
-function swapFrameSrc(url: string) {
-  if (shownFrameSrc === url) return;
-  shownFrameSrc = url;
-  const next = new Image();
-  next.onload = () => {
-    if (shownFrameSrc === url) ui.frameImg.src = url;
+/** Feeding <img> a fresh base64 data URL every second is what grew the Web
+    Content process to 6 GB: WebKit keeps a cache entry per distinct URL, and a
+    new screenshot is always a new string. Blob URLs can be revoked, so each
+    swap releases the frame it replaces. */
+let activeFrameUrl = "";
+
+function toRevocableUrl(dataUrl: string): string | null {
+  if (!dataUrl.startsWith("data:")) return null; // the dev mock uses a plain asset URL
+  const binary = atob(dataUrl.slice(dataUrl.indexOf(",") + 1));
+  const bytes = Uint8Array.from(binary, (c) => c.charCodeAt(0));
+  return URL.createObjectURL(new Blob([bytes], { type: "image/png" }));
+}
+
+function swapFrameSrc(dataUrl: string) {
+  const url = toRevocableUrl(dataUrl);
+  if (url === null) {
+    ui.frameImg.src = dataUrl;
+    return;
+  }
+  const pre = new Image();
+  pre.onload = () => {
+    const previous = activeFrameUrl;
+    ui.frameImg.src = url;
+    activeFrameUrl = url;
+    pre.src = "";
+    if (previous) URL.revokeObjectURL(previous);
   };
-  next.src = url;
+  pre.onerror = () => URL.revokeObjectURL(url);
+  pre.src = url;
+}
+
+function releaseFrame() {
+  if (activeFrameUrl) URL.revokeObjectURL(activeFrameUrl);
+  activeFrameUrl = "";
+  ui.frameImg.removeAttribute("src");
 }
 
 function renderStage() {
@@ -644,6 +669,7 @@ function devOverrides() {
   if (page === "run" || page === "stats" || page === "settings") state.page = page;
   const theme = params.get("theme");
   if (theme === "light" || theme === "dark" || theme === "system") state.settings.themeMode = theme;
+  if (params.get("connect") === "1") state.autoConnect = true;
   return params.get("run") === "1";
 }
 
@@ -663,6 +689,8 @@ async function boot() {
   if (startImmediately) {
     await connect();
     await toggleRun();
+  } else if (state.autoConnect) {
+    await connect();
   }
   window.setInterval(() => void tick(), 250);
 }
