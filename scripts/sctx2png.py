@@ -58,6 +58,10 @@ figure { margin: 0; width: 190px; text-align: center; }
 img { max-width: 180px; max-height: 150px; display: block; margin: 0 auto;
       background: repeating-conic-gradient(#3a3d42 0 25%, #2a2c30 0 50%) 0 0 / 16px 16px; }
 figcaption { margin-top: 4px; font-size: 11px; opacity: .65; word-break: break-all; }
+nav { position: sticky; top: 0; background: #17181a; padding: 10px 0; font-size: 12px; line-height: 2;
+      border-bottom: 1px solid #2c2f33; max-height: 40vh; overflow: auto; }
+nav a { color: #8ab4f8; text-decoration: none; margin-right: 4px; }
+nav b { color: #e8eaed; font-weight: 500; }
 </style>
 """
 
@@ -120,26 +124,60 @@ def decode(data: bytes) -> Image.Image | None:
     return None
 
 
-def out_rel(name: str) -> Path:
-    """Categorised destination, keyed on where the texture sits in the APK.
+def asset_parts(name: str) -> tuple[str, ...]:
+    """Path relative to the asset root.
 
-    The APK itself groups sprites by use, so reusing that grouping keeps a full
-    extraction browsable instead of one flat dump of several hundred files.
+    An APK stores things under `assets/`, a pulled content directory under
+    `<pkg>/update/`; both describe the same layout, so normalising here lets
+    one categorisation rule serve both.
     """
-    path = Path(name)
-    parts, stem = path.parts, path.stem
-    if len(parts) > 1 and parts[1] == "sc3d":
-        return Path("sc3d", *parts[2:]).with_suffix(".png")
-    if parts[:3] == ("assets", "ui", "sc"):
-        return Path("ui", stem.split("_")[0], *parts[3:]).with_suffix(".png")
-    if parts[:2] == ("assets", "image"):
-        inner = parts[2:]
-        if inner[0].endswith(".sctx"):
-            return Path("image", "misc", *inner).with_suffix(".png")
-        return Path("image", *inner).with_suffix(".png")
-    if parts[:2] == ("assets", "sc"):
-        return Path("sc", stem.split("_")[0], *parts[2:]).with_suffix(".png")
-    return Path("misc", *parts).with_suffix(".png")
+    parts = Path(name).parts
+    for marker in ("assets", "update"):
+        if marker in parts:
+            return parts[parts.index(marker) + 1 :]
+    return parts
+
+
+def out_rel(name: str) -> Path:
+    """Categorised destination, keyed on where the texture sits.
+
+    The game groups sprites by use, so reusing that grouping keeps a full
+    extraction browsable instead of one flat dump of several thousand files.
+    """
+    parts = asset_parts(name)
+    if not parts:
+        return Path("misc", Path(name).with_suffix(".png").name)
+    stem = Path(name).stem
+    group = stem.split("_")[0]
+    tail = Path(*parts)
+    if parts[0] == "sc3d":
+        return Path("sc3d", *parts[1:]).with_suffix(".png")
+    if parts[:2] == ("ui", "sc"):
+        return Path("ui", group, *parts[2:]).with_suffix(".png")
+    if parts[0] == "image":
+        if len(parts) == 2:
+            return Path("image", "misc", *parts[1:]).with_suffix(".png")
+        return Path("image", *parts[1:]).with_suffix(".png")
+    if parts[0] == "sc":
+        return Path("sc", group, *parts[1:]).with_suffix(".png")
+    return Path("misc", tail).with_suffix(".png")
+
+
+def iter_files(source: Path, suffixes: tuple[str, ...]):
+    """Yield (name, bytes) for an APK or for every matching file under a directory.
+
+    A pulled content tree carries gigabytes of `.glb` and audio that this tool
+    cannot decode, so filter before reading rather than after.
+    """
+    if source.is_dir():
+        for path in sorted(source.rglob("*")):
+            if path.is_file() and path.suffix in suffixes:
+                yield path.relative_to(source).as_posix(), path.read_bytes()
+        return
+    with zipfile.ZipFile(source) as zf:
+        for name in zf.namelist():
+            if name.endswith(suffixes):
+                yield name, zf.read(name)
 
 
 def ktx_pages(blob: bytes):
@@ -158,61 +196,65 @@ def ktx_pages(blob: bytes):
         pos = blob.find(KTX, pos + 64)
 
 
-def extract_sc(archive: Path, out: Path, force: bool, contains: str) -> tuple[int, int, int]:
-    """Sprite collections ship their own texture pages.
+def save(image: Image.Image, target: Path, max_edge: int) -> None:
+    if max_edge and max(image.size) > max_edge:
+        ratio = max_edge / max(image.size)
+        image = image.resize((max(1, round(image.width * ratio)), max(1, round(image.height * ratio))), Image.LANCZOS)
+    target.parent.mkdir(parents=True, exist_ok=True)
+    image.save(target)
 
-    A `.sc` is a name table plus a zstd body, and the body holds whole KTX
-    atlases -- this is where the unit info renders live, which is what the
-    in-game card face is cropped from.
-    """
-    done = skipped = failed = 0
-    with zipfile.ZipFile(archive) as zf:
-        names = [n for n in zf.namelist() if n.endswith(".sc") and (not contains or contains in n)]
-        for name in names:
-            raw = zf.read(name)
-            start = raw.find(ZSTD)
-            stem = Path(name).stem
-            if start < 0:
-                failed += 1
-                continue
-            try:
-                pages = list(ktx_pages(zstandard.decompress(raw[start:])))
-            except Exception:
-                failed += 1
-                continue
-            for index, image in enumerate(pages):
-                target = out / "sc-ktx" / f"{stem}_{index}_{image.width}x{image.height}.png"
-                if target.exists() and not force:
-                    skipped += 1
-                    continue
-                target.parent.mkdir(parents=True, exist_ok=True)
-                image.save(target)
-                done += 1
+
+def extract(source: Path, out: Path, force: bool, contains: str, max_edge: int) -> tuple[int, int, list[str]]:
+    done, skipped, failed = 0, 0, []
+    for name, data in iter_files(source, (".sctx",)):
+        if contains and contains not in name:
+            continue
+        target = out / out_rel(name)
+        if target.exists() and not force:
+            skipped += 1
+            continue
+        try:
+            image = decode(data)
+        except Exception as exc:
+            failed.append(f"{name}: {type(exc).__name__}")
+            continue
+        if image is None:
+            failed.append(name)
+            continue
+        save(image, target, max_edge)
+        done += 1
+        if (done + skipped) % 200 == 0:
+            print(f"  ... {done + skipped}", flush=True)
     return done, skipped, failed
 
 
-def extract(archive: Path, out: Path, force: bool, contains: str) -> tuple[int, int, list[str]]:
-    done, skipped, failed = 0, 0, []
-    with zipfile.ZipFile(archive) as zf:
-        names = [n for n in zf.namelist() if n.endswith(".sctx") and (not contains or contains in n)]
-        for name in names:
-            target = out / out_rel(name)
+def extract_sc(source: Path, out: Path, force: bool, contains: str, max_edge: int) -> tuple[int, int, int]:
+    """Sprite collections ship their own texture pages.
+
+    A `.sc` is a name table plus a zstd body, and the body holds whole KTX
+    atlases -- this is where the unit info renders and the card faces live.
+    """
+    done = skipped = failed = 0
+    for name, raw in iter_files(source, (".sc",)):
+        if contains and contains not in name:
+            continue
+        start = raw.find(ZSTD)
+        stem = Path(name).stem
+        if start < 0:
+            failed += 1
+            continue
+        try:
+            pages = list(ktx_pages(zstandard.decompress(raw[start:])))
+        except Exception:
+            failed += 1
+            continue
+        for index, image in enumerate(pages):
+            target = out / "sc-ktx" / f"{stem}_{index}_{image.width}x{image.height}.png"
             if target.exists() and not force:
                 skipped += 1
                 continue
-            try:
-                image = decode(zf.read(name))
-            except Exception as exc:
-                failed.append(f"{name}: {type(exc).__name__}")
-                continue
-            if image is None:
-                failed.append(name)
-                continue
-            target.parent.mkdir(parents=True, exist_ok=True)
-            image.save(target)
+            save(image, target, max_edge)
             done += 1
-            if (done + skipped) % 100 == 0:
-                print(f"  {done + skipped}/{len(names)} ...", flush=True)
     return done, skipped, failed
 
 
@@ -228,6 +270,9 @@ def write_gallery(out: Path) -> Path:
         groups.setdefault(path.parent.relative_to(out).as_posix(), []).append(path)
 
     parts = [GALLERY_HEAD]
+    parts.append('<nav>' + ' · '.join(
+        f'<a href="#{escape(g)}">{escape(g)}&nbsp;<b>{len(p)}</b></a>'
+        for g, p in sorted(groups.items())) + '</nav>')
     for group, paths in groups.items():
         parts.append(f'<h2 id="{escape(group)}">{escape(group)} <small>{len(paths)}</small></h2><div class="grid">')
         for path in paths:
@@ -249,28 +294,31 @@ def write_gallery(out: Path) -> Path:
 
 def main() -> int:
     parser = argparse.ArgumentParser(description=__doc__.splitlines()[0])
-    parser.add_argument("apk", nargs="*", type=Path, help="APK files to read (default: every apk/*.apk)")
+    parser.add_argument("source", nargs="*", type=Path,
+                        help="APK files or directories to read (default: every apk/*.apk)")
     parser.add_argument("-d", "--dest", type=Path, default=DEFAULT_DEST)
     parser.add_argument("-c", "--contains", default="", help="only extract paths containing this text")
     parser.add_argument("-f", "--force", action="store_true", help="re-decode files that already exist")
+    parser.add_argument("--max-edge", type=int, default=0,
+                        help="downscale saved pages so the longest edge fits, keeping a huge dump browsable")
     args = parser.parse_args()
 
-    archives = args.apk or sorted((args.dest.parent / "apk").glob("*.apk"))
-    if not archives:
-        print("没有可解包的 APK", file=sys.stderr)
+    sources = args.source or sorted((args.dest.parent / "apk").glob("*.apk"))
+    if not sources:
+        print("没有可解包的来源", file=sys.stderr)
         return 1
 
     total_done = total_skipped = total_sc_failed = 0
     all_failed: list[str] = []
-    for archive in archives:
-        print(f"解包 {archive}")
-        done, skipped, failed = extract(archive, args.dest, args.force, args.contains)
-        print(f"  sctx  新写 {done}，已存在 {skipped}，未解析 {len(failed)}")
+    for source in sources:
+        print(f"解包 {source}", flush=True)
+        done, skipped, failed = extract(source, args.dest, args.force, args.contains, args.max_edge)
+        print(f"  sctx  新写 {done}，已存在 {skipped}，未解析 {len(failed)}", flush=True)
         total_done += done
         total_skipped += skipped
         all_failed += failed
-        done, skipped, failed = extract_sc(archive, args.dest, args.force, args.contains)
-        print(f"  sc    新写 {done}，已存在 {skipped}，无内嵌贴图 {failed}")
+        done, skipped, failed = extract_sc(source, args.dest, args.force, args.contains, args.max_edge)
+        print(f"  sc    新写 {done}，已存在 {skipped}，无内嵌贴图 {failed}", flush=True)
         total_done += done
         total_skipped += skipped
         total_sc_failed += failed
