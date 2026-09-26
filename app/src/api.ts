@@ -48,7 +48,7 @@ export interface Frame {
   dataUrl: string;
   width: number;
   height: number;
-  matchSpace: boolean;
+  landscape: boolean;
 }
 
 /** Where the app keeps its own files — the address to ask for when reporting a bug. */

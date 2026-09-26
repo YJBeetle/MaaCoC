@@ -417,14 +417,13 @@ function renderStage() {
     return;
   }
   swapFrameSrc(frame.dataUrl);
-  ui.badge.textContent = frame.matchSpace
-    ? `${frame.width}×${frame.height}`
-    : `设备当前 ${frame.width}×${frame.height}，不是横屏 1280×720：模板和命中框都无效`;
-  ui.badge.classList.toggle("warn", !frame.matchSpace);
-  const children = [ui.frameImg, ui.badge];
-  // Boxes are authored in the landscape match space; drawing them over a
-  // portrait frame lands them anywhere but where the button actually is.
-  const overlay = state.settings.overlayHits && frame.matchSpace;
+  ui.badge.textContent = `${frame.width}×${frame.height}`;
+  ui.badge.classList.toggle("warn", !frame.landscape);
+  const children: HTMLElement[] = [ui.frameImg, ui.badge];
+  if (!frame.landscape) children.push(el("div", { class: "void", text: "设备处于竖屏，游戏不在前台" }));
+  // In portrait the events on screen came from a landscape frame, so their
+  // boxes land anywhere but where the button actually is.
+  const overlay = state.settings.overlayHits && frame.landscape;
   if (overlay) children.push(ui.overlay);
   showStageChildren(children);
   if (overlay) drawOverlay();

@@ -75,8 +75,8 @@ pub struct Frame {
     pub data_url: String,
     pub width: u32,
     pub height: u32,
-    /// False when the device is not showing the landscape the templates assume.
-    pub match_space: bool,
+    /// False when the device is in portrait, i.e. not showing the game at all.
+    pub landscape: bool,
 }
 
 struct Inner {
@@ -383,7 +383,7 @@ async fn frame(state: State<'_, AppState>) -> Result<Option<Frame>, String> {
         ),
         width,
         height,
-        match_space: runner.in_match_space(width, height),
+        landscape: runner.is_landscape(width, height),
     }))
 }
 

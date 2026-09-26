@@ -220,12 +220,12 @@ impl Runner {
         self.bus.ignored()
     }
 
-    /// The PNG the framework actually captured, in the 1280x720 match space.
-    /// True when a frame of these dimensions is what the templates were drawn
-    /// for. A portrait phone (launcher, a crashed game) yields 720x1280, where
-    /// every coordinate in the pipeline is meaningless.
-    pub fn in_match_space(&self, width: u32, height: u32) -> bool {
-        (width, height) == crate::MATCH_SIZE
+    /// Whether the device is showing a landscape frame. A 20:9 phone legitimately
+    /// reports 1600x720, so this must not be an equality test against the 16:9
+    /// size the assets were cropped on — only portrait means the game is not on
+    /// screen at all (launcher, a crashed app) and nothing can match.
+    pub fn is_landscape(&self, width: u32, height: u32) -> bool {
+        width > height
     }
 
     pub fn screencap_png(&self) -> Result<Vec<u8>> {
