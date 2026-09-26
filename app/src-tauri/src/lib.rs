@@ -81,6 +81,7 @@ struct Inner {
     runner: Option<Runner>,
     settings: Settings,
     recorder: Option<FrameStore>,
+    last_reco: i64,
     log_dir: String,
     events: VecDeque<NodeEvent>,
     started: Option<Instant>,
@@ -106,6 +107,7 @@ impl AppState {
                 runner: None,
                 settings,
                 recorder: None,
+                last_reco: 0,
                 log_dir,
                 events: VecDeque::new(),
                 started: None,
@@ -160,7 +162,11 @@ fn frames_dir<R: Runtime>(app: &AppHandle<R>) -> Result<PathBuf, String> {
 fn apply_recording<R: Runtime>(inner: &mut Inner, app: &AppHandle<R>) -> Result<(), String> {
     let on = inner.settings.record_frames;
     if let Some(runner) = inner.runner.as_ref() {
-        runner.set_debug_mode(on).map_err(|e| e.to_string())?;
+        // Debug mode is what makes "the frame a recognition saw" readable, which
+        // is the only live view available while a task owns the controller. The
+        // cache limit keeps it to a few frames instead of the 4096 default.
+        runner.set_debug_mode(true).map_err(|e| e.to_string())?;
+        maacoc_engine::runner::Runner::set_reco_cache_limit(4).map_err(|e| e.to_string())?;
     }
     inner.recorder = if on {
         Some(FrameStore::open(frames_dir(app)?))
@@ -171,13 +177,13 @@ fn apply_recording<R: Runtime>(inner: &mut Inner, app: &AppHandle<R>) -> Result<
 }
 
 #[tauri::command]
-fn settings(state: State<'_, AppState>) -> Result<Settings, String> {
+async fn settings(state: State<'_, AppState>) -> Result<Settings, String> {
     Ok(state.inner.lock().unwrap().settings.clone())
 }
 
 /// Where the app keeps its own files, for the 关于 panel and for bug reports.
 #[tauri::command]
-fn paths(state: State<'_, AppState>) -> Result<Paths, String> {
+async fn paths(state: State<'_, AppState>) -> Result<Paths, String> {
     let inner = state.inner.lock().unwrap();
     Ok(Paths {
         log_dir: inner.log_dir.clone(),
@@ -185,7 +191,7 @@ fn paths(state: State<'_, AppState>) -> Result<Paths, String> {
 }
 
 #[tauri::command]
-fn save_settings<R: Runtime>(
+async fn save_settings<R: Runtime>(
     app: AppHandle<R>,
     state: State<'_, AppState>,
     next: Settings,
@@ -236,6 +242,11 @@ async fn connect<R: Runtime>(app: AppHandle<R>, state: State<'_, AppState>) -> R
     let mut inner = state.inner.lock().unwrap();
     match outcome {
         Ok(runner) => {
+            // Replacing a live Runner drops it; Drop stops the task first, but do
+            // it visibly here so a reconnect never races the old worker thread.
+            if let Some(old) = inner.runner.take() {
+                old.stop(Duration::from_secs(10));
+            }
             inner.detail = runner.label.clone();
             inner.phase = Phase::Ready;
             inner.runner = Some(runner);
@@ -308,7 +319,7 @@ fn status_of(inner: &Inner) -> Status {
 }
 
 #[tauri::command]
-fn status(state: State<'_, AppState>) -> Result<Status, String> {
+async fn status(state: State<'_, AppState>) -> Result<Status, String> {
     let inner = state.inner.lock().unwrap();
     Ok(status_of(&inner))
 }
@@ -323,6 +334,9 @@ async fn events(state: State<'_, AppState>) -> Result<Vec<NodeEvent>, String> {
     for event in &fresh {
         if event.kind == "action" && event.node == "AttackStart" {
             inner.battles += 1;
+        }
+        if event.kind == "recognition" && event.reco_id > 0 {
+            inner.last_reco = event.reco_id;
         }
         inner.events.push_back(event.clone());
         while inner.events.len() > 300 {
@@ -349,11 +363,13 @@ async fn frame(state: State<'_, AppState>) -> Result<Option<Frame>, String> {
     let Some(runner) = inner.runner.as_ref() else {
         return Ok(None);
     };
-    // While a battle is running the framework is already screenshotting every
-    // loop; asking for another capture just queues behind it and takes ~1.2s of
-    // adb round trip, which is what made the window stutter.
+    // While a task runs the controller is owned by it, and a direct screencap
+    // comes back empty (observed on every poll during a battle). The frame the
+    // last recognition actually matched on is both available and more honest, so
+    // show that; debug mode keeps it alive for exactly one frame worth of work.
     let png = if runner.running() {
-        runner.cached_png().ok_or_else(|| "还没有可用画面".to_string())?
+        let reco = inner.last_reco;
+        runner.recognition_png(reco).ok_or("任务运行中，等待下一次识别")?
     } else {
         runner.screencap_png().map_err(|e| e.to_string())?
     };

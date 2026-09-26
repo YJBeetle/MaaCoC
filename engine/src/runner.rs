@@ -20,6 +20,7 @@ pub struct Runner {
     controller: Option<Controller>,
     resource: Resource,
     tasker: Tasker,
+    sink_id: i64,
     bus: EventBus,
     pub label: String,
 }
@@ -29,6 +30,22 @@ fn check(status: MaaStatus, what: &str) -> Result<()> {
         Ok(())
     } else {
         Err(format!("{what} 失败: {status:?}").into())
+    }
+}
+
+impl Drop for Runner {
+    /// MAA's worker thread calls the context sink we registered while it is
+    /// recognising. Freeing the tasker (and with it the boxed callback) mid-call
+    /// is a use-after-free — it showed up as a SIGSEGV inside
+    /// `EventDispatcher::notify` when a reconnect replaced a running Runner.
+    /// So: ask it to stop, wait for the worker to finish, unregister the sink.
+    fn drop(&mut self) {
+        if self.tasker.running() {
+            let _ = self.tasker.post_stop();
+        }
+        if self.await_idle(Duration::from_secs(15)) && self.sink_id > 0 {
+            self.tasker.remove_context_sink(self.sink_id);
+        }
     }
 }
 
@@ -95,10 +112,11 @@ impl Runner {
         }
         let bus = EventBus::new();
         // Context sinks carry the per-node recognition/action notifications.
-        let _ = tasker.add_context_sink(bus.handle());
+        let sink_id = tasker.add_context_sink(bus.handle()).unwrap_or(0);
         Self {
             controller,
             resource,
+            sink_id,
             tasker,
             bus,
             label,
@@ -146,6 +164,16 @@ impl Runner {
         self.tasker.running()
     }
 
+    /// Stop the resident task and wait for its worker thread to actually leave.
+    /// Returns false if the task is still running after the grace period.
+    pub fn await_idle(&self, grace: Duration) -> bool {
+        let deadline = Instant::now() + grace;
+        while self.tasker.running() && Instant::now() < deadline {
+            thread::sleep(Duration::from_millis(50));
+        }
+        !self.tasker.running()
+    }
+
     /// The exact frame a recognition ran on. Free in debug mode, and unlike a
     /// second screencap it cannot drift from what was actually matched.
     pub fn recognition_png(&self, reco_id: i64) -> Option<Vec<u8>> {
@@ -171,6 +199,12 @@ impl Runner {
         Ok(())
     }
 
+    /// Keep only a handful of recognition frames around: the default cache is
+    /// 4096 images, which is how the process ends up holding gigabytes.
+    pub fn set_reco_cache_limit(limit: usize) -> Result<()> {
+        Tasker::set_reco_image_cache_limit(limit).map_err(|e| e.to_string().into())
+    }
+
     pub fn poll(&self) -> Vec<NodeEvent> {
         self.bus.drain()
     }
@@ -186,16 +220,6 @@ impl Runner {
     }
 
     /// The PNG the framework actually captured, in the 1280x720 match space.
-    /// The last frame the framework itself captured. While a task is running
-    /// this is already fresh — the loop screenshots every iteration — and it
-    /// costs nothing, unlike posting a second capture that then has to wait for
-    /// the task's own round trip.
-    pub fn cached_png(&self) -> Option<Vec<u8>> {
-        let controller = self.controller.as_ref()?;
-        let image = controller.cached_image().ok()?;
-        image.to_vec()
-    }
-
     pub fn screencap_png(&self) -> Result<Vec<u8>> {
         let controller = self.controller.as_ref().ok_or("当前无设备，无法截图")?;
         check(controller.wait(controller.post_screencap()?), "截图")?;
