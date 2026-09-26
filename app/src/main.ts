@@ -5,6 +5,7 @@ import "@fontsource/roboto/400.css";
 import "@fontsource/roboto/500.css";
 import "./styles.css";
 import "@material/web/button/filled-button.js";
+import "@material/web/button/outlined-button.js";
 import "@material/web/button/text-button.js";
 import "@material/web/fab/fab.js";
 import "@material/web/chips/assist-chip.js";
@@ -13,9 +14,17 @@ import "@material/web/switch/switch.js";
 import "@material/web/select/outlined-select.js";
 import "@material/web/select/select-option.js";
 
-import type { EngineApi, Frame, NodeEvent, Paths, Settings, Status } from "./api";
+import type { EngineApi, Frame, NodeEvent, Paths, Phase, Settings, Status } from "./api";
 import { DEFAULT_SETTINGS, eventLabel, eventValue, formatUptime } from "./api";
 import { applyTheme, type ThemeMode } from "./theme";
+
+const stateLabels: Record<Phase, string> = {
+  idle: "未连接",
+  connecting: "连接中",
+  ready: "已连接",
+  running: "战斗中",
+  error: "出错",
+};
 
 const idle: Status = { phase: "idle", detail: "", battles: 0, uptimeMs: 0, currentNode: "" };
 
@@ -76,9 +85,19 @@ function el<K extends keyof HTMLElementTagNameMap>(tag: K, attrs: Record<string,
   return node;
 }
 
+/** Swap a label in place; rebuilding the button on every 4 Hz render flickered. */
+function setLabel(host: HTMLElement, className: string, text: string) {
+  let node = host.querySelector(`.${className}`);
+  if (!node) {
+    node = el("span", { class: className });
+    host.appendChild(node);
+  }
+  if (node.textContent !== text) node.textContent = text;
+}
+
 const ui = {
   title: el("h1", { text: "挂机", id: "page-title" }),
-  chip: el("md-assist-chip", { label: "未连接", id: "status-chip" }),
+  chip: el("span", { id: "status-note" }),
   meta: el("span", { class: "meta", id: "run-meta", text: "" }),
   stage: el("div", { class: "stage", id: "stage" }),
   frameImg: el("img", { id: "frame-img", alt: "设备画面" }),
@@ -87,6 +106,7 @@ const ui = {
   void: el("div", { class: "void", text: "未连接设备" }),
   timeline: el("div", { class: "timeline", id: "timeline" }),
   fab: el("md-fab", { id: "fab" }),
+  link: el("md-outlined-button", { id: "btn-link" }),
   actions: el("div", { class: "actions", id: "actions" }),
   pages: {} as Record<string, HTMLElement>,
 };
@@ -108,7 +128,14 @@ function buildShell() {
   }
 
   const topbar = el("div", { class: "topbar" });
-  topbar.append(ui.title, el("span", { class: "grow" }), ui.meta, ui.chip);
+  const linkLabel = el("span", { class: "swap" });
+  linkLabel.append(el("span", { class: "state", text: "未连接" }), el("span", { class: "action", text: "连接设备" }));
+  ui.link.append(linkLabel);
+  ui.link.addEventListener("click", () => {
+    const connected = state.status.phase === "ready" || state.status.phase === "running";
+    void (connected ? disconnectNow() : connect());
+  });
+  topbar.append(ui.title, el("span", { class: "grow" }), ui.meta, ui.chip, ui.link);
 
   const main = el("div", { class: "main" });
   ui.fab.setAttribute("label", "开始战斗");
@@ -166,7 +193,6 @@ function buildSettingsPage(): HTMLElement {
     el("div", { class: "field", id: "f-entry" }),
     el("div", { class: "field", id: "f-interval" }),
     el("div", { class: "field", id: "f-autostart" }),
-    el("div", { class: "field", id: "f-disconnect" }),
   );
 
   const diag = el("div", { class: "card bordered" });
@@ -328,18 +354,10 @@ function renderActions() {
   const icon = ui.fab.querySelector("md-icon");
   if (icon) icon.textContent = running ? "stop" : "play_arrow";
 
-  const wanted = connected ? "disconnect" : "connect";
-  let button = ui.actions.querySelector<HTMLElement>("[data-action]");
-  if (button?.dataset.action !== wanted) {
-    const next: HTMLElement = connected ? el("md-text-button") : el("md-filled-button");
-    next.dataset.action = wanted;
-    next.appendChild(el("span", { text: connected ? "断开连接" : "连接设备" }));
-    next.addEventListener("click", () => void (connected ? disconnectNow() : connect()));
-    if (button) button.replaceWith(next);
-    else ui.actions.insertBefore(next, ui.fab);
-    button = next;
-  }
-  button.toggleAttribute("disabled", phase === "connecting");
+  // Swap text in place: rebuilding the button on every 4 Hz render flickered.
+  setLabel(ui.link, "state", stateLabels[phase]);
+  setLabel(ui.link, "action", connected ? "断开连接" : "连接设备");
+  ui.link.toggleAttribute("disabled", phase === "connecting");
 }
 
 async function toggleRun() {
@@ -568,22 +586,6 @@ function renderSettings() {
     "跟随系统",
   );
 
-  // 断开属于管理动作，放在设置里而不是挂机页的操作条上。
-  const connected = state.status.phase === "ready" || state.status.phase === "running";
-  const disconnect = fieldOf("f-disconnect", "断开当前连接", connected ? state.status.detail : "当前没有连接设备");
-  if (disconnect) {
-    let btn = disconnect.querySelector<HTMLElement>("md-text-button");
-    if (!btn) {
-      btn = el("md-text-button");
-      btn.appendChild(el("span", { text: "断开" }));
-      btn.addEventListener("click", () => void disconnectNow());
-      disconnect.appendChild(btn);
-    }
-    btn.toggleAttribute("disabled", !connected);
-  }
-
-  fieldOf("f-log", "日志目录", state.paths.logDir || "未知");
-
   const version = fieldOf("f-version", "版本");
   if (version) {
     let text = version.querySelector("code");
@@ -607,10 +609,9 @@ function renderSettings() {
 
 function render() {
   const phase = state.status.phase;
-  const chipLabels: Record<string, string> = { idle: "未连接", connecting: "连接中", ready: "已连接", running: "战斗中", error: "出错" };
   const problem = state.error || (phase === "error" ? state.status.detail : "");
-  ui.chip.setAttribute("label", problem ? `${chipLabels[phase]} · ${problem}` : chipLabels[phase]);
-  ui.chip.toggleAttribute("data-running", phase === "running");
+  ui.chip.textContent = problem;
+  ui.chip.classList.toggle("error", Boolean(problem));
   const running = phase === "running";
   const node = state.status.currentNode;
   ui.meta.textContent = running

@@ -78,9 +78,19 @@ body { overflow: hidden; user-select: none; }
 .stage .void { display: grid; place-items: center; gap: 8px; color: var(--md-sys-color-on-surface-variant); font-size: 13px; }
 .stage .res { position: absolute; top: 10px; right: 10px; max-width: calc(100% - 20px); padding: 3px 8px; border-radius: 6px; background: rgb(0 0 0 / 0.6); font: 11px ui-monospace, Menlo, monospace; color: var(--md-sys-color-surface-bright); }
 .stage .res.warn { background: var(--md-sys-color-error-container); color: var(--md-sys-color-on-error-container); font-family: inherit; }
-/* The secondary action sits next to a 56px extended FAB; at the button default
-   of 40px the pair reads as a label glued to a button. */
-.actions md-text-button, .actions md-filled-button { height: 56px; padding-inline: 20px; font-size: 15px; }
+/* One control carries both the connection state and the action: the state is
+   what you read, the action is what you get when you aim at it. Both labels
+   share one grid cell so the button is as wide as the longer of the two and
+   never resizes under the cursor. */
+#btn-link { margin-left: 8px; }
+#btn-link .swap { display: grid; place-items: center; }
+#btn-link .swap > * { grid-area: 1 / 1; }
+#btn-link .action { visibility: hidden; }
+#btn-link:hover:not([disabled]) .state { visibility: hidden; }
+#btn-link:hover:not([disabled]) .action { visibility: visible; }
+#status-note { font-size: 12px; color: var(--md-sys-color-on-surface-variant); }
+#status-note.error { color: var(--md-sys-color-error); }
+#status-note:empty { display: none; }
 /* drawOverlay positions this over the letterboxed frame, not the whole stage. */
 .stage canvas { position: absolute; pointer-events: none; }
 
