@@ -30,7 +30,7 @@ export function createMockApi(): EngineApi {
   let cursor = 0;
   let clock = 0;
 
-  const frame: Frame = { dataUrl: frameUrl, width: 1280, height: 720 };
+  const frame: Frame = { dataUrl: frameUrl, width: 1280, height: 720, matchSpace: true };
 
   return {
     mode: "mock",

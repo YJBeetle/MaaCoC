@@ -45,7 +45,7 @@ pub fn list_devices() -> Result<Vec<DeviceInfo>> {
         .collect())
 }
 
-fn device_model(device: &maa_framework::toolkit::AdbDevice) -> Option<String> {
+pub(crate) fn device_model(device: &maa_framework::toolkit::AdbDevice) -> Option<String> {
     let output = std::process::Command::new(&device.adb_path)
         .args([
             "-s",

@@ -417,11 +417,17 @@ function renderStage() {
     return;
   }
   swapFrameSrc(frame.dataUrl);
-  ui.badge.textContent = `${frame.width}×${frame.height}`;
+  ui.badge.textContent = frame.matchSpace
+    ? `${frame.width}×${frame.height}`
+    : `设备当前 ${frame.width}×${frame.height}，不是横屏 1280×720：模板和命中框都无效`;
+  ui.badge.classList.toggle("warn", !frame.matchSpace);
   const children = [ui.frameImg, ui.badge];
-  if (state.settings.overlayHits) children.push(ui.overlay);
+  // Boxes are authored in the landscape match space; drawing them over a
+  // portrait frame lands them anywhere but where the button actually is.
+  const overlay = state.settings.overlayHits && frame.matchSpace;
+  if (overlay) children.push(ui.overlay);
   showStageChildren(children);
-  if (state.settings.overlayHits) drawOverlay();
+  if (overlay) drawOverlay();
 }
 
 function drawOverlay() {

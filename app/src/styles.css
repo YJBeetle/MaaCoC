@@ -76,7 +76,11 @@ body { overflow: hidden; user-select: none; }
 .stage { position: relative; flex: 1; min-width: 0; min-height: 0; background: var(--md-sys-color-surface-container-lowest); display: grid; place-items: center; }
 .stage img { width: 100%; height: 100%; object-fit: contain; display: block; }
 .stage .void { display: grid; place-items: center; gap: 8px; color: var(--md-sys-color-on-surface-variant); font-size: 13px; }
-.stage .res { position: absolute; top: 10px; right: 10px; padding: 3px 8px; border-radius: 6px; background: rgb(0 0 0 / 0.6); font: 11px ui-monospace, Menlo, monospace; color: var(--md-sys-color-surface-bright); }
+.stage .res { position: absolute; top: 10px; right: 10px; max-width: calc(100% - 20px); padding: 3px 8px; border-radius: 6px; background: rgb(0 0 0 / 0.6); font: 11px ui-monospace, Menlo, monospace; color: var(--md-sys-color-surface-bright); }
+.stage .res.warn { background: var(--md-sys-color-error-container); color: var(--md-sys-color-on-error-container); font-family: inherit; }
+/* The secondary action sits next to a 56px extended FAB; at the button default
+   of 40px the pair reads as a label glued to a button. */
+.actions md-text-button, .actions md-filled-button { height: 56px; padding-inline: 20px; font-size: 15px; }
 /* drawOverlay positions this over the letterboxed frame, not the whole stage. */
 .stage canvas { position: absolute; pointer-events: none; }
 

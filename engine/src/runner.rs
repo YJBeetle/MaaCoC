@@ -76,7 +76,8 @@ impl Runner {
                         .ok_or_else(|| format!("未找到设备 {needle}"))?,
                     None => devices.remove(0),
                 };
-                let label = format!("{} @ {}", device.name, device.address);
+                let name = crate::device_model(&device).unwrap_or_else(|| device.name.clone());
+                let label = format!("{name} · {}", device.address);
                 let config = serde_json::to_string(&device.config)?;
                 let controller = Controller::new_adb(
                     device.adb_path.to_str().ok_or("adb 路径无效")?,
@@ -220,6 +221,13 @@ impl Runner {
     }
 
     /// The PNG the framework actually captured, in the 1280x720 match space.
+    /// True when a frame of these dimensions is what the templates were drawn
+    /// for. A portrait phone (launcher, a crashed game) yields 720x1280, where
+    /// every coordinate in the pipeline is meaningless.
+    pub fn in_match_space(&self, width: u32, height: u32) -> bool {
+        (width, height) == crate::MATCH_SIZE
+    }
+
     pub fn screencap_png(&self) -> Result<Vec<u8>> {
         let controller = self.controller.as_ref().ok_or("当前无设备，无法截图")?;
         check(controller.wait(controller.post_screencap()?), "截图")?;
