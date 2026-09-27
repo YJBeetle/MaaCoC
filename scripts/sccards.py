@@ -171,7 +171,8 @@ def review_sheet(sc, pages, out, cols=10, cell=132):
 
 def main(argv=None):
     ap = argparse.ArgumentParser(description=__doc__.splitlines()[0])
-    ap.add_argument("source", type=Path, help="ui.sc（SCFILE 容器或已解压正文）")
+    ap.add_argument("source", type=Path, help="ui.sc / 含 ui.sc 的 APK 或目录")
+    ap.add_argument("--sc", default="ui.sc", help="从 APK/目录里挑哪个 .sc")
     ap.add_argument("--templates", type=Path, default=REPO / "assets/image/Soldier")
     ap.add_argument("--symbols", type=Path,
                     default=REPO / "assets/config/card-symbols.json")
@@ -181,7 +182,7 @@ def main(argv=None):
     args = ap.parse_args(argv)
 
     templates = sorted(args.templates.glob("*.png"))
-    sc = scframes.ScFile(args.source.read_bytes())
+    sc = scframes.ScFile(scframes.load_sc(args.source, args.sc))
     pages = [sctx2png.ktx_image(sc.page_ktx(i)) for i in range(len(sc.tsets))]
     if args.review:
         review_sheet(sc, pages, args.review)

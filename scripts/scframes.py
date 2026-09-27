@@ -313,15 +313,41 @@ def selfcheck(sc: ScFile, frames):
     return bad
 
 
+def load_sc(source, member="ui.sc"):
+    """从 .sc 文件、目录或 APK 里取到一个 SCFILE 的原始字节。
+
+    游戏更新交付的是 APK，所以这里直接支持 APK/目录，省得手工先解出来。
+    """
+    path = Path(source)
+    data = path.read_bytes() if path.is_file() else b""
+    if data[:2] == b"SC":
+        return data
+    want = Path(member).name
+    if path.is_dir():
+        hits = sorted(p for p in path.rglob(want))
+        if not hits:
+            raise ValueError("%s 下找不到 %s" % (path, want))
+        return hits[0].read_bytes()
+    import zipfile
+    with zipfile.ZipFile(path) as zf:
+        hits = [n for n in zf.namelist() if n.endswith("/" + want) or n == want]
+        if not hits:
+            raise ValueError("%s 里没有 %s（.sc 共 %d 个）"
+                             % (path.name, want,
+                                sum(n.endswith(".sc") for n in zf.namelist())))
+        return zf.read(sorted(hits, key=len)[0])
+
+
 def main(argv=None):
     ap = argparse.ArgumentParser(description=__doc__.splitlines()[0])
-    ap.add_argument("source", type=Path, help=".sc 文件，或已解压的正文")
+    ap.add_argument("source", type=Path, help="ui.sc / 含 ui.sc 的 APK 或目录")
+    ap.add_argument("--sc", default="ui.sc", help="从 APK/目录里挑哪个 .sc")
     ap.add_argument("-o", "--output", type=Path, help="写出 JSON 清单")
     ap.add_argument("--list", metavar="GLOB", default="*", help="只打印匹配的符号")
     ap.add_argument("--split", action="store_true", help="同名不合并，逐块列出")
     args = ap.parse_args(argv)
 
-    sc = ScFile(args.source.read_bytes())
+    sc = ScFile(load_sc(args.source, args.sc))
     frames = frame_table(sc, merge=not args.split)
     pages = [sc.page(i) for i in range(len(sc.tsets))]
     print("分块: %s" % ", ".join("%s(%d)" % p for p in sc.parts))
