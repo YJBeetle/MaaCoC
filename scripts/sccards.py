@@ -56,36 +56,72 @@ def leaf_shapes(sc, obj_id, seen=None):
     return out
 
 
-def face_tile(sc, pages, obj_id):
-    """返回 (显示朝向的卡面图, 是否被转存 90 度)。
+# 图集里一张图块可能的 8 种存法（二面体群 D4）。O 把页内像素 (U,V) 映到显示
+# 坐标 (X,Y) 的线性部分 —— 符号和置换是拿一张 4x3 的标记图实测 PIL transpose
+# 得到的，不是推的：例如 ROTATE_90 把 (0,0) 送到 (0,3)，即 X∝+V、Y∝-U。
+ORIENTATIONS = (
+    (None, np.array([[1., 0.], [0., 1.]])),
+    (Image.Transpose.ROTATE_90, np.array([[0., 1.], [-1., 0.]])),
+    (Image.Transpose.ROTATE_180, np.array([[-1., 0.], [0., -1.]])),
+    (Image.Transpose.ROTATE_270, np.array([[0., -1.], [1., 0.]])),
+    (Image.Transpose.FLIP_LEFT_RIGHT, np.array([[-1., 0.], [0., 1.]])),
+    (Image.Transpose.FLIP_TOP_BOTTOM, np.array([[1., 0.], [0., -1.]])),
+    (Image.Transpose.TRANSPOSE, np.array([[0., 1.], [1., 0.]])),
+    (Image.Transpose.TRANSVERSE, np.array([[0., -1.], [-1., 0.]])),
+)
+# 拟合残差超过这个比例就说明图块不是轴对齐存放（多半是实例矩阵带了斜角），
+# 宁可报出来也别硬猜一个朝向。
+ORIENT_TOL = 0.01
 
-    朝向不靠试出来：把顶点的局部 (x,y) 分别对 uv 做最小二乘，
-    u 跟着 y 走就是图集里转存过。
+
+def command_tile(sc, pages, cmd):
+    """一条绘制命令 -> (显示朝向的图, 用的转置, 拟合相对残差, 面积)。
+
+    朝向按命令单独定：每个 Shape 有自己的局部坐标系，混在一起拟合会互相污染。
+    拟合必须带常数项 —— 局部坐标原点在形状中心而 uv 原点在页角，省掉截距会把
+    线性部分算成一团垃圾（这个坑踩过一次）。
     """
-    pts, page = [], None
-    for s in leaf_shapes(sc, obj_id):
-        for _flags, tex, count, start in sc.commands(s):
-            if count <= 0:
-                continue
-            pts += [tuple(v) for v in sc.vertices(start, count)]
-            page = tex
-    if not pts or page is None:
-        return None, False
-    xs, ys, us, vs = np.array(pts, dtype=float).T
-
-    def resid(src, dst):
-        a = np.vstack([src, np.ones_like(src)]).T
-        k, *_ = np.linalg.lstsq(a, dst, rcond=None)
-        return float(np.abs(dst - a @ k).max())
-
-    rotated = resid(ys, us) < resid(xs, us)
+    _flags, page, count, start = cmd
+    if count <= 0 or page < 0 or page >= len(sc.tsets):
+        return None, None, None, 0
+    xs, ys, us, vs = np.array(sc.vertices(start, count), dtype=float).T
     w, h = sc.page(page)
+    if not w or not h:
+        return None, None, None, 0
+    a = np.column_stack([xs, ys, np.ones_like(xs)])
+    u = np.linalg.lstsq(a, us / UV * w, rcond=None)[0]
+    v = np.linalg.lstsq(a, vs / UV * h, rcond=None)[0]
+    k = np.array([[u[0], u[1]], [v[0], v[1]]])
+    best = None
+    for op, o in ORIENTATIONS:
+        m = o @ k
+        scale = np.trace(m) / 2
+        if scale <= 0:
+            continue
+        err = float(np.abs(m - scale * np.eye(2)).max()) / scale
+        if best is None or err < best[0]:
+            best = (err, op)
+    if best is None or best[0] > ORIENT_TOL:
+        return None, None, best[0] if best else None, 0
+    err, op = best
     box = (round(us.min() / UV * w), round(vs.min() / UV * h),
            round(us.max() / UV * w), round(vs.max() / UV * h))
+    if box[2] - box[0] < 2 or box[3] - box[1] < 2:
+        return None, op, err, 0
     img = pages[page].crop(box)
-    if rotated:
-        img = img.transpose(Image.ROTATE_90)
-    return img.convert("RGBA"), rotated
+    if op is not None:
+        img = img.transpose(op)
+    return img.convert("RGBA"), op, err, (box[2] - box[0]) * (box[3] - box[1])
+
+
+def face_tile(sc, pages, obj_id):
+    """返回 (显示朝向的卡面图, 用的转置)。多条命令时取面积最大的一条。"""
+    cmds = [c for s in leaf_shapes(sc, obj_id) for c in sc.commands(s)]
+    tiles = [r for r in (command_tile(sc, pages, c) for c in cmds) if r[0] is not None]
+    if not tiles:
+        return None, None
+    img, op, _err, _area = max(tiles, key=lambda e: e[3])
+    return img, op
 
 
 def fit_cover(src, width, height):
@@ -121,7 +157,7 @@ def review_sheet(sc, pages, out, cols=10, cell=132):
     dr = ImageDraw.Draw(sheet)
     ex = dict(sc.exports())
     for i, nm in enumerate(names):
-        tile, _rot = face_tile(sc, pages, ex[nm])
+        tile, _op = face_tile(sc, pages, ex[nm])
         if tile is None:
             continue
         tile.thumbnail((cell - 4, cell - 14))
@@ -177,7 +213,7 @@ def main(argv=None):
             print("  %-26s 符号未对照%s" % (fname, "" if sym else "上"))
             miss += 1
             continue
-        tile, rotated = face_tile(sc, pages, exports[sym])
+        tile, op = face_tile(sc, pages, exports[sym])
         if tile is None:
             print("  %-26s %-26s 没有图块" % (fname, sym))
             miss += 1
@@ -189,7 +225,8 @@ def main(argv=None):
         diff = int(np.abs(old[:, :, :3].astype(int) - new[:, :, :3].astype(int)).mean())
         tag = "不变" if diff == 0 else "差异 %d" % diff
         print("  %-26s %-28s %dx%d%s  %s"
-              % (fname, sym, old.shape[1], old.shape[0], " 转存" if rotated else "", tag))
+              % (fname, sym, old.shape[1], old.shape[0],
+                 " 转存%s" % getattr(op, "name", "") if op else "", tag))
         if diff:
             changed += 1
             if args.apply:
