@@ -180,19 +180,30 @@ def iter_files(source: Path, suffixes: tuple[str, ...]):
                 yield name, zf.read(name)
 
 
+def ktx_image(data: bytes) -> Image.Image | None:
+    """Decode one KTX 1.1 ASTC block, including its 12-byte identifier."""
+    if not data.startswith(KTX):
+        return None
+    _, _, _, _, internal, _, width, height, _, _, _, _, kv = struct.unpack_from("<13I", data, 12)
+    index = internal - 0x93B0
+    if not 0 <= index < len(ASTC_BLOCKS):
+        return None
+    block = ASTC_BLOCKS[index]
+    size = struct.unpack_from("<I", data, 64 + kv)[0]
+    pixels = data[68 + kv : 68 + kv + size]
+    if ceil(width / block[0]) * ceil(height / block[1]) * 16 != size:
+        return None
+    rgba = texture2ddecoder.decode_astc(pixels, width, height, *block)
+    return Image.frombytes("RGBA", (width, height), rgba, "raw", "BGRA")
+
+
 def ktx_pages(blob: bytes):
     """Every KTX page inside a decompressed `.sc` body, as (name-less) images."""
     pos = blob.find(KTX)
     while pos >= 0:
-        _, _, _, _, internal, _, width, height, _, _, _, _, kv = struct.unpack_from("<13I", blob, pos + 12)
-        index = internal - 0x93B0
-        if 0 <= index < len(ASTC_BLOCKS):
-            block = ASTC_BLOCKS[index]
-            size = struct.unpack_from("<I", blob, pos + 64 + kv)[0]
-            data = blob[pos + 68 + kv : pos + 68 + kv + size]
-            if ceil(width / block[0]) * ceil(height / block[1]) * 16 == size:
-                rgba = texture2ddecoder.decode_astc(data, width, height, *block)
-                yield Image.frombytes("RGBA", (width, height), rgba, "raw", "BGRA")
+        image = ktx_image(blob[pos:])
+        if image is not None:
+            yield image
         pos = blob.find(KTX, pos + 64)
 
 
