@@ -38,12 +38,16 @@ def preview_header(title):
             ".filter{margin:0 0 20px;display:flex;align-items:center;gap:12px;flex-wrap:wrap}"
             ".filter input{font:inherit;color:#eee;background:#333;border:1px solid #666;"
             "border-radius:6px;padding:8px 10px;min-width:min(320px,80vw)}"
-            ".filter output{color:#aaa}.symbol{margin:0 0 24px;padding:16px;"
+            ".filter output{color:#aaa}#symbols{display:grid;"
+            "grid-template-columns:repeat(auto-fill,minmax(min(100%,300px),1fr));"
+            "gap:16px;align-items:start;grid-auto-flow:dense}"
+            ".symbol{min-width:0;padding:12px;"
             "border:1px solid #444;border-radius:10px;background:#242424}"
             ".symbol[hidden]{display:none}.symbol h2{font-size:18px;margin:0 0 14px;"
             "overflow-wrap:anywhere}.grid{display:flex;flex-wrap:wrap;gap:16px}"
-            "figure{margin:0;width:270px}"
-            ".missing{width:256px;height:80px;display:grid;place-items:center;"
+            "figure{margin:0;width:270px;max-width:100%}"
+            ".missing{box-sizing:border-box;width:256px;max-width:100%;height:80px;"
+            "display:grid;place-items:center;"
             "background:#303030;color:#aaa;border:1px dashed #666}"
             "img{max-width:256px;max-height:256px;background:#444}"
             "figcaption{overflow-wrap:anywhere;font-size:12px;color:#aaa}</style>",
@@ -58,8 +62,15 @@ def write_preview(out, lines):
     """收尾并写入支持即时筛选的浏览页。"""
     lines.extend(['<script>',
                   'const input = document.getElementById("symbol-filter");',
+                  'const grid = document.getElementById("symbols");',
                   'const groups = [...document.querySelectorAll(".symbol")];',
                   'const count = document.getElementById("match-count");',
+                  'function sizeGroups() {',
+                  '  const columns = getComputedStyle(grid).gridTemplateColumns.split(" ").length;',
+                  '  for (const group of groups) {',
+                  '    group.style.gridColumnEnd = `span ${Math.min(+group.dataset.figures, columns)}`;',
+                  '  }',
+                  '}',
                   'function filterSymbols() {',
                   '  const query = input.value.trim().toLocaleLowerCase();',
                   '  let matches = 0;',
@@ -70,7 +81,9 @@ def write_preview(out, lines):
                   '  }',
                   '  count.textContent = `${matches} / ${groups.length} 个符号`;',
                   '}',
+                  'window.addEventListener("resize", sizeGroups);',
                   'input.addEventListener("input", filterSymbols);',
+                  'sizeGroups();',
                   'filterSymbols();',
                   '</script>'])
     (out / "index.html").write_text("\n".join(lines) + "\n", encoding="utf-8")
@@ -313,11 +326,16 @@ def filename_for(name, natural, size, layer=None):
 
 def start_group(lines, name):
     escaped = html.escape(name, quote=True)
-    lines.append(f'<section class="symbol" data-name="{escaped}">'
+    lines.append(f'<section class="symbol" data-name="{escaped}" '
+                 'data-figures="0">'
                  f'<h2>{html.escape(name)}</h2><div class="grid">')
+    return len(lines) - 1
 
 
-def end_group(lines):
+def end_group(lines, start):
+    figures = sum(line.startswith("<figure>") for line in lines[start + 1:])
+    lines[start] = lines[start].replace('data-figures="0"',
+                                        f'data-figures="{figures}"', 1)
     lines.append("</div></section>")
 
 
@@ -368,15 +386,15 @@ def export(sc, out: Path, decode_ktx, max_size=1000, name_filters=()):
         image, natural, pages = result
         filename = filename_for(name, natural, image.size)
         image.save(out / filename)
-        start_group(lines, name)
-        add_figure(lines, name, filename,
-                   f"组合图 · 顶点尺寸 {natural[0]}×{natural[1]} · "
-                   f"PNG {image.width}×{image.height} · 页 {pages}")
-        exported += 1
         clips = sc.clips_by_id.get(obj_id, ())
         visible = ({child for child, _matrix, _color
                     in renderer.clip_elements(clips[0])} if clips else set())
         layers = root_layers(sc, obj_id, visible)
+        group_start = start_group(lines, name)
+        add_figure(lines, name, filename,
+                   f"组合图 · 顶点尺寸 {natural[0]}×{natural[1]} · "
+                   f"PNG {image.width}×{image.height} · 页 {pages}")
+        exported += 1
         if layers:
             bounds = renderer.bounds(list(renderer.meshes(obj_id)), obj_id)
             layer_results = []
@@ -412,7 +430,7 @@ def export(sc, out: Path, decode_ktx, max_size=1000, name_filters=()):
                            f"图层 [{layer_index}] · 对象 {child_id} · "
                            f"PNG {layer_image.width}×{layer_image.height}")
                 layer_exported += 1
-        end_group(lines)
+        end_group(lines, group_start)
     if total:
         print(f"渲染进度：{total:,}/{total:,}（100%）", flush=True)
     lines.append("</main>")
@@ -550,7 +568,7 @@ def export_apng(sc, out: Path, decode_ktx, max_size=1000, name_filters=()):
         renderer.clip_frame_cache.clear()
         if index > 1 and (index - 1) % 100 == 0:
             print(f"渲染进度：{index - 1:,}/{len(exports):,}", flush=True)
-        group_open = False
+        group_start = None
         try:
             clips = sc.clips_by_id.get(obj_id, ())
             visible = (set(renderer.clip_appearances(clips[0])) if clips else set())
@@ -582,8 +600,7 @@ def export_apng(sc, out: Path, decode_ktx, max_size=1000, name_filters=()):
                         path, count, fps)
             results.append((name, path, count, fps))
             label = f"{count} 帧 · {fps} FPS" if count > 1 else "静态"
-            start_group(lines, name)
-            group_open = True
+            group_start = start_group(lines, name)
             add_figure(lines, name, filename,
                        f"组合图 · {label} · {size[0]}×{size[1]}")
             drawable = {
@@ -617,11 +634,11 @@ def export_apng(sc, out: Path, decode_ktx, max_size=1000, name_filters=()):
                            f"图层 [{layer_index}] · 对象 {child_id} · {detail} · "
                            f"{size[0]}×{size[1]}")
                 layer_exported += 1
-            end_group(lines)
-            group_open = False
+            end_group(lines, group_start)
+            group_start = None
         except (OSError, ValueError) as exc:
-            if group_open:
-                end_group(lines)
+            if group_start is not None:
+                end_group(lines, group_start)
             failed.append((name, str(exc)))
     print(f"渲染进度：{len(exports):,}/{len(exports):,}", flush=True)
     lines.append("</main>")
