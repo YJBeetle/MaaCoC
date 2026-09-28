@@ -4,7 +4,7 @@
 卡面不是独立图片，而是 ui.sc 图集页上的一块矩形，而且游戏不存这个矩形 ——
 它存矢量形状，矩形是顶点 uv 包围盒乘页尺寸算出来的。推导链在 scframes.py。
 
-    python3 scripts/refresh-cards/sccards.py var/coc-unpack/sc/ui.sc
+    python3 scripts/refresh-cards/export_cards.py var/coc-unpack/sc/ui.sc
 
 产出 assets/image/cards/<符号名>.png。
 """

@@ -51,7 +51,7 @@ unzip -o -j var/coc-unpack/apk/split_install_time_asset_pack.apk assets/sc/ui.sc
 ## 导出全部卡面
 
 ```bash
-scripts/refresh-cards/sccards.py var/coc-unpack/sc/ui.sc
+scripts/refresh-cards/export_cards.py var/coc-unpack/sc/ui.sc
 ```
 
 约 2 秒，输出 `assets/image/cards/<符号名>.png`，当前共 236 张。
