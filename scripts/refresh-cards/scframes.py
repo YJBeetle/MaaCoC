@@ -15,13 +15,11 @@ CoC 的卡面不是独立图片，而是 ui.sc 图集页上的一块矩形；引
 
 用法：
     python3 scripts/refresh-cards/scframes.py var/coc-unpack/sc/ui.sc -o ui.frames.json
-    python3 scripts/refresh-cards/scframes.py var/coc-unpack/sc/ui.sc --list 'icon_unit_*'
 """
 
 from __future__ import annotations
 
 import argparse
-import fnmatch
 import json
 import struct
 import sys
@@ -368,7 +366,6 @@ def main(argv=None):
     ap = argparse.ArgumentParser(description=__doc__.splitlines()[0])
     ap.add_argument("source", type=Path, help="已解压的 .sc 文件")
     ap.add_argument("-o", "--output", type=Path, help="写出 JSON 清单")
-    ap.add_argument("--list", metavar="GLOB", default="*", help="筛选预览的符号（最多显示 6 个）")
     ap.add_argument("--split", action="store_true", help="同名不合并，逐块列出")
     args = ap.parse_args(argv)
 
@@ -379,7 +376,7 @@ def main(argv=None):
     frames = frame_table(sc, merge=not args.split)
     pages = [sc.page(i) for i in range(len(sc.tsets))]
     bad = selfcheck(sc, frames)
-    matched = [name for name in sorted(frames) if fnmatch.fnmatchcase(name, args.list)]
+    names = sorted(frames)
     exports = list(sc.exports())
     if sc.container:
         print("SCFILE v%d" % sc.container["version"])
@@ -438,13 +435,13 @@ def main(argv=None):
     print("   ├─ 越界自检：%d 处异常" % len(bad))
     for row in bad[:5]:
         print("   │  %s" % (row,))
-    print("   └─ 匹配符号 {:,} 个".format(len(matched)))
+    print("   └─ 符号示例")
     def describe_frame(name):
         rects = "；".join("页%d (%d, %d) %d×%d" %
                          (r["page"], r["x"], r["y"], r["w"], r["h"])
                          for r in frames[name])
         return "%s → %s" % (name, rects)
-    print_preview(matched, "      ", describe_frame)
+    print_preview(names, "      ", describe_frame)
     if bad:
         return 1
 
