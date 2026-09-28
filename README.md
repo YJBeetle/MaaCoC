@@ -105,7 +105,7 @@ clippy、单元测试和离线识别回归。发布（`.github/workflows/release
 | `engine/` | 引擎库与命令行：设备连接、常驻任务、事件流、识别试跑、离线回归、pipeline 改写 |
 | `app/` | Tauri 壳（`src-tauri/` Rust 命令层）+ Material Web 前端（`src/`） |
 | `assets/` | 模板图片与 pipeline 定义，被引擎和界面共用 |
-| `scripts/` | 拉 SDK、同步/收集动态库、校验产物、无头截图 |
+| `scripts/` | 拉 SDK、同步/收集动态库、校验产物、无头截图；`refresh-cards/` 见其 README，从游戏更新包重导卡面图 |
 | `tests/fixtures/` | 离线回归用的真机语料帧 |
 | `src/`、`cmake/`、`CMakeLists.txt` | 旧的 C++ 宿主，仍可用 `cmake -B build && cmake --build build` 构建，但已不是主路径 |
 

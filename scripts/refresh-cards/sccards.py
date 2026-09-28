@@ -27,11 +27,13 @@ from pathlib import Path
 import numpy as np
 from PIL import Image, ImageDraw
 
-sys.path.insert(0, str(Path(__file__).resolve().parent))
+# 同级拿 scframes，上一级 scripts/ 拿共用的 KTX 解码 sctx2png
+HERE = Path(__file__).resolve().parent
+sys.path[:0] = [str(HERE), str(HERE.parent)]
 import scframes          # noqa: E402
 import sctx2png          # noqa: E402
 
-REPO = Path(__file__).resolve().parents[1]
+REPO = HERE.parents[1]
 GREEN = (0, 255, 0)
 UV = 65536.0
 
