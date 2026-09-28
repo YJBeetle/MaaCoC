@@ -85,9 +85,11 @@ scripts/refresh-cards/scframes.py var/coc-unpack/sc/ui.sc --textures-out var/coc
 输出 `越界自检: 0 处异常` 说明这批矩形通过了边界检查，但不代表卡面朝向和选块都正确。
 树状输出会列出各分块的已读字段和最多 6 个示例；`TextFields` 等未用于卡面推导的内容只统计数量。
 `-o` 写出的 JSON 仍包含全部矩形。
-`--png-out` 按推导出的矩形裁图，并生成 `index.html` 供浏览；同一符号的多块矩形会分别显示。
-默认 PNG 是最长边 256 像素的预览图，页面标注图集中的原始坐标和尺寸；如需原尺寸裁图，
-加 `--png-size 0`。这是矩形推导的可视化，不会合成 MovieClip 或校正朝向。
+`--png-out` 按顶点 `(x, y)` 和 UV 对三角网格做纹理映射，生成各符号的首帧 PNG 与
+`index.html` 浏览页。顶点到像素的倍率在 `scrender.py` 的 `PIXELS_PER_UNIT` 中，当前为 1。
+输出宽高默认各不超过 1000 像素；可用 `--max-size` 修改。超限时等比缩小，文件名会注明
+缩放前后的尺寸（例如 `--2400x1200-to-1000x500.png`），浏览页也会列出两种尺寸。
+MovieClip 取首帧，并应用子对象的 2D 矩阵；动画后续帧、文本、颜色变换和裁剪遮罩尚未还原。
 `--textures-out` 导出 TextureSets 的各纹理页原尺寸 PNG（`page-000.png` 等），
 并生成 `textures.html` 浏览页。每页按 TextureSets 页号读取，优先使用 highres 槽。
 
