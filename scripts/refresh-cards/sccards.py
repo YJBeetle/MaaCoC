@@ -1,12 +1,12 @@
 #!/usr/bin/env python3
-"""游戏更新后，把 .sc 里的全部卡面图块导出来，索引用官方符号名。
+"""游戏更新后，把 .sc 里的全部卡面图块导出来，文件名用官方符号名。
 
 卡面不是独立图片，而是 ui.sc 图集页上的一块矩形，而且游戏不存这个矩形 ——
 它存矢量形状，矩形是顶点 uv 包围盒乘页尺寸算出来的。推导链在 scframes.py。
 
     python3 scripts/refresh-cards/sccards.py var/coc-unpack/sc/ui.sc
 
-产出 assets/image/cards/<符号名>.png 加一份 assets/config/cards.json 索引。
+产出 assets/image/cards/<符号名>.png。
 """
 
 from __future__ import annotations
@@ -14,7 +14,6 @@ from __future__ import annotations
 import argparse
 import collections
 import hashlib
-import json
 import os
 import struct
 import sys
@@ -77,7 +76,7 @@ def uv_box(us, vs, w, h):
 
 
 def command_tile(sc, pages, cmd):
-    """一条绘制命令 -> (显示朝向的图, 用的转置, 像素矩形, 面积)。
+    """一条绘制命令 -> (显示朝向的图, 面积)。
 
     朝向必须按命令单独定：卡面 MovieClip 的孩子混着遮罩、脸和背景块，各有各的
     局部坐标系，混在一起拟合会互相污染。拟合还必须带常数项 —— 局部原点在形状
@@ -104,18 +103,18 @@ def command_tile(sc, pages, cmd):
         if best is None or err < best[0]:
             best = (err, op)
     if best is None or best[0] > ORIENT_TOL:
-        return None, None, best[0] if best else None, 0
+        return None, 0
     _err, op = best
     x0, y0, x1, y1 = uv_box(us, vs, w, h)
     if not (0 <= x0 <= x1 <= w and 0 <= y0 <= y1 <= h):
         raise ValueError("纹理页 %d 的裁剪矩形越界：%s" %
                          (page, (x0, y0, x1, y1)))
     if x1 - x0 < 2 or y1 - y0 < 2:
-        return None, op, None, 0
+        return None, 0
     img = pages[page].crop((x0, y0, x1, y1))
     if op is not None:
         img = img.transpose(op)
-    return img.convert("RGBA"), op, [page, x0, y0, x1 - x0, y1 - y0], (x1 - x0) * (y1 - y0)
+    return img.convert("RGBA"), (x1 - x0) * (y1 - y0)
 
 
 def biggest_tile(sc, pages, obj_id):
@@ -124,62 +123,22 @@ def biggest_tile(sc, pages, obj_id):
                          for s in leaf_shapes(sc, obj_id) for c in sc.commands(s))
              if t[0] is not None]
     if not tiles:
-        return None, None, None
-    img, op, rect, _area = max(tiles, key=lambda e: e[3])
-    return img, op, rect
+        return None
+    return max(tiles, key=lambda e: e[1])[0]
 
 
-def clip_of(sc, obj_id):
-    """卡面 MovieClip 用的裁剪遮罩对象 id（既不是 Shape 也不是 MovieClip 的孩子）。"""
-    for c in sc.clips_by_id.get(obj_id, ()):
-        for p in c.struct_pos(5, 2):
-            kid = struct.unpack_from("<H", c.b, p)[0]
-            if kid not in sc.shapes_by_id and kid not in sc.clips_by_id:
-                return kid
-    return None
-
-
-def kind(name, all_names):
-    """按官方命名规则给卡面分类。
-
-    超级兵不能只看 elite_ 前缀：21 个 icon_unit_elite_* 里 7 个压根没有同名普通版
-    （bowler / hogrider / minion / valkyrie / icehound / infernodragon /
-    barbarian_group_cc），那里 elite_ 就是本体图块的名字。
-    所以判据是「elite_ 且有同名普通版」。
-    """
-    if name.startswith("icon_spell_"):
-        return "spell"
-    if name.startswith("icon_unit_pet_"):
-        return "pet"
-    if name.startswith("icon_unit_siege_machine"):
-        return "siege"
-    if name.startswith("icon_hero"):
-        return "hero"
-    if name.startswith("icon_gear"):
-        return "gear"
-    if name.startswith("icon_2025"):
-        return "event"
-    if name.startswith("icon_league"):
-        return "league"
-    if name.startswith("icon_unit_elite_"):
-        base = name.replace("icon_unit_elite_", "icon_unit_").replace("_cc", "")
-        return "super" if base in all_names else "troop"
-    return "troop"
-
-
-def export(sc, pages, prefixes, out, manifest):
-    """导出给定前缀下的全部卡面，并写符号名到文件名的索引。"""
+def export(sc, pages, prefixes, out):
+    """导出给定前缀下的全部卡面。"""
     ex = dict(sc.exports())
-    all_names = set(ex)
     selected = sorted(n for n in ex if n.startswith(tuple(prefixes)))
     if not selected:
         raise ValueError("没有匹配前缀的符号：%s" % ", ".join(prefixes))
     folded = collections.Counter(n.casefold() for n in selected)
-    rows, images, failed = {}, {}, []
+    images, failed = {}, []
     for name in selected:
         if Path(name).name != name or name in (".", ".."):
             raise ValueError("符号名不能用作文件名：%r" % name)
-        img, op, rect = biggest_tile(sc, pages, ex[name])
+        img = biggest_tile(sc, pages, ex[name])
         if img is None:
             failed.append(name)
             continue
@@ -187,18 +146,9 @@ def export(sc, pages, prefixes, out, manifest):
         if folded[name.casefold()] > 1:
             filename = name + "--" + hashlib.sha256(name.encode()).hexdigest()[:8] + ".png"
         images[filename] = img
-        rows[name] = {"kind": kind(name, all_names), "clip": clip_of(sc, ex[name]),
-                      "orient": getattr(op, "name", "none"),
-                      "size": list(img.size), "rect": rect}
-        if filename != name + ".png":
-            rows[name]["file"] = filename
     if failed:
         raise ValueError("裁不出 %d 个卡面：%s" % (len(failed), ", ".join(failed)))
 
-    old_files = set()
-    if manifest.exists():
-        old_files = {row.get("file", name + ".png")
-                     for name, row in json.loads(manifest.read_text())["cards"].items()}
     out.parent.mkdir(parents=True, exist_ok=True)
     with tempfile.TemporaryDirectory(prefix=".cards-", dir=out.parent) as stage_name:
         stage = Path(stage_name)
@@ -208,18 +158,7 @@ def export(sc, pages, prefixes, out, manifest):
         for filename in images:
             os.replace(stage / filename, out / filename)
 
-    manifest.parent.mkdir(parents=True, exist_ok=True)
-    with tempfile.NamedTemporaryFile(mode="w", encoding="utf-8", prefix=".cards-",
-                                     dir=manifest.parent, delete=False) as tmp:
-        tmp.write(json.dumps({"prefixes": list(prefixes), "cards": rows},
-                             ensure_ascii=False, indent=1) + "\n")
-    os.replace(tmp.name, manifest)
-    for filename in old_files - images.keys():
-        if Path(filename).name == filename and filename not in (".", ".."):
-            (out / filename).unlink(missing_ok=True)
-    print("导出 %d 张 -> %s" % (len(rows), out))
-    print("类别: %s" % dict(collections.Counter(r["kind"] for r in rows.values()).most_common()))
-    print("索引 -> %s" % manifest)
+    print("导出 %d 张 -> %s" % (len(images), out))
 
 
 def main(argv=None):
@@ -228,7 +167,6 @@ def main(argv=None):
     ap.add_argument("--prefix", action="append",
                     help="要导出的符号前缀，可重复（默认 %s）" % " 和 ".join(DEFAULT_PREFIXES))
     ap.add_argument("--out", type=Path, default=REPO / "assets/image/cards")
-    ap.add_argument("--manifest", type=Path, default=REPO / "assets/config/cards.json")
     args = ap.parse_args(argv)
 
     try:
@@ -239,7 +177,7 @@ def main(argv=None):
     for i, page in enumerate(pages):
         if page is None or page.size != sc.page(i):
             raise ValueError("纹理页 %d 解码尺寸与 .sc 记录不一致" % i)
-    export(sc, pages, args.prefix or list(DEFAULT_PREFIXES), args.out, args.manifest)
+    export(sc, pages, args.prefix or list(DEFAULT_PREFIXES), args.out)
     return 0
 
 

@@ -54,15 +54,9 @@ unzip -o -j var/coc-unpack/apk/split_install_time_asset_pack.apk assets/sc/ui.sc
 scripts/refresh-cards/sccards.py var/coc-unpack/sc/ui.sc
 ```
 
-约 2 秒，输出：
-
-- `assets/image/cards/<符号名>.png` —— 236 张，通常直接用游戏里的符号名作文件名。
-  两个仅大小写不同的符号在大小写不敏感的文件系统上会冲突，脚本始终给它们加稳定后缀，
-  并在索引的 `file` 字段记录实际文件名。
-- `assets/config/cards.json` —— 索引表，每条是
-  `{kind, clip, orient, size, rect:[页, x, y, 宽, 高]}`，重名文件另有 `file`。
-  注意 `rect` 是**图集里那块**（转回正之前的框），`size` 是导出图的尺寸；
-  `orient` 是 90/270/转置 的那 48 张两者宽高会互换，除此之外应当完全相等。
+约 2 秒，输出 `assets/image/cards/<符号名>.png`，当前共 236 张。
+两个仅大小写不同的符号在大小写不敏感的文件系统上会冲突，脚本会给它们加稳定后缀。
+卡牌类型和卡牌背景由后续维护的「卡牌 ↔ SC 符号名」对应表决定，这里只按符号名导出图片。
 
 常用参数：
 
@@ -71,7 +65,8 @@ scripts/refresh-cards/sccards.py var/coc-unpack/sc/ui.sc
 | `--prefix icon_unit_` | 只要某类前缀，可重复（默认 `icon_unit_` 和 `icon_spell_`） |
 | `--out /tmp/cards` | 换输出目录，不碰仓库里的 |
 
-导出的 PNG **不入库**（16MB，而仓库 `.git` 才 13MB，且随时能重算），只入 `cards.json` 那份索引。
+导出的 PNG **不入库**，随时可以重新生成。重复导出会覆盖同名文件，
+但不会自动删除输出目录里本次未生成的旧 PNG。
 
 ## 查看通用 SC 的推导结果
 
@@ -96,25 +91,8 @@ MovieClip 取首帧，并应用子对象的 2D 矩阵；动画后续帧、文本
 ## 验收要看什么
 
 1. 输出里没有「裁不出 N 个」这一行。
-2. 缩略图扫一遍有没有倒的。重点查 `orient` 不是 `none` 的：
-   ```bash
-   python -c "
-   import json;d=json.load(open('assets/config/cards.json'))['cards']
-   print([k for k,v in d.items() if v['orient']!='none'])"
-   ```
-   全量 236 张里有 80 张在图集里是歪着存的（转 90 度 41、上下翻 8、左右翻 9、转置 5、
-   反对角 9、转 270 度 7、转 180 度 1）。
-3. `super` 那 14 个是不是真的超级兵（见下）。
-
-## 类别是怎么定的
-
-`kind` 按官方命名前缀分，`clip` 是卡面 MovieClip 用的裁剪遮罩对象 id，两者互为交叉验证 ——
-遮罩确实按类别聚得很干净：兵/宠物 7998，英雄 8484/8516，攻城 8485/8502，装备 10725/10726，
-联赛徽章 2906，活动角色 1825/12903，法术则根本没有遮罩（独立家族 `icon_spell_*`）。
-
-**`elite_` 前缀不等于超级兵。** 21 个 `icon_unit_elite_*` 里有 7 个压根没有同名普通版
-（bowler / hogrider / minion / valkyrie / icehound / infernodragon / barbarian_group_cc），
-那里 `elite_` 只是这个兵本体图块的名字。所以判据是「`elite_` **且**存在同名普通版」，得到 14 个。
+2. 缩略图扫一遍有没有倒置、镜像或裁错。图集里有 80 张图块原本带旋转或镜像，
+   导出时会自动校正朝向。
 
 ## 朝向为什么不能用简单规则
 
