@@ -74,6 +74,7 @@ scripts/refresh-cards/sccards.py var/coc-unpack/sc/ui.sc
 scripts/refresh-cards/scframes.py var/coc-unpack/sc/ui.sc -o ui.frames.json
 scripts/refresh-cards/scframes.py var/coc-unpack/sc/ui.sc --png-out var/coc-unpack/frames
 scripts/refresh-cards/scframes.py var/coc-unpack/sc/ui.sc --apng-out var/coc-unpack/animations
+scripts/refresh-cards/scframes.py var/coc-unpack/sc/ui.sc --apng-out var/coc-unpack/animations --filter capacity_slot
 scripts/refresh-cards/scframes.py var/coc-unpack/sc/ui.sc --textures-out var/coc-unpack/textures
 ```
 
@@ -92,6 +93,8 @@ MovieClip 的组合图导出为循环播放的 APNG，单帧符号的组合图�
 可以按子对象顺序叠回去。只有一个可绘制图层时只保存组合图，不重复导出图层。
 文字层会在浏览页标出，但暂不生成图片。
 两种浏览页都把同一符号的组合图与图层放在一组；顶部可按符号名筛选整组，并显示匹配数量。
+导出时可用 `--filter` 按符号名包含的文字筛选，不区分大小写；重复传入时匹配任一条件。
+筛选只影响 PNG/APNG 导出及其浏览页，已有目录中其他文件不会因此删除。
 在 `--apng-out` 中，各图层按自己的时间轴长度导出，组合图取最长图层的帧数。
 根 MovieClip 只有一帧、子对象有动画时也会导出 APNG。动画各帧共用一张固定大小的画布，
 较短的时间轴结束后保留最后一帧。使用 `.sc` 记录的帧率；`--max-size` 同样控制画布宽高上限。

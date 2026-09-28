@@ -402,12 +402,16 @@ def main(argv=None):
     ap.add_argument("--split", action="store_true", help="同名不合并，逐块列出")
     ap.add_argument("--png-out", type=Path, help="按顶点与 UV 导出符号 PNG 和浏览页")
     ap.add_argument("--apng-out", type=Path, help="导出全部符号；多帧为 APNG，单帧为 PNG，附浏览页")
+    ap.add_argument("--filter", action="append", metavar="TEXT",
+                    help="按符号名筛选 PNG/APNG 导出，不区分大小写；可重复，任一匹配即可")
     ap.add_argument("--textures-out", type=Path, help="导出 TextureSets 纹理页的原尺寸 PNG")
     ap.add_argument("--max-size", type=int, default=PNG_MAX_SIZE,
                     help="符号 PNG 宽高上限（默认 1000）")
     args = ap.parse_args(argv)
     if args.max_size <= 0:
         ap.error("--max-size 必须大于 0")
+    if args.filter and not (args.png_out or args.apng_out):
+        ap.error("--filter 需要搭配 --png-out 或 --apng-out")
 
     try:
         sc = ScFile(load_sc(args.source))
@@ -500,7 +504,7 @@ def main(argv=None):
             if args.png_out:
                 from scrender import export as export_rendered_png
                 count, layers, skipped, failed = export_rendered_png(
-                    sc, args.png_out, ktx_image, args.max_size)
+                    sc, args.png_out, ktx_image, args.max_size, args.filter or ())
                 print("导出 {:,} 张组合 PNG、{:,} 张图层 PNG → {}"
                       "（浏览页 index.html；无网格 {:,} 个，失败 {:,} 个）".format(
                           count, layers, args.png_out, len(skipped), len(failed)))
@@ -510,7 +514,7 @@ def main(argv=None):
             if args.apng_out:
                 from scrender import export_apng
                 results, layers, skipped, failed = export_apng(
-                    sc, args.apng_out, ktx_image, args.max_size)
+                    sc, args.apng_out, ktx_image, args.max_size, args.filter or ())
                 animated = sum(count > 1 for _, _, count, _ in results)
                 print(f"导出 {len(results):,} 张组合图、{layers:,} 张图层图 → {args.apng_out}"
                       f"（组合图中动画 {animated:,} 个；浏览页 index.html；"

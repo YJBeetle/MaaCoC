@@ -341,14 +341,16 @@ def text_field_ids(sc):
              for p in table.struct_pos(0, 40)} if table else set())
 
 
-def export(sc, out: Path, decode_ktx, max_size=1000):
+def export(sc, out: Path, decode_ktx, max_size=1000, name_filters=()):
     """导出每个符号的首帧 PNG 和浏览页。"""
     renderer = Renderer(sc, decode_ktx)
     out.mkdir(parents=True, exist_ok=True)
     lines = preview_header("SC 符号首帧渲染")
     exported, layer_exported, skipped, failed = 0, 0, [], []
     texts = text_field_ids(sc)
-    symbols = sorted(dict(sc.exports()).items())
+    filters = tuple(value.casefold() for value in name_filters)
+    symbols = sorted((name, obj_id) for name, obj_id in dict(sc.exports()).items()
+                     if not filters or any(value in name.casefold() for value in filters))
     total = len(symbols)
     for index, (name, obj_id) in enumerate(symbols, 1):
         renderer.clip_frame_cache.clear()
@@ -533,10 +535,12 @@ def save_frames(frames, path, count, fps):
             os.unlink(temp_name)
 
 
-def export_apng(sc, out: Path, decode_ktx, max_size=1000):
+def export_apng(sc, out: Path, decode_ktx, max_size=1000, name_filters=()):
     """导出组合图及各直属图层；各自有动画时用 APNG。"""
     renderer = Renderer(sc, decode_ktx)
-    exports = dict(sc.exports())
+    filters = tuple(value.casefold() for value in name_filters)
+    exports = {name: obj_id for name, obj_id in sc.exports()
+               if not filters or any(value in name.casefold() for value in filters)}
     out.mkdir(parents=True, exist_ok=True)
     lines = preview_header("SC 符号动画预览")
     results, layer_exported, skipped, failed = [], 0, [], []
