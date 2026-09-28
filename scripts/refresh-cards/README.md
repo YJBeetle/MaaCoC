@@ -11,10 +11,15 @@
 `.sc` 的结构（v6 容器）：
 
 ```
-SCFILE 容器 = "SC" + 版本 + 符号定义表(3043 条: 16字节哈希 + 名字) + 一个 zstd 帧
+SCFILE 容器 = "SC" + 版本 + FlatBuffers 描述头长度 + 描述头 + zstd 帧
+描述头      = 包含符号元数据（当前 ui.sc 为 3043 条，每条有名字和 16 字节哈希）
 正文        = 连续的 [u32 长度][flatbuffers 分块]
               Resources / Exports / TextFields / Shapes / MovieClips / Modifiers / TextureSets
 ```
+
+当前 `ui.sc` 的外层头部：偏移 `0..1` 是 `SC`，`2..5` 是小端版本号 `6`，`6..7` 是 `0`；
+偏移 `8..11` 的 `196476` 是**描述头长度**。描述头位于 `12..196487`，本身也是
+FlatBuffers，3043 条符号元数据在其中；zstd 帧从偏移 `196488` 开始。
 
 推导链：`FBExports` 给出「符号名 ↔ 对象 id」，id 解析到 `FBShape` 的绘制命令
 `{页号, 顶点数, 起始顶点下标}`，再回 `FBResources.shape_points` 取顶点

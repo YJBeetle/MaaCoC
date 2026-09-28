@@ -6,7 +6,7 @@ CoC 的卡面不是独立图片，而是 ui.sc 图集页上的一块矩形；引
 本脚本按同一套规则复现这个推导，所以每次游戏更新后可以直接重算，
 不需要人工截图或比对。
 
-    .sc = SCFILE 容器（magic "SC" + 版本 6 + 符号定义表 + 一个 zstd 帧）
+    .sc = SCFILE 容器（magic "SC" + 版本 6 + FlatBuffers 描述头 + zstd 正文）
     正文 = 连续的 [u32 长度][flatbuffers 分块]
            Resources / Exports / TextFields / Shapes / MovieClips /
            Modifiers / TextureSets
@@ -123,24 +123,35 @@ def root(b):
     return Table(b, u32(b, 0))
 
 
-def scfile_body(data: bytes) -> bytes:
-    """SCFILE 容器 -> 解压后的正文。
-
-    定义表里的哈希字节可能凑出 zstd 魔数，所以逐个候选位置试解。
-    """
-    if data[:2] != b"SC":
+def scfile_body(data: bytes) -> tuple[bytes, dict[str, int]]:
+    """按描述头长度定位 zstd 帧，返回解压正文与容器信息。"""
+    if len(data) < 12 or data[:2] != b"SC":
         raise ValueError("不是 SCFILE（缺 SC 魔数）")
-    d = zstandard.ZstdDecompressor()
-    pos = data.find(ZSTD_FRAME)
-    while pos >= 0:
-        try:
-            blob = d.decompressobj().decompress(memoryview(data)[pos:])
-        except zstandard.ZstdError:
-            blob = b""
-        if len(blob) > 8 and 8 <= u32(blob, 0) <= len(blob) - 4:
-            return blob
-        pos = data.find(ZSTD_FRAME, pos + 4)
-    raise ValueError("容器里没有可解的 zstd 帧")
+    version = u32(data, 2)
+    if version != 6:
+        raise ValueError("仅支持 SCFILE v6，当前版本为 %d" % version)
+    header_size = u32(data, 8)
+    frame_at = 12 + header_size
+    if header_size < 8 or frame_at > len(data):
+        raise ValueError("SCFILE 描述头长度越界：%d" % header_size)
+    try:
+        header = root(data[12:frame_at])
+        metadata_count, _ = header.vec(10, 4)
+        compressed_size = header.scalar(11)
+    except (ValueError, struct.error) as exc:
+        raise ValueError("SCFILE 描述头无效") from exc
+    frame_end = frame_at + (compressed_size or len(data) - frame_at)
+    if frame_end > len(data) or data[frame_at:frame_at + 4] != ZSTD_FRAME:
+        raise ValueError("SCFILE 描述头指向的 zstd 帧无效")
+    try:
+        decoder = zstandard.ZstdDecompressor().decompressobj()
+        blob = decoder.decompress(memoryview(data)[frame_at:frame_end])
+    except zstandard.ZstdError as exc:
+        raise ValueError("SCFILE 正文解压失败") from exc
+    if not decoder.eof or len(blob) < 8:
+        raise ValueError("SCFILE zstd 帧不完整")
+    return blob, {"version": version, "header_size": header_size,
+                  "metadata_count": metadata_count}
 
 
 def split_chunks(blob):
@@ -160,7 +171,7 @@ class ScFile:
     """一个 .sc：符号名、形状、纹理页。"""
 
     def __init__(self, data: bytes):
-        blob = scfile_body(data) if data[:2] == b"SC" else data
+        blob, self.container = scfile_body(data) if data[:2] == b"SC" else (data, None)
         self.blob = blob
         parts, tab, off = [], {}, {}
         for i, (o, ln) in enumerate(split_chunks(blob)):
@@ -354,7 +365,12 @@ def main(argv=None):
         ap.exit(1, "%s: %s\n" % (ap.prog, exc))
     frames = frame_table(sc, merge=not args.split)
     pages = [sc.page(i) for i in range(len(sc.tsets))]
-    print("SCFILE")
+    if sc.container:
+        print("SCFILE v%d" % sc.container["version"])
+        print("├─ FlatBuffers 描述头：{:,} 字节，符号元数据 {:,} 条".format(
+              sc.container["header_size"], sc.container["metadata_count"]))
+    else:
+        print("SCFILE 正文")
     print("└─ 正文（解压后 {:,} 字节；分块偏移相对正文起点）".format(len(sc.blob)))
     for i, (name, size) in enumerate(sc.parts):
         last = i == len(sc.parts) - 1
