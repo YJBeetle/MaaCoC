@@ -26,9 +26,7 @@ schema 直接可用，不需要逆向。
 ## 准备环境
 
 ```bash
-cd <仓库根目录>
-python3 -m venv var/coc-unpack/.venv
-var/coc-unpack/.venv/bin/python -m pip install pillow numpy zstandard texture2ddecoder
+pip install pillow numpy zstandard texture2ddecoder
 ```
 
 ## 拉取文件
@@ -48,7 +46,7 @@ unzip -o -j var/coc-unpack/apk/split_install_time_asset_pack.apk assets/sc/ui.sc
 ## 导出全部卡面
 
 ```bash
-var/coc-unpack/.venv/bin/python scripts/refresh-cards/sccards.py var/coc-unpack/sc/ui.sc
+scripts/refresh-cards/sccards.py var/coc-unpack/sc/ui.sc
 ```
 
 约 2 秒，输出：
@@ -73,7 +71,7 @@ var/coc-unpack/.venv/bin/python scripts/refresh-cards/sccards.py var/coc-unpack/
 ## 只看矩形、不要图
 
 ```bash
-var/coc-unpack/.venv/bin/python scripts/refresh-cards/scframes.py var/coc-unpack/sc/ui.sc -o ui.frames.json
+scripts/refresh-cards/scframes.py var/coc-unpack/sc/ui.sc -o ui.frames.json
 ```
 
 它会检查保留下来的非零面积矩形是否落在对应纹理页内；无效页号、顶点范围等结构错误会直接报错。
@@ -84,7 +82,7 @@ var/coc-unpack/.venv/bin/python scripts/refresh-cards/scframes.py var/coc-unpack
 1. 输出里没有「裁不出 N 个」这一行。
 2. 缩略图扫一遍有没有倒的。重点查 `orient` 不是 `none` 的：
    ```bash
-   var/coc-unpack/.venv/bin/python -c "
+   python -c "
    import json;d=json.load(open('assets/config/cards.json'))['cards']
    print([k for k,v in d.items() if v['orient']!='none'])"
    ```

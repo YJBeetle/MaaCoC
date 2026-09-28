@@ -231,7 +231,10 @@ def main(argv=None):
     ap.add_argument("--manifest", type=Path, default=REPO / "assets/config/cards.json")
     args = ap.parse_args(argv)
 
-    sc = scframes.ScFile(scframes.load_sc(args.source))
+    try:
+        sc = scframes.ScFile(scframes.load_sc(args.source))
+    except (OSError, ValueError) as exc:
+        ap.exit(1, "%s: %s\n" % (ap.prog, exc))
     pages = [sctx2png.ktx_image(sc.page_ktx(i)) for i in range(len(sc.tsets))]
     for i, page in enumerate(pages):
         if page is None or page.size != sc.page(i):

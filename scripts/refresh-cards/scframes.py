@@ -331,7 +331,10 @@ def selfcheck(sc: ScFile, frames):
 
 def load_sc(source):
     """读取一个已解压的 SCFILE 文件。"""
-    data = Path(source).read_bytes()
+    try:
+        data = Path(source).read_bytes()
+    except FileNotFoundError as exc:
+        raise ValueError("找不到 .sc 文件：%s" % source) from exc
     if not data.startswith(b"SC"):
         raise ValueError("不是 SCFILE 文件：%s" % source)
     return data
@@ -345,7 +348,10 @@ def main(argv=None):
     ap.add_argument("--split", action="store_true", help="同名不合并，逐块列出")
     args = ap.parse_args(argv)
 
-    sc = ScFile(load_sc(args.source))
+    try:
+        sc = ScFile(load_sc(args.source))
+    except (OSError, ValueError) as exc:
+        ap.exit(1, "%s: %s\n" % (ap.prog, exc))
     frames = frame_table(sc, merge=not args.split)
     pages = [sc.page(i) for i in range(len(sc.tsets))]
     print("分块: %s" % ", ".join("%s(%d)" % p for p in sc.parts))
