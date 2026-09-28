@@ -33,6 +33,7 @@ CHUNK_ORDER = ["resources", "exports", "textfields", "shapes",
                "movieclips", "modifiers", "texturesets"]
 ZSTD_FRAME = b"\x28\xb5\x2f\xfd"
 UV_SCALE = 65536.0          # 顶点 uv 是 16 位归一化坐标
+PREVIEW_LIMIT = 6
 
 
 def u16(b, p):
@@ -340,6 +341,18 @@ def selfcheck(sc: ScFile, frames):
     return bad
 
 
+def print_preview(items, indent, describe, unit="个"):
+    """树状列出前几个条目，再给出剩余数量。"""
+    if not items:
+        print(f"{indent}└─ （无）")
+        return
+    for i, item in enumerate(items[:PREVIEW_LIMIT]):
+        branch = "└─" if i == len(items) - 1 else "├─"
+        print("%s%s %s" % (indent, branch, describe(item)))
+    if len(items) > PREVIEW_LIMIT:
+        print(f"{indent}└─ ……等 {len(items) - PREVIEW_LIMIT:,} {unit}")
+
+
 def load_sc(source):
     """读取一个已解压的 SCFILE 文件。"""
     try:
@@ -355,7 +368,7 @@ def main(argv=None):
     ap = argparse.ArgumentParser(description=__doc__.splitlines()[0])
     ap.add_argument("source", type=Path, help="已解压的 .sc 文件")
     ap.add_argument("-o", "--output", type=Path, help="写出 JSON 清单")
-    ap.add_argument("--list", metavar="GLOB", default="*", help="只打印匹配的符号")
+    ap.add_argument("--list", metavar="GLOB", default="*", help="筛选预览的符号（最多显示 6 个）")
     ap.add_argument("--split", action="store_true", help="同名不合并，逐块列出")
     args = ap.parse_args(argv)
 
@@ -365,41 +378,75 @@ def main(argv=None):
         ap.exit(1, "%s: %s\n" % (ap.prog, exc))
     frames = frame_table(sc, merge=not args.split)
     pages = [sc.page(i) for i in range(len(sc.tsets))]
+    bad = selfcheck(sc, frames)
+    matched = [name for name in sorted(frames) if fnmatch.fnmatchcase(name, args.list)]
+    exports = list(sc.exports())
     if sc.container:
         print("SCFILE v%d" % sc.container["version"])
         print("├─ FlatBuffers 描述头：{:,} 字节，符号元数据 {:,} 条".format(
               sc.container["header_size"], sc.container["metadata_count"]))
     else:
         print("SCFILE 正文")
-    print("└─ 正文（解压后 {:,} 字节；分块偏移相对正文起点）".format(len(sc.blob)))
+    print("├─ 正文（解压后 {:,} 字节；分块偏移相对正文起点）".format(len(sc.blob)))
     for i, (name, size) in enumerate(sc.parts):
         last = i == len(sc.parts) - 1
-        print("   %s [%d] %-12s 偏移 %10s，长度 %10s 字节" %
+        print("│  %s [%d] %-12s 偏移 %10s，长度 %10s 字节" %
               ("└─" if last else "├─", i, name,
                format(sc.off[name], ","), format(size, ",")))
+        indent = "│     " if last else "│  │  "
+        if name == "resources":
+            resources = sc.tab[name]
+            print("%s├─ 字符串 {:,} 条，形状顶点 {:,} 个（已用于推导）".format(
+                  len(sc.strings), sc.points_n) % indent)
+            print("%s└─ 帧元素 {:,} 个，缩放网格 {:,} 个，矩阵组 {:,} 个（只统计）".format(
+                  resources.vec(4, 2)[0], resources.vec(3, 16)[0],
+                  resources.vec(6, 4)[0]) % indent)
+        elif name == "exports":
+            print("%s├─ 名称 → 对象 ID：{:,} 条".format(len(exports)) % indent)
+            print_preview(exports, indent, lambda row: "%s → %d" % row, "条")
+        elif name == "textfields":
+            print("%s└─ 文本域 {:,} 个（内容未展开）".format(
+                  sc.tab[name].vec(0)[0]) % indent)
+        elif name == "shapes":
+            print("%s├─ Shape {:,} 个，绘制命令 {:,} 条".format(
+                  len(sc.shapes), sum(len(sc.commands(shape)) for shape in sc.shapes)) % indent)
+            print_preview(sc.shapes, indent,
+                          lambda shape: "id %d：%d 条命令" %
+                          (shape.scalar(0, 2), len(sc.commands(shape))))
+        elif name == "movieclips":
+            print("%s├─ MovieClip {:,} 个（仅使用子对象关系）".format(len(sc.clips)) % indent)
+            print_preview(sc.clips, indent,
+                          lambda clip: f"id {clip.scalar(0, 2)}："
+                                       f"{len(clip.struct_pos(5, 2))} 个子对象")
+        elif name == "modifiers":
+            modifiers = sc.tab[name]
+            rows = [struct.unpack_from("<HH", modifiers.b, p)
+                    for p in modifiers.struct_pos(0, 4)]
+            print("%s├─ Modifier {:,} 个（未参与矩形推导）".format(len(rows)) % indent)
+            print_preview(rows, indent, lambda row: "id %d，类型 %d" % row)
         if name == "texturesets":
-            indent = "      " if last else "   │  "
-            for page, (w, h) in enumerate(pages):
-                branch = "└─" if page == len(pages) - 1 else "├─"
-                print("%s%s 页 [%d]：%d × %d" % (indent, branch, page, w, h))
-    print("有矩形的符号 %d 个，推导出的矩形 %d 个" %
-          (len(frames), sum(len(v) for v in frames.values())))
-    bad = selfcheck(sc, frames)
-    print("越界自检: %d 处异常" % len(bad))
+            print("%s├─ 纹理集 {:,} 个（lowres {:,}，highres {:,}）".format(
+                  len(sc.tsets),
+                  sum(st.table(0) is not None for st in sc.tsets),
+                  sum(st.table(1) is not None for st in sc.tsets)) % indent)
+            print_preview(list(enumerate(pages)), indent,
+                          lambda row: "页 [%d]：%d × %d" %
+                          (row[0], row[1][0], row[1][1]), "页")
+    print("└─ 推导结果（Exports → Shapes/MovieClips → Resources → TextureSets）")
+    print("   ├─ 有矩形的符号 {:,} 个，矩形 {:,} 个".format(
+          len(frames), sum(len(v) for v in frames.values())))
+    print("   ├─ 越界自检：%d 处异常" % len(bad))
     for row in bad[:5]:
-        print("   ", row)
+        print("   │  %s" % (row,))
+    print("   └─ 匹配符号 {:,} 个".format(len(matched)))
+    def describe_frame(name):
+        rects = "；".join("页%d (%d, %d) %d×%d" %
+                         (r["page"], r["x"], r["y"], r["w"], r["h"])
+                         for r in frames[name])
+        return "%s → %s" % (name, rects)
+    print_preview(matched, "      ", describe_frame)
     if bad:
         return 1
-
-    shown = 0
-    for name in sorted(frames):
-        if not fnmatch.fnmatchcase(name, args.list):
-            continue
-        shown += 1
-        if shown <= 400:
-            print("  %-40s %s" % (name, frames[name]))
-    if shown > 400:
-        print("  ...共 %d 个，仅显示前 400" % shown)
 
     if args.output:
         args.output.write_text(json.dumps(
