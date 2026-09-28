@@ -21,8 +21,8 @@ CoC 的卡面不是独立图片，而是 ui.sc 图集页上的一块矩形；引
 from __future__ import annotations
 
 import argparse
+import fnmatch
 import json
-import re
 import struct
 import sys
 from pathlib import Path
@@ -57,7 +57,10 @@ class Table:
 
     def slot(self, field):
         off = 4 + 2 * field
-        return None if off >= u16(self.b, self.vt) else u16(self.b, self.vt + off)
+        if off >= u16(self.b, self.vt):
+            return None
+        value = u16(self.b, self.vt + off)
+        return value or None
 
     def at(self, field):
         s = self.slot(field)
@@ -69,21 +72,21 @@ class Table:
             return default
         return struct.unpack_from({1: "<B", 2: "<H", 4: "<I"}[size], self.b, a)[0]
 
-    def vec(self, field):
-        """向量字段 -> (元素个数, 数据位置)。越界当空向量。"""
+    def vec(self, field, item_size=1):
+        """向量字段 -> (元素个数, 数据位置)。"""
         a = self.at(field)
         if a is None:
             return 0, None
         v = a + u32(self.b, a)
         if v + 4 > len(self.b):
-            return 0, None
+            raise ValueError("向量长度越界（字段 %d）" % field)
         n = u32(self.b, v)
-        if n > len(self.b) - v - 4:
-            return 0, None
+        if n > (len(self.b) - v - 4) // item_size:
+            raise ValueError("向量内容越界（字段 %d，元素大小 %d）" % (field, item_size))
         return n, v + 4
 
     def strings(self, field):
-        n, v = self.vec(field)
+        n, v = self.vec(field, 4)
         out = []
         for i in range(n):
             o = v + 4 * i
@@ -92,7 +95,7 @@ class Table:
         return out
 
     def tables(self, field):
-        n, v = self.vec(field)
+        n, v = self.vec(field, 4)
         out = []
         for i in range(n):
             o = v + 4 * i
@@ -112,7 +115,7 @@ class Table:
         return Table(self.b, p) if 0 <= vt < len(self.b) - 4 else None
 
     def struct_pos(self, field, size):
-        n, v = self.vec(field)
+        n, v = self.vec(field, size)
         return [v + size * i for i in range(n)]
 
 
@@ -145,9 +148,11 @@ def split_chunks(blob):
     while pos + 4 <= len(blob):
         ln = u32(blob, pos)
         if ln < 8 or pos + 4 + ln > len(blob):
-            break
+            raise ValueError("flatbuffers 分块长度无效，偏移 %d，长度 %d" % (pos, ln))
         out.append((pos + 4, ln))
         pos += 4 + ln
+    if pos != len(blob):
+        raise ValueError("flatbuffers 正文末尾有 %d 个多余字节" % (len(blob) - pos))
     return out
 
 
@@ -172,10 +177,17 @@ class ScFile:
         self.strings = r.strings(0)
         # 分块内的 Table 用的是切片坐标，加回分块起点才是正文绝对偏移
         n, v = r.vec(5)
-        self.points_n, self.points_at = n, off["resources"] + v
+        if v is None:
+            raise ValueError("Resources 缺少 shape_points")
+        # shape_points 是字节向量；每个顶点占 12 字节。
+        if n % 12:
+            raise ValueError("Resources.shape_points 长度不是 12 的倍数")
+        self.points_n, self.points_at = n // 12, off["resources"] + v
         ex = tab["exports"]
         self.export_ids = [u16(ex.b, p) for p in ex.struct_pos(0, 2)]
         self.export_names = [u32(ex.b, p) for p in ex.struct_pos(1, 4)]
+        if len(self.export_ids) != len(self.export_names):
+            raise ValueError("Exports 的对象 id 与名字数量不一致")
         self.shapes = tab["shapes"].tables(0) if "shapes" in tab else []
         self.clips = tab["movieclips"].tables(0) if "movieclips" in tab else []
         self.tsets = tab["texturesets"].tables(0) if "texturesets" in tab else []
@@ -215,6 +227,9 @@ class ScFile:
     # ---- 几何 ---------------------------------------------------------
     def vertices(self, start, count):
         """ShapePoint{x, y 为 f32；u, v 为 u16}，12 字节一个。"""
+        if start < 0 or count < 0 or start + count > self.points_n:
+            raise ValueError("顶点范围越界：起点 %d，数量 %d，总数 %d" %
+                             (start, count, self.points_n))
         base = self.points_at + 12 * start
         return [struct.unpack_from("<2f2H", self.blob, base + 12 * i) for i in range(count)]
 
@@ -250,10 +265,11 @@ class ScFile:
             seen.add(id(s))
             for _flags, page, count, start in self.commands(s):
                 if count <= 0 or page < 0 or page >= len(self.tsets):
-                    continue
+                    raise ValueError("对象 %d 的绘制命令无效：页 %d，顶点数 %d" %
+                                     (obj_id, page, count))
                 w, h = self.page(page)
                 if not (w and h):
-                    continue
+                    raise ValueError("纹理页 %d 的尺寸无效" % page)
                 pts = self.vertices(start, count)
                 out.append((page,
                             min(p[2] for p in pts) / UV_SCALE * w,
@@ -319,9 +335,10 @@ def load_sc(source, member="ui.sc"):
     游戏更新交付的是 APK，所以这里直接支持 APK/目录，省得手工先解出来。
     """
     path = Path(source)
-    data = path.read_bytes() if path.is_file() else b""
-    if data[:2] == b"SC":
-        return data
+    if path.is_file():
+        with path.open("rb") as file:
+            if file.read(2) == b"SC":
+                return path.read_bytes()
     want = Path(member).name
     if path.is_dir():
         hits = sorted(p for p in path.rglob(want))
@@ -357,11 +374,12 @@ def main(argv=None):
     print("越界自检: %d 处异常" % len(bad))
     for row in bad[:5]:
         print("   ", row)
+    if bad:
+        return 1
 
-    pat = re.compile(args.list.replace("*", ".*").replace("?", "."))
     shown = 0
     for name in sorted(frames):
-        if not pat.match(name):
+        if not fnmatch.fnmatchcase(name, args.list):
             continue
         shown += 1
         if shown <= 400:

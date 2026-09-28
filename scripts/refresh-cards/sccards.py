@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""游戏更新后，把 .sc 里的全部卡面图块导出来，文件名用官方符号名。
+"""游戏更新后，把 .sc 里的全部卡面图块导出来，索引用官方符号名。
 
 卡面不是独立图片，而是 ui.sc 图集页上的一块矩形，而且游戏不存这个矩形 ——
 它存矢量形状，矩形是顶点 uv 包围盒乘页尺寸算出来的。推导链在 scframes.py。
@@ -13,9 +13,12 @@ from __future__ import annotations
 
 import argparse
 import collections
+import hashlib
 import json
+import os
 import struct
 import sys
+import tempfile
 from pathlib import Path
 
 import numpy as np
@@ -82,11 +85,11 @@ def command_tile(sc, pages, cmd):
     """
     _flags, page, count, start = cmd
     if count <= 0 or page < 0 or page >= len(sc.tsets):
-        return None, None, None, 0
+        raise ValueError("绘制命令无效：页 %d，顶点数 %d" % (page, count))
     xs, ys, us, vs = np.array(sc.vertices(start, count), dtype=float).T
     w, h = sc.page(page)
     if not w or not h:
-        return None, None, None, 0
+        raise ValueError("纹理页 %d 的尺寸无效" % page)
     a = np.column_stack([xs, ys, np.ones_like(xs)])
     u = np.linalg.lstsq(a, us / UV * w, rcond=None)[0]
     v = np.linalg.lstsq(a, vs / UV * h, rcond=None)[0]
@@ -104,6 +107,9 @@ def command_tile(sc, pages, cmd):
         return None, None, best[0] if best else None, 0
     _err, op = best
     x0, y0, x1, y1 = uv_box(us, vs, w, h)
+    if not (0 <= x0 <= x1 <= w and 0 <= y0 <= y1 <= h):
+        raise ValueError("纹理页 %d 的裁剪矩形越界：%s" %
+                         (page, (x0, y0, x1, y1)))
     if x1 - x0 < 2 or y1 - y0 < 2:
         return None, op, None, 0
     img = pages[page].crop((x0, y0, x1, y1))
@@ -162,26 +168,57 @@ def kind(name, all_names):
 
 
 def export(sc, pages, prefixes, out, manifest):
-    """导出给定前缀下的全部卡面，文件名用官方符号名，并写一份索引。"""
+    """导出给定前缀下的全部卡面，并写符号名到文件名的索引。"""
     ex = dict(sc.exports())
-    out.mkdir(parents=True, exist_ok=True)
-    rows, failed = {}, []
-    for name in sorted(n for n in ex if n.startswith(tuple(prefixes))):
+    all_names = set(ex)
+    selected = sorted(n for n in ex if n.startswith(tuple(prefixes)))
+    if not selected:
+        raise ValueError("没有匹配前缀的符号：%s" % ", ".join(prefixes))
+    folded = collections.Counter(n.casefold() for n in selected)
+    rows, images, failed = {}, {}, []
+    for name in selected:
+        if Path(name).name != name or name in (".", ".."):
+            raise ValueError("符号名不能用作文件名：%r" % name)
         img, op, rect = biggest_tile(sc, pages, ex[name])
         if img is None:
             failed.append(name)
             continue
-        img.save(out / (name + ".png"))
-        rows[name] = {"kind": kind(name, set(ex)), "clip": clip_of(sc, ex[name]),
+        filename = name + ".png"
+        if folded[name.casefold()] > 1:
+            filename = name + "--" + hashlib.sha256(name.encode()).hexdigest()[:8] + ".png"
+        images[filename] = img
+        rows[name] = {"kind": kind(name, all_names), "clip": clip_of(sc, ex[name]),
                       "orient": getattr(op, "name", "none"),
                       "size": list(img.size), "rect": rect}
+        if filename != name + ".png":
+            rows[name]["file"] = filename
+    if failed:
+        raise ValueError("裁不出 %d 个卡面：%s" % (len(failed), ", ".join(failed)))
+
+    old_files = set()
+    if manifest.exists():
+        old_files = {row.get("file", name + ".png")
+                     for name, row in json.loads(manifest.read_text())["cards"].items()}
+    out.parent.mkdir(parents=True, exist_ok=True)
+    with tempfile.TemporaryDirectory(prefix=".cards-", dir=out.parent) as stage_name:
+        stage = Path(stage_name)
+        for filename, img in images.items():
+            img.save(stage / filename)
+        out.mkdir(parents=True, exist_ok=True)
+        for filename in images:
+            os.replace(stage / filename, out / filename)
+
     manifest.parent.mkdir(parents=True, exist_ok=True)
-    manifest.write_text(json.dumps({"prefixes": list(prefixes), "cards": rows},
-                                   ensure_ascii=False, indent=1) + "\n")
+    with tempfile.NamedTemporaryFile(mode="w", encoding="utf-8", prefix=".cards-",
+                                     dir=manifest.parent, delete=False) as tmp:
+        tmp.write(json.dumps({"prefixes": list(prefixes), "cards": rows},
+                             ensure_ascii=False, indent=1) + "\n")
+    os.replace(tmp.name, manifest)
+    for filename in old_files - images.keys():
+        if Path(filename).name == filename and filename not in (".", ".."):
+            (out / filename).unlink(missing_ok=True)
     print("导出 %d 张 -> %s" % (len(rows), out))
     print("类别: %s" % dict(collections.Counter(r["kind"] for r in rows.values()).most_common()))
-    if failed:
-        print("裁不出 %d 个: %s" % (len(failed), ", ".join(failed[:10])))
     print("索引 -> %s" % manifest)
 
 
@@ -197,6 +234,9 @@ def main(argv=None):
 
     sc = scframes.ScFile(scframes.load_sc(args.source, args.sc))
     pages = [sctx2png.ktx_image(sc.page_ktx(i)) for i in range(len(sc.tsets))]
+    for i, page in enumerate(pages):
+        if page is None or page.size != sc.page(i):
+            raise ValueError("纹理页 %d 解码尺寸与 .sc 记录不一致" % i)
     export(sc, pages, args.prefix or list(DEFAULT_PREFIXES), args.out, args.manifest)
     return 0
 

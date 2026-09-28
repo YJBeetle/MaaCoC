@@ -46,14 +46,16 @@ unzip -l var/coc-unpack/apk/split_install_time_asset_pack.apk | grep 'assets/sc/
 ## 导出全部卡面
 
 ```bash
-var/coc-unpack/.venv/bin/python scripts/refresh-cards/sccards.py var/coc-unpack/apk/split_install_time_asset_pack.apk --all
+var/coc-unpack/.venv/bin/python scripts/refresh-cards/sccards.py var/coc-unpack/apk/split_install_time_asset_pack.apk
 ```
 
 约 2 秒，输出：
 
-- `assets/image/cards/<符号名>.png` —— 236 张，**文件名就是游戏里的符号名**
+- `assets/image/cards/<符号名>.png` —— 236 张，通常直接用游戏里的符号名作文件名。
+  两个仅大小写不同的符号在大小写不敏感的文件系统上会冲突，脚本始终给它们加稳定后缀，
+  并在索引的 `file` 字段记录实际文件名。
 - `assets/config/cards.json` —— 索引表，每条是
-  `{kind, clip, orient, size, rect:[页, x, y, 宽, 高]}`。
+  `{kind, clip, orient, size, rect:[页, x, y, 宽, 高]}`，重名文件另有 `file`。
   注意 `rect` 是**图集里那块**（转回正之前的框），`size` 是导出图的尺寸；
   `orient` 是 90/270/转置 的那 48 张两者宽高会互换，除此之外应当完全相等。
 
@@ -73,8 +75,8 @@ var/coc-unpack/.venv/bin/python scripts/refresh-cards/sccards.py var/coc-unpack/
 var/coc-unpack/.venv/bin/python scripts/refresh-cards/scframes.py <APK 或 ui.sc> -o ui.frames.json
 ```
 
-它会跑一遍结构自检 —— **每个矩形必须落在自己那一页的尺寸内**，输出 `越界自检: 0 处异常` 才算通过。
-这是判据，不是打分：矩形对不上就是解析错了，没有"差不多"。
+它会检查保留下来的非零面积矩形是否落在对应纹理页内；无效页号、顶点范围等结构错误会直接报错。
+输出 `越界自检: 0 处异常` 说明这批矩形通过了边界检查，但不代表卡面朝向和选块都正确。
 
 ## 验收要看什么
 

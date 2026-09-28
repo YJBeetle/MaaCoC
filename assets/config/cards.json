@@ -2994,7 +2994,8 @@
     832,
     176,
     155
-   ]
+   ],
+   "file": "icon_unit_siege_machine_Ram--95ed1f46.png"
   },
   "icon_unit_siege_machine_Zeppelin": {
    "kind": "siege",
@@ -3442,7 +3443,8 @@
     832,
     176,
     155
-   ]
+   ],
+   "file": "icon_unit_siege_machine_ram--7676fc4a.png"
   },
   "icon_unit_siege_machine_ram_ability": {
    "kind": "siege",
