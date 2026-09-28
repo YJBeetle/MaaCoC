@@ -1,17 +1,12 @@
 #!/usr/bin/env python3
-"""游戏更新后，用 .sc 里的原始图块刷新战斗条卡牌模板。
+"""游戏更新后，把 .sc 里的全部卡面图块导出来，文件名用官方符号名。
 
-卡面不是独立图片，而是 ui.sc 图集页上的一块矩形，位置由
-scripts/scframes.py 从 flatbuffers 里推出来。本脚本把那块矩形裁出来、
-按模板原有尺寸重新装框、再把模板里原有的纯绿 (0,255,0) 角标遮罩
-原样贴回去（green_mask 靠它跳过会变化的等级/费用角标）。
+卡面不是独立图片，而是 ui.sc 图集页上的一块矩形，而且游戏不存这个矩形 ——
+它存矢量形状，矩形是顶点 uv 包围盒乘页尺寸算出来的。推导链在 scframes.py。
 
-模板的几何（尺寸、绿块位置）一律沿用现存的 PNG —— 要换的只有像素。
+    python3 scripts/refresh-cards/sccards.py <APK 或 ui.sc>
 
-用法：
-    python3 scripts/sccards.py ui.sc                 # 干跑，报告差异
-    python3 scripts/sccards.py ui.sc --apply         # 写盘
-    python3 scripts/sccards.py ui.sc --symbols auto  # 重新生成符号对照表
+产出 assets/image/cards/<符号名>.png 加一份 assets/config/cards.json 索引。
 """
 
 from __future__ import annotations
@@ -19,13 +14,12 @@ from __future__ import annotations
 import argparse
 import collections
 import json
-import re
 import struct
 import sys
 from pathlib import Path
 
 import numpy as np
-from PIL import Image, ImageDraw
+from PIL import Image
 
 # 同级拿 scframes，上一级 scripts/ 拿共用的 KTX 解码 sctx2png
 HERE = Path(__file__).resolve().parent
@@ -34,12 +28,8 @@ import scframes          # noqa: E402
 import sctx2png          # noqa: E402
 
 REPO = HERE.parents[1]
-GREEN = (0, 255, 0)
 UV = 65536.0
-
-
-def norm(s):
-    return re.sub(r"[^a-z]", "", s.lower())
+DEFAULT_PREFIXES = ("icon_unit_", "icon_spell_")
 
 
 def leaf_shapes(sc, obj_id, seen=None):
@@ -59,9 +49,9 @@ def leaf_shapes(sc, obj_id, seen=None):
     return out
 
 
-# 图集里一张图块可能的 8 种存法（二面体群 D4）。O 把页内像素 (U,V) 映到显示
-# 坐标 (X,Y) 的线性部分 —— 符号和置换是拿一张 4x3 的标记图实测 PIL transpose
-# 得到的，不是推的：例如 ROTATE_90 把 (0,0) 送到 (0,3)，即 X∝+V、Y∝-U。
+# 图块在图集里可能是 8 种存法之一（二面体群 D4）。O 把页内像素 (U,V) 映到显示
+# 坐标 (X,Y) 的线性部分 —— 符号和置换是拿一张 4x3 标记图实测 PIL transpose 得到
+# 的，不是推的：ROTATE_90 把 (0,0) 送到 (0,3)，即 X∝+V、Y∝-U。
 ORIENTATIONS = (
     (None, np.array([[1., 0.], [0., 1.]])),
     (Image.Transpose.ROTATE_90, np.array([[0., 1.], [-1., 0.]])),
@@ -72,17 +62,23 @@ ORIENTATIONS = (
     (Image.Transpose.TRANSPOSE, np.array([[0., 1.], [1., 0.]])),
     (Image.Transpose.TRANSVERSE, np.array([[0., -1.], [-1., 0.]])),
 )
-# 拟合残差超过这个比例就说明图块不是轴对齐存放（多半是实例矩阵带了斜角），
+# 残差超过这个比例说明图块不是轴对齐存放（多半是实例矩阵带了斜角），
 # 宁可报出来也别硬猜一个朝向。
 ORIENT_TOL = 0.01
 
 
-def command_tile(sc, pages, cmd):
-    """一条绘制命令 -> (显示朝向的图, 用的转置, 拟合相对残差, 面积)。
+def uv_box(us, vs, w, h):
+    """uv 包围盒 -> 页内像素矩形。"""
+    return (round(us.min() / UV * w), round(vs.min() / UV * h),
+            round(us.max() / UV * w), round(vs.max() / UV * h))
 
-    朝向按命令单独定：每个 Shape 有自己的局部坐标系，混在一起拟合会互相污染。
-    拟合必须带常数项 —— 局部坐标原点在形状中心而 uv 原点在页角，省掉截距会把
-    线性部分算成一团垃圾（这个坑踩过一次）。
+
+def command_tile(sc, pages, cmd):
+    """一条绘制命令 -> (显示朝向的图, 用的转置, 像素矩形, 面积)。
+
+    朝向必须按命令单独定：卡面 MovieClip 的孩子混着遮罩、脸和背景块，各有各的
+    局部坐标系，混在一起拟合会互相污染。拟合还必须带常数项 —— 局部原点在形状
+    中心而 uv 原点在页角，省掉截距会把线性部分算成一团垃圾（这坑踩过）。
     """
     _flags, page, count, start = cmd
     if count <= 0 or page < 0 or page >= len(sc.tsets):
@@ -106,38 +102,29 @@ def command_tile(sc, pages, cmd):
             best = (err, op)
     if best is None or best[0] > ORIENT_TOL:
         return None, None, best[0] if best else None, 0
-    err, op = best
-    box = (round(us.min() / UV * w), round(vs.min() / UV * h),
-           round(us.max() / UV * w), round(vs.max() / UV * h))
-    if box[2] - box[0] < 2 or box[3] - box[1] < 2:
-        return None, op, err, 0
-    img = pages[page].crop(box)
+    _err, op = best
+    x0, y0, x1, y1 = uv_box(us, vs, w, h)
+    if x1 - x0 < 2 or y1 - y0 < 2:
+        return None, op, None, 0
+    img = pages[page].crop((x0, y0, x1, y1))
     if op is not None:
         img = img.transpose(op)
-    return img.convert("RGBA"), op, err, (box[2] - box[0]) * (box[3] - box[1])
+    return img.convert("RGBA"), op, [page, x0, y0, x1 - x0, y1 - y0], (x1 - x0) * (y1 - y0)
 
 
-def face_tile(sc, pages, obj_id):
-    """返回 (显示朝向的卡面图, 用的转置)。多条命令时取面积最大的一条。"""
-    cmds = [c for s in leaf_shapes(sc, obj_id) for c in sc.commands(s)]
-    tiles = [r for r in (command_tile(sc, pages, c) for c in cmds) if r[0] is not None]
+def biggest_tile(sc, pages, obj_id):
+    """对象所有绘制命令里面积最大的那块 —— 卡面就是一块主图，其余是遮罩/背景。"""
+    tiles = [t for t in (command_tile(sc, pages, c)
+                         for s in leaf_shapes(sc, obj_id) for c in sc.commands(s))
+             if t[0] is not None]
     if not tiles:
-        return None, None
-    img, op, _err, _area = max(tiles, key=lambda e: e[3])
-    return img, op
-
-
-def fit_cover(src, width, height):
-    """等比放大到铺满窗口后居中裁切。"""
-    s = max(width / src.width, height / src.height)
-    w, h = max(width, round(src.width * s)), max(height, round(src.height * s))
-    im = src.resize((w, h), Image.LANCZOS)
-    return im.crop(((w - width) // 2, (h - height) // 2,
-                    (w - width) // 2 + width, (h - height) // 2 + height))
+        return None, None, None
+    img, op, rect, _area = max(tiles, key=lambda e: e[3])
+    return img, op, rect
 
 
 def clip_of(sc, obj_id):
-    """卡面 MovieClip 用的裁剪遮罩对象 id（既不是 Shape 也不是 MovieClip 的那个孩子）。"""
+    """卡面 MovieClip 用的裁剪遮罩对象 id（既不是 Shape 也不是 MovieClip 的孩子）。"""
     for c in sc.clips_by_id.get(obj_id, ()):
         for p in c.struct_pos(5, 2):
             kid = struct.unpack_from("<H", c.b, p)[0]
@@ -149,9 +136,10 @@ def clip_of(sc, obj_id):
 def kind(name, all_names):
     """按官方命名规则给卡面分类。
 
-    只有"超级兵"这一条需要看有没有同名普通版，单看 elite_ 前缀会错：
-    21 个 icon_unit_elite_* 里 8 个（bowler/hogrider/minion/valkyrie/icehound/
-    infernodragon/barbarian_group_cc）根本没有普通版，elite_ 就是它们本体图块名。
+    超级兵不能只看 elite_ 前缀：21 个 icon_unit_elite_* 里 7 个压根没有同名普通版
+    （bowler / hogrider / minion / valkyrie / icehound / infernodragon /
+    barbarian_group_cc），那里 elite_ 就是本体图块的名字。
+    所以判据是「elite_ 且有同名普通版」。
     """
     if name.startswith("icon_spell_"):
         return "spell"
@@ -173,158 +161,43 @@ def kind(name, all_names):
     return "troop"
 
 
-def export_all(sc, pages, prefixes, out, manifest):
-    """把给定前缀下的全部卡面按官方符号名导出，并写一份带类别和矩形的清单。"""
+def export(sc, pages, prefixes, out, manifest):
+    """导出给定前缀下的全部卡面，文件名用官方符号名，并写一份索引。"""
     ex = dict(sc.exports())
-    all_names = set(ex)
-    picked = sorted(n for n in all_names if n.startswith(tuple(prefixes)))
     out.mkdir(parents=True, exist_ok=True)
     rows, failed = {}, []
-    for name in picked:
-        tile, op = face_tile(sc, pages, ex[name])
-        if tile is None:
+    for name in sorted(n for n in ex if n.startswith(tuple(prefixes))):
+        img, op, rect = biggest_tile(sc, pages, ex[name])
+        if img is None:
             failed.append(name)
             continue
-        rect = next((r for r in frame_rects(sc, ex[name])), None)
-        tile.save(out / (name + ".png"))
-        rows[name] = {"kind": kind(name, all_names), "clip": clip_of(sc, ex[name]),
+        img.save(out / (name + ".png"))
+        rows[name] = {"kind": kind(name, set(ex)), "clip": clip_of(sc, ex[name]),
                       "orient": getattr(op, "name", "none"),
-                      "size": list(tile.size), "rect": rect}
+                      "size": list(img.size), "rect": rect}
+    manifest.parent.mkdir(parents=True, exist_ok=True)
     manifest.write_text(json.dumps({"prefixes": list(prefixes), "cards": rows},
                                    ensure_ascii=False, indent=1) + "\n")
-    counts = collections.Counter(r["kind"] for r in rows.values())
     print("导出 %d 张 -> %s" % (len(rows), out))
-    print("类别: %s" % dict(counts.most_common()))
+    print("类别: %s" % dict(collections.Counter(r["kind"] for r in rows.values()).most_common()))
     if failed:
         print("裁不出 %d 个: %s" % (len(failed), ", ".join(failed[:10])))
-    print("清单 -> %s" % manifest)
-
-
-def frame_rects(sc, obj_id):
-    """对象覆盖到的图集矩形，取整后的 [页, x, y, 宽, 高]。"""
-    for s in leaf_shapes(sc, obj_id):
-        for _flags, page, count, start in sc.commands(s):
-            xs, ys, us, vs = np.array(sc.vertices(start, count), dtype=float).T
-            w, h = sc.page(page)
-            x0, y0 = round(us.min() / UV * w), round(vs.min() / UV * h)
-            x1, y1 = round(us.max() / UV * w), round(vs.max() / UV * h)
-            if x1 > x0 and y1 > y0:
-                yield [page, x0, y0, x1 - x0, y1 - y0]
-
-
-def build_symbols(sc, templates):
-    """按 icon_unit_<小写名> 自动对一遍符号，对不上的留空等人工补。"""
-    names = {n for n, _ in sc.exports()}
-    out = {}
-    for p in templates:
-        key = norm(re.sub(r"^\d+_", "", p.stem))
-        guess = "icon_unit_" + key
-        if guess in names:
-            out[p.name] = guess
-            continue
-        cand = sorted(n for n in names
-                      if n.startswith("icon_unit_") and norm(n[10:]) == key)
-        out[p.name] = cand[0] if len(cand) == 1 else None
-    return out
-
-
-def review_sheet(sc, pages, out, cols=10, cell=132):
-    """把所有 icon_unit_* 图块铺成一张带名字的对照表，给人挑符号用。"""
-    names = sorted({n for n, _ in sc.exports() if n.startswith("icon_unit_")})
-    sheet = Image.new("RGBA", (cols * cell, cell * (len(names) // cols + 1)),
-                      (26, 26, 30, 255))
-    dr = ImageDraw.Draw(sheet)
-    ex = dict(sc.exports())
-    for i, nm in enumerate(names):
-        tile, _op = face_tile(sc, pages, ex[nm])
-        if tile is None:
-            continue
-        tile.thumbnail((cell - 4, cell - 14))
-        x, y = (i % cols) * cell, (i // cols) * cell
-        sheet.paste(tile, (x, y + 12), tile)
-        dr.text((x + 2, y + 1), nm[10:], fill=(255, 255, 0, 255))
-    out.parent.mkdir(parents=True, exist_ok=True)
-    sheet.save(out)
-    print("写出符号对照图 %s（%d 个 icon_unit_*）" % (out, len(names)))
+    print("索引 -> %s" % manifest)
 
 
 def main(argv=None):
     ap = argparse.ArgumentParser(description=__doc__.splitlines()[0])
     ap.add_argument("source", type=Path, help="ui.sc / 含 ui.sc 的 APK 或目录")
     ap.add_argument("--sc", default="ui.sc", help="从 APK/目录里挑哪个 .sc")
-    ap.add_argument("--templates", type=Path, default=REPO / "assets/image/Soldier")
-    ap.add_argument("--symbols", type=Path,
-                    default=REPO / "assets/config/card-symbols.json")
-    ap.add_argument("--apply", action="store_true", help="写盘，默认只报告")
-    ap.add_argument("--auto", action="store_true", help="重写符号对照表")
-    ap.add_argument("--review", type=Path, help="导出 icon_unit_* 对照图后退出")
-    ap.add_argument("--all", action="store_true",
-                    help="导出全部卡面，文件名直接用官方符号名")
     ap.add_argument("--prefix", action="append",
-                    help="--all 要导出的符号前缀，可重复（默认 icon_unit_ 和 icon_spell_）")
+                    help="要导出的符号前缀，可重复（默认 %s）" % " 和 ".join(DEFAULT_PREFIXES))
     ap.add_argument("--out", type=Path, default=REPO / "assets/image/cards")
     ap.add_argument("--manifest", type=Path, default=REPO / "assets/config/cards.json")
     args = ap.parse_args(argv)
 
-    templates = sorted(args.templates.glob("*.png"))
     sc = scframes.ScFile(scframes.load_sc(args.source, args.sc))
     pages = [sctx2png.ktx_image(sc.page_ktx(i)) for i in range(len(sc.tsets))]
-    prefixes = args.prefix or ["icon_unit_", "icon_spell_"]
-    if args.all:
-        export_all(sc, pages, prefixes, args.out, args.manifest)
-        return 0
-    if args.review:
-        review_sheet(sc, pages, args.review)
-        return 0
-    exports = dict(sc.exports())
-    if args.auto or not args.symbols.exists():
-        table = build_symbols(sc, templates)
-        args.symbols.write_text(json.dumps(table, ensure_ascii=False, indent=1) + "\n")
-        left = [k for k, v in table.items() if not v]
-        print("写出符号对照表 %s（%d/%d 自动对上）"
-              % (args.symbols, len(table) - len(left), len(table)))
-        if left:
-            print("待人工指定:", ", ".join(left))
-        if args.auto and not args.apply:
-            return 0
-    else:
-        table = json.loads(args.symbols.read_text())
-
-    print("页: %s" % [p.size for p in pages])
-    same = changed = miss = 0
-    for fname, sym in sorted(table.items()):
-        path = args.templates / fname
-        if not path.exists():
-            print("  %-26s 模板文件不存在" % fname)
-            miss += 1
-            continue
-        old = np.array(Image.open(path).convert("RGBA"))
-        if not sym or sym not in exports:
-            print("  %-26s 符号未对照%s" % (fname, "" if sym else "上"))
-            miss += 1
-            continue
-        tile, op = face_tile(sc, pages, exports[sym])
-        if tile is None:
-            print("  %-26s %-26s 没有图块" % (fname, sym))
-            miss += 1
-            continue
-        new = np.array(fit_cover(tile, old.shape[1], old.shape[0]))
-        new[:, :, 3] = 255
-        mask = np.all(old[:, :, :3] == np.array(GREEN), axis=-1)   # 角标遮罩原样保留
-        new[mask] = (GREEN[0], GREEN[1], GREEN[2], 255)
-        diff = int(np.abs(old[:, :, :3].astype(int) - new[:, :, :3].astype(int)).mean())
-        tag = "不变" if diff == 0 else "差异 %d" % diff
-        print("  %-26s %-28s %dx%d%s  %s"
-              % (fname, sym, old.shape[1], old.shape[0],
-                 " 转存%s" % getattr(op, "name", "") if op else "", tag))
-        if diff:
-            changed += 1
-            if args.apply:
-                Image.fromarray(new, "RGBA").save(path)
-        else:
-            same += 1
-    print("\n一致 %d，需更新 %d，未覆盖 %d%s"
-          % (same, changed, miss, "（已写盘）" if args.apply else "（干跑，未写盘）"))
+    export(sc, pages, args.prefix or list(DEFAULT_PREFIXES), args.out, args.manifest)
     return 0
 
 

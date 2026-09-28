@@ -23,7 +23,7 @@ SCFILE 容器 = "SC" + 版本 + 符号定义表(3043 条: 16字节哈希 + 名�
 这套格式有公开参考实现（`sc-workshop/SupercellFlash`、`danila-schelkov/supercell-swf`），
 schema 直接可用，不需要逆向。
 
-## 准备
+## 准备环境
 
 ```bash
 cd <仓库根目录>
@@ -31,21 +31,31 @@ python3 -m venv var/coc-unpack/.venv
 var/coc-unpack/.venv/bin/python -m pip install pillow numpy zstandard texture2ddecoder
 ```
 
-素材包是 `split_install_time_asset_pack.apk`（约 650MB，`ui.sc` 在里面的 `assets/sc/ui.sc`）。
-游戏更新后换掉这个 APK 就行。
+## 拉取文件
+
+```bash
+adb pull "$(adb shell pm path com.supercell.clashofclans | tr -d '\r' | sed 's/^package://' | grep /split_install_time_asset_pack.apk)" var/coc-unpack/apk/
+```
+
+检查
+
+```bash
+unzip -l var/coc-unpack/apk/split_install_time_asset_pack.apk | grep 'assets/sc/ui.sc$'
+```
 
 ## 导出全部卡面
 
 ```bash
-var/coc-unpack/.venv/bin/python scripts/refresh-cards/sccards.py \
-    var/coc-unpack/apk/split_install_time_asset_pack.apk --all
+var/coc-unpack/.venv/bin/python scripts/refresh-cards/sccards.py var/coc-unpack/apk/split_install_time_asset_pack.apk --all
 ```
 
 约 2 秒，输出：
 
 - `assets/image/cards/<符号名>.png` —— 236 张，**文件名就是游戏里的符号名**
 - `assets/config/cards.json` —— 索引表，每条是
-  `{kind, clip, orient, size, rect:[页, x, y, 宽, 高]}`
+  `{kind, clip, orient, size, rect:[页, x, y, 宽, 高]}`。
+  注意 `rect` 是**图集里那块**（转回正之前的框），`size` 是导出图的尺寸；
+  `orient` 是 90/270/转置 的那 48 张两者宽高会互换，除此之外应当完全相等。
 
 常用参数：
 
@@ -113,6 +123,5 @@ var/coc-unpack/.venv/bin/python scripts/refresh-cards/scframes.py <APK 或 ui.sc
   这个差不能用来判对错 —— 真正的判据只有流水线的 TemplateMatch 分数。
 - **绿块还没打**。`green_mask` 用的纯 `(0,255,0)` 角标遮罩需要后处理时加，
   从现有 26 张模板反推的相对比例中位数是 `(左 0.047, 上 0.656, 宽 0.295, 高 0.261)`，分量范围都很窄。
-- **`Soldier/` 还是老的手起名**。`sccards.py` 不带 `--all` 的那条路径靠
-  `assets/config/card-symbols.json` 把老名字映射到符号名，26/48 自动对上，其余等人工。
-  等这批官方命名的图验收通过，直接让模板也用符号名，这张对照表就可以删了。
+- **`assets/image/Soldier/` 那 48 张模板还是老的手起名**，且没有绿块。要让流水线用这批官方
+  命名的图，得先定后处理规则（统一尺寸、装框方式、绿块位置），再把模板迁成符号名。
