@@ -354,9 +354,20 @@ def main(argv=None):
         ap.exit(1, "%s: %s\n" % (ap.prog, exc))
     frames = frame_table(sc, merge=not args.split)
     pages = [sc.page(i) for i in range(len(sc.tsets))]
-    print("分块: %s" % ", ".join("%s(%d)" % p for p in sc.parts))
-    print("页: %s" % pages)
-    print("符号 %d 个，矩形 %d 个" % (len(frames), sum(len(v) for v in frames.values())))
+    print("SCFILE")
+    print("└─ 正文（解压后 {:,} 字节；分块偏移相对正文起点）".format(len(sc.blob)))
+    for i, (name, size) in enumerate(sc.parts):
+        last = i == len(sc.parts) - 1
+        print("   %s [%d] %-12s 偏移 %10s，长度 %10s 字节" %
+              ("└─" if last else "├─", i, name,
+               format(sc.off[name], ","), format(size, ",")))
+        if name == "texturesets":
+            indent = "      " if last else "   │  "
+            for page, (w, h) in enumerate(pages):
+                branch = "└─" if page == len(pages) - 1 else "├─"
+                print("%s%s 页 [%d]：%d × %d" % (indent, branch, page, w, h))
+    print("有矩形的符号 %d 个，推导出的矩形 %d 个" %
+          (len(frames), sum(len(v) for v in frames.values())))
     bad = selfcheck(sc, frames)
     print("越界自检: %d 处异常" % len(bad))
     for row in bad[:5]:
