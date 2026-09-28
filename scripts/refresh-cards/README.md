@@ -73,6 +73,7 @@ scripts/refresh-cards/sccards.py var/coc-unpack/sc/ui.sc
 ```bash
 scripts/refresh-cards/scframes.py var/coc-unpack/sc/ui.sc -o ui.frames.json
 scripts/refresh-cards/scframes.py var/coc-unpack/sc/ui.sc --png-out var/coc-unpack/frames
+scripts/refresh-cards/scframes.py var/coc-unpack/sc/ui.sc --apng-out var/coc-unpack/animations
 scripts/refresh-cards/scframes.py var/coc-unpack/sc/ui.sc --textures-out var/coc-unpack/textures
 ```
 
@@ -84,7 +85,11 @@ scripts/refresh-cards/scframes.py var/coc-unpack/sc/ui.sc --textures-out var/coc
 `index.html` 浏览页。顶点到像素的倍率在 `scrender.py` 的 `PIXELS_PER_UNIT` 中，当前为 1。
 输出宽高默认各不超过 1000 像素；可用 `--max-size` 修改。超限时等比缩小，文件名会注明
 缩放前后的尺寸（例如 `--2400x1200-to-1000x500.png`），浏览页也会列出两种尺寸。
-MovieClip 取首帧，并应用子对象的 2D 矩阵；动画后续帧、文本、颜色变换和裁剪遮罩尚未还原。
+普通 `--png-out` 取首帧。`--apng-out` 同样导出全部符号并生成 `index.html`：多帧
+MovieClip 导出为循环播放的 APNG，单帧符号导出为普通 PNG，都是每个符号一个 `.png` 文件。
+动画各帧共用一张固定大小的画布，使用 `.sc` 记录的帧率；`--max-size` 同样控制画布宽高上限。
+相邻画面相同时，编码器可能合并帧，但会保留总播放时长。渲染会应用子对象的 2D 矩阵；
+嵌套 MovieClip 暂按同一帧号推进，文本、颜色变换和裁剪遮罩尚未还原。
 `--textures-out` 导出 TextureSets 的各纹理页原尺寸 PNG（`page-000.png` 等），
 并生成 `textures.html` 浏览页。每页按 TextureSets 页号读取，优先使用 highres 槽。
 

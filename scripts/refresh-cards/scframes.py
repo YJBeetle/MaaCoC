@@ -16,6 +16,7 @@ CoC 的卡面不是独立图片，而是 ui.sc 图集页上的一块矩形；引
 用法：
     python3 scripts/refresh-cards/scframes.py var/coc-unpack/sc/ui.sc -o ui.frames.json
     python3 scripts/refresh-cards/scframes.py var/coc-unpack/sc/ui.sc --png-out var/coc-unpack/frames
+    python3 scripts/refresh-cards/scframes.py var/coc-unpack/sc/ui.sc --apng-out var/coc-unpack/animations
     python3 scripts/refresh-cards/scframes.py var/coc-unpack/sc/ui.sc --textures-out var/coc-unpack/textures
 """
 
@@ -400,6 +401,7 @@ def main(argv=None):
     ap.add_argument("-o", "--output", type=Path, help="写出 JSON 清单")
     ap.add_argument("--split", action="store_true", help="同名不合并，逐块列出")
     ap.add_argument("--png-out", type=Path, help="按顶点与 UV 导出符号 PNG 和浏览页")
+    ap.add_argument("--apng-out", type=Path, help="导出全部符号；多帧为 APNG，单帧为 PNG，附浏览页")
     ap.add_argument("--textures-out", type=Path, help="导出 TextureSets 纹理页的原尺寸 PNG")
     ap.add_argument("--max-size", type=int, default=PNG_MAX_SIZE,
                     help="符号 PNG 宽高上限（默认 1000）")
@@ -490,7 +492,7 @@ def main(argv=None):
              "frames": frames}, ensure_ascii=False, indent=1))
         print("写出 %s" % args.output)
     render_failed = False
-    if args.png_out or args.textures_out:
+    if args.png_out or args.apng_out or args.textures_out:
         try:
             # 解码器是共用脚本；只在确实导出 PNG 时加载其依赖。
             sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
@@ -504,6 +506,17 @@ def main(argv=None):
                 render_failed = bool(failed)
                 for name, reason in failed[:5]:
                     print("  渲染失败：%s：%s" % (name, reason))
+            if args.apng_out:
+                from scrender import export_apng
+                results, skipped, failed = export_apng(
+                    sc, args.apng_out, ktx_image, args.max_size)
+                animated = sum(count > 1 for _, _, count, _ in results)
+                print(f"导出 {len(results):,} 张符号 PNG → {args.apng_out}"
+                      f"（其中动画 {animated:,} 个；浏览页 index.html；"
+                      f"无网格 {len(skipped):,} 个，失败 {len(failed):,} 个）")
+                for name, reason in failed[:5]:
+                    print(f"  渲染失败：{name}：{reason}")
+                render_failed |= bool(failed)
             if args.textures_out:
                 count = export_texture_pages(sc, args.textures_out, ktx_image)
                 print("导出 {:,} 张纹理页 PNG → {}（浏览页 textures.html）".format(

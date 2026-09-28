@@ -36,6 +36,7 @@ class Renderer:
         self.banks = resources.tables(6)
         self.matrix_cache = {}
         self.clip_elements_cache = {}
+        self.clip_frame_cache = {}
         self.pages = {}
 
     def matrix(self, bank_index, matrix_index):
@@ -64,26 +65,38 @@ class Renderer:
             self.pages[index] = image.convert("RGBa")
         return self.pages[index]
 
-    def clip_elements(self, clip):
-        """返回 MovieClip 首帧的元素。"""
+    def clip_elements(self, clip, frame=0):
+        """返回 MovieClip 指定帧的元素。"""
         key = id(clip)
         if key not in self.clip_elements_cache:
             count, frames_at = clip.vec(8, 8)
+            item_size, fmt = 8, "<I"
             if not count:
-                self.clip_elements_cache[key] = []
-            else:
-                offset = clip.scalar(9)
-                used = struct.unpack_from("<I", clip.b, frames_at)[0]
+                count, frames_at = clip.vec(12, 2)
+                item_size, fmt = 2, "<H"
+            offset = clip.scalar(9)
+            frames = []
+            for i in range(count):
+                used = struct.unpack_from(fmt, clip.b, frames_at + item_size * i)[0]
                 if offset + 3 * used > self.frame_elements_count:
                     raise ValueError("MovieClip 帧元素越界")
-                self.clip_elements_cache[key] = [struct.unpack_from(
-                    "<3H", self.frame_elements,
-                    self.frame_elements_at + 2 * (offset + 3 * i))
-                    for i in range(used)]
-        return self.clip_elements_cache[key]
+                frames.append((offset, used))
+                offset += 3 * used
+            self.clip_elements_cache[key] = frames
+        frames = self.clip_elements_cache[key]
+        if not frames:
+            return []
+        selected = (key, frame % len(frames))
+        if selected not in self.clip_frame_cache:
+            offset, used = frames[selected[1]]
+            self.clip_frame_cache[selected] = [struct.unpack_from(
+                "<3H", self.frame_elements,
+                self.frame_elements_at + 2 * (offset + 3 * j))
+                for j in range(used)]
+        return self.clip_frame_cache[selected]
 
-    def meshes(self, obj_id, transform=IDENTITY, stack=frozenset()):
-        """按 MovieClip 首帧顺序递归取 Shape 网格；循环引用不展开。"""
+    def meshes(self, obj_id, transform=IDENTITY, stack=frozenset(), frame=0):
+        """按 MovieClip 指定帧顺序递归取 Shape 网格；循环引用不展开。"""
         if obj_id in stack:
             return
         stack = stack | {obj_id}
@@ -102,23 +115,21 @@ class Renderer:
             children = [struct.unpack_from("<H", clip.b, p)[0]
                         for p in clip.struct_pos(5, 2)]
             bank = clip.scalar(10)
-            for child_index, matrix_index, _color in self.clip_elements(clip):
+            for child_index, matrix_index, _color in self.clip_elements(clip, frame):
                 if child_index >= len(children):
                     raise ValueError(f"MovieClip {obj_id} 的子对象下标越界")
                 child_transform = compose(transform, self.matrix(bank, matrix_index))
-                yield from self.meshes(children[child_index], child_transform, stack)
+                yield from self.meshes(children[child_index], child_transform, stack, frame)
 
-    def render(self, obj_id, max_size=1000):
-        """首帧按 xy 画布渲染；超出 max_size 时等比缩小。"""
-        meshes = list(self.meshes(obj_id))
+    def render(self, obj_id, max_size=1000, frame=0, bounds=None):
+        """按 xy 画布渲染一帧；bounds 可固定动画各帧画布。"""
+        meshes = list(self.meshes(obj_id, frame=frame))
         if not meshes:
             return None
-        xs = [point[0] for _, points in meshes for point in points]
-        ys = [point[1] for _, points in meshes for point in points]
-        if not all(math.isfinite(v) for v in xs + ys):
-            raise ValueError(f"对象 {obj_id} 的顶点坐标无效")
-        min_x, min_y = min(xs), min(ys)
-        span_x, span_y = max(xs) - min_x, max(ys) - min_y
+        if bounds is None:
+            bounds = self.bounds(meshes, obj_id)
+        min_x, min_y, max_x, max_y = bounds
+        span_x, span_y = max_x - min_x, max_y - min_y
         if span_x <= 0 or span_y <= 0:
             return None
         scale = PIXELS_PER_UNIT
@@ -164,6 +175,14 @@ class Renderer:
                 tile.putalpha(ImageChops.multiply(tile.getchannel("A"), mask))
                 canvas.alpha_composite(tile, (left, top))
         return canvas, natural, sorted({page for page, _ in meshes})
+
+    @staticmethod
+    def bounds(meshes, obj_id):
+        xs = [point[0] for _, points in meshes for point in points]
+        ys = [point[1] for _, points in meshes for point in points]
+        if not all(math.isfinite(v) for v in xs + ys):
+            raise ValueError(f"对象 {obj_id} 的顶点坐标无效")
+        return min(xs), min(ys), max(xs), max(ys)
 
 
 def export(sc, out: Path, decode_ktx, max_size=1000):
@@ -215,3 +234,96 @@ def export(sc, out: Path, decode_ktx, max_size=1000):
         lines.append("</ul>")
     (out / "index.html").write_text("\n".join(lines) + "\n", encoding="utf-8")
     return exported, skipped, failed
+
+
+def animation_frames(clip):
+    """MovieClip 时间轴帧数（兼容两种帧记录）。"""
+    return clip.vec(8, 8)[0] or clip.vec(12, 2)[0]
+
+
+def export_apng(sc, out: Path, decode_ktx, max_size=1000):
+    """导出全部符号；多帧用 APNG，单帧用普通 PNG。"""
+    renderer = Renderer(sc, decode_ktx)
+    exports = dict(sc.exports())
+    out.mkdir(parents=True, exist_ok=True)
+    lines = ["<!doctype html>", '<meta charset="utf-8">',
+             "<title>SC 符号动画预览</title>",
+             "<style>body{font:14px system-ui;background:#1b1b1b;color:#eee;margin:24px}"
+             ".grid{display:flex;flex-wrap:wrap;gap:16px}figure{margin:0;width:270px}"
+             "img{max-width:256px;max-height:256px;background:#444}"
+             "figcaption{overflow-wrap:anywhere;font-size:12px;color:#aaa}</style>",
+             "<h1>SC 符号动画预览</h1>", '<div class="grid">']
+    results, skipped, failed = [], [], []
+    for index, (name, obj_id) in enumerate(sorted(exports.items()), 1):
+        # 帧元素按符号用完即释放；纹理页和矩阵仍可跨符号复用。
+        renderer.clip_frame_cache.clear()
+        if index > 1 and (index - 1) % 100 == 0:
+            print(f"渲染进度：{index - 1:,}/{len(exports):,}", flush=True)
+        clips = sc.clips_by_id.get(obj_id, ())
+        count = animation_frames(clips[0]) if clips else 1
+        fps = (clips[0].scalar(2, 1) or 30) if count > 1 else None
+        try:
+            if count < 2:
+                result = renderer.render(obj_id, max_size)
+                if result is None:
+                    skipped.append(name)
+                    continue
+                frames = [result[0]]
+                natural = result[1]
+            else:
+                bounds = None
+                for frame in range(count):
+                    meshes = list(renderer.meshes(obj_id, frame=frame))
+                    if not meshes:
+                        continue
+                    current = renderer.bounds(meshes, obj_id)
+                    bounds = current if bounds is None else (
+                        min(bounds[0], current[0]), min(bounds[1], current[1]),
+                        max(bounds[2], current[2]), max(bounds[3], current[3]))
+                if bounds is None:
+                    skipped.append(name)
+                    continue
+                span_x, span_y = bounds[2] - bounds[0], bounds[3] - bounds[1]
+                natural = (max(1, math.ceil(span_x * PIXELS_PER_UNIT)),
+                           max(1, math.ceil(span_y * PIXELS_PER_UNIT)))
+                frames = []
+                for frame in range(count):
+                    result = renderer.render(obj_id, max_size, frame, bounds)
+                    if result is None:
+                        # 空帧仍需占据一帧时间，不能挤掉动画节奏。
+                        scale = min(PIXELS_PER_UNIT, max_size / max(span_x, span_y))
+                        size = (min(max_size, max(1, math.ceil(span_x * scale))),
+                                min(max_size, max(1, math.ceil(span_y * scale))))
+                        image = Image.new("RGBA", size)
+                    else:
+                        image = result[0]
+                    frames.append(image)
+            safe = re.sub(r"[^A-Za-z0-9_.-]+", "_", name).strip("._")[:80] or "symbol"
+            suffix = hashlib.sha256(name.encode("utf-8")).hexdigest()[:10]
+            filename = f"{safe}--{suffix}"
+            if frames[0].size != natural:
+                filename += f"--{natural[0]}x{natural[1]}-to-{frames[0].width}x{frames[0].height}"
+            filename += ".png"
+            path = out / filename
+            if count > 1:
+                frames[0].save(path, save_all=True, append_images=frames[1:],
+                               duration=1000 / fps, loop=0, disposal=2, blend=0)
+            else:
+                frames[0].save(path)
+            results.append((name, path, count, fps))
+            label = f"{count} 帧 · {fps} FPS" if count > 1 else "静态"
+            lines.append(f'<figure><img loading="lazy" src="{html.escape(filename, quote=True)}" '
+                         f'alt="{html.escape(name, quote=True)}">'
+                         f'<figcaption>{html.escape(name)} · {label} · '
+                         f'{frames[0].width}×{frames[0].height}</figcaption></figure>')
+        except (OSError, ValueError) as exc:
+            failed.append((name, str(exc)))
+    print(f"渲染进度：{len(exports):,}/{len(exports):,}", flush=True)
+    lines.append("</div>")
+    if failed:
+        lines.append("<h2>未能渲染</h2><ul>")
+        for name, reason in failed:
+            lines.append(f"<li>{html.escape(name)}：{html.escape(reason)}</li>")
+        lines.append("</ul>")
+    (out / "index.html").write_text("\n".join(lines) + "\n", encoding="utf-8")
+    return results, skipped, failed
