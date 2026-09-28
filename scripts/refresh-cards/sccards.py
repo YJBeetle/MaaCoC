@@ -4,7 +4,7 @@
 卡面不是独立图片，而是 ui.sc 图集页上的一块矩形，而且游戏不存这个矩形 ——
 它存矢量形状，矩形是顶点 uv 包围盒乘页尺寸算出来的。推导链在 scframes.py。
 
-    python3 scripts/refresh-cards/sccards.py <APK 或 ui.sc>
+    python3 scripts/refresh-cards/sccards.py var/coc-unpack/sc/ui.sc
 
 产出 assets/image/cards/<符号名>.png 加一份 assets/config/cards.json 索引。
 """
@@ -224,15 +224,14 @@ def export(sc, pages, prefixes, out, manifest):
 
 def main(argv=None):
     ap = argparse.ArgumentParser(description=__doc__.splitlines()[0])
-    ap.add_argument("source", type=Path, help="ui.sc / 含 ui.sc 的 APK 或目录")
-    ap.add_argument("--sc", default="ui.sc", help="从 APK/目录里挑哪个 .sc")
+    ap.add_argument("source", type=Path, help="已解压的 .sc 文件")
     ap.add_argument("--prefix", action="append",
                     help="要导出的符号前缀，可重复（默认 %s）" % " 和 ".join(DEFAULT_PREFIXES))
     ap.add_argument("--out", type=Path, default=REPO / "assets/image/cards")
     ap.add_argument("--manifest", type=Path, default=REPO / "assets/config/cards.json")
     args = ap.parse_args(argv)
 
-    sc = scframes.ScFile(scframes.load_sc(args.source, args.sc))
+    sc = scframes.ScFile(scframes.load_sc(args.source))
     pages = [sctx2png.ktx_image(sc.page_ktx(i)) for i in range(len(sc.tsets))]
     for i, page in enumerate(pages):
         if page is None or page.size != sc.page(i):

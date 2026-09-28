@@ -33,20 +33,22 @@ var/coc-unpack/.venv/bin/python -m pip install pillow numpy zstandard texture2dd
 
 ## 拉取文件
 
+从设备拉取 APK
+
 ```bash
 adb pull "$(adb shell pm path com.supercell.clashofclans | tr -d '\r' | sed 's/^package://' | grep /split_install_time_asset_pack.apk)" var/coc-unpack/apk/
 ```
 
-检查
+从 APK 里取出指定的 `.sc` 文件：
 
 ```bash
-unzip -l var/coc-unpack/apk/split_install_time_asset_pack.apk | grep 'assets/sc/ui.sc$'
+unzip -o -j var/coc-unpack/apk/split_install_time_asset_pack.apk assets/sc/ui.sc -d var/coc-unpack/sc
 ```
 
 ## 导出全部卡面
 
 ```bash
-var/coc-unpack/.venv/bin/python scripts/refresh-cards/sccards.py var/coc-unpack/apk/split_install_time_asset_pack.apk
+var/coc-unpack/.venv/bin/python scripts/refresh-cards/sccards.py var/coc-unpack/sc/ui.sc
 ```
 
 约 2 秒，输出：
@@ -65,14 +67,13 @@ var/coc-unpack/.venv/bin/python scripts/refresh-cards/sccards.py var/coc-unpack/
 |---|---|
 | `--prefix icon_unit_` | 只要某类前缀，可重复（默认 `icon_unit_` 和 `icon_spell_`） |
 | `--out /tmp/cards` | 换输出目录，不碰仓库里的 |
-| `--sc ui_common.sc` | 从 APK/目录里挑别的 `.sc` |
 
 导出的 PNG **不入库**（16MB，而仓库 `.git` 才 13MB，且随时能重算），只入 `cards.json` 那份索引。
 
 ## 只看矩形、不要图
 
 ```bash
-var/coc-unpack/.venv/bin/python scripts/refresh-cards/scframes.py <APK 或 ui.sc> -o ui.frames.json
+var/coc-unpack/.venv/bin/python scripts/refresh-cards/scframes.py var/coc-unpack/sc/ui.sc -o ui.frames.json
 ```
 
 它会检查保留下来的非零面积矩形是否落在对应纹理页内；无效页号、顶点范围等结构错误会直接报错。
