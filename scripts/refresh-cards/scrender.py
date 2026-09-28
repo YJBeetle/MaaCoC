@@ -46,6 +46,13 @@ def preview_header(title):
             ".symbol[hidden]{display:none}.symbol h2{font-size:18px;margin:0 0 14px;"
             "overflow-wrap:anywhere}.grid{display:flex;flex-wrap:wrap;gap:16px}"
             "figure{margin:0;width:270px;max-width:100%}"
+            ".image-with-text{position:relative;display:inline-block;line-height:0}"
+            ".overlay-text{position:absolute;left:50%;top:50%;"
+            "transform:translate(-50%,-50%);font:18px system-ui;line-height:1;"
+            "white-space:nowrap;color:#fff;text-shadow:0 1px 2px #000}"
+            ".text-placeholder{width:256px;max-width:100%;height:80px;"
+            "display:grid;place-items:center;background:#303030;"
+            "color:#eee;font:18px system-ui}"
             ".missing{box-sizing:border-box;width:256px;max-width:100%;height:80px;"
             "display:grid;place-items:center;"
             "background:#303030;color:#aaa;border:1px dashed #666}"
@@ -339,17 +346,29 @@ def end_group(lines, start):
     lines.append("</div></section>")
 
 
-def add_figure(lines, name, filename, detail):
-    lines.append(f'<figure><img loading="lazy" src="{html.escape(filename, quote=True)}" '
-                 f'alt="{html.escape(name, quote=True)}">'
-                 f'<figcaption>{html.escape(detail)}'
-                 f'</figcaption></figure>')
+def add_figure(lines, name, filename, detail, overlay_text=False):
+    image = (f'<img loading="lazy" src="{html.escape(filename, quote=True)}" '
+             f'alt="{html.escape(name, quote=True)}">')
+    if overlay_text:
+        image = (f'<div class="image-with-text">{image}'
+                 '<span class="overlay-text">######</span></div>')
+    lines.append(f'<figure>{image}<figcaption>{html.escape(detail)}'
+                 '</figcaption></figure>')
 
 
 def add_missing_layer(lines, index, child, reason):
     lines.append(f'<figure><div class="missing">{html.escape(reason)}</div>'
                  f'<figcaption>图层 [{index}]，对象 {child} · '
                  f'{html.escape(reason)}</figcaption></figure>')
+
+
+def add_text_layer(lines, index, child, size):
+    scale = min(1, 256 / max(size))
+    width, height = (max(1, round(value * scale)) for value in size)
+    lines.append(f'<figure><div class="text-placeholder" '
+                 f'style="width:{width}px;height:{height}px">######</div>'
+                 f'<figcaption>图层 [{index}]，对象 {child} · 文字占位'
+                 '</figcaption></figure>')
 
 
 def text_field_ids(sc):
@@ -393,7 +412,8 @@ def export(sc, out: Path, decode_ktx, max_size=1000, name_filters=()):
         group_start = start_group(lines, name)
         add_figure(lines, name, filename,
                    f"组合图 · 顶点尺寸 {natural[0]}×{natural[1]} · "
-                   f"PNG {image.width}×{image.height} · 页 {pages}")
+                   f"PNG {image.width}×{image.height} · 页 {pages}",
+                   overlay_text=any(child_id in texts for _, child_id in layers))
         exported += 1
         if layers:
             bounds = renderer.bounds(list(renderer.meshes(obj_id)), obj_id)
@@ -416,10 +436,14 @@ def export(sc, out: Path, decode_ktx, max_size=1000, name_filters=()):
                 layer_results.append((layer_index, child_id, part[0], None))
             drawable = [entry for entry in layer_results if entry[2] is not None]
             single_layer = (layer_errors == 0 and len(clips) == 1 and
-                            not sc.shapes_by_id.get(obj_id) and len(drawable) == 1)
+                            len(layers) == 1 and not sc.shapes_by_id.get(obj_id)
+                            and len(drawable) == 1)
             for layer_index, child_id, layer_image, reason in layer_results:
                 if reason is not None:
-                    add_missing_layer(lines, layer_index, child_id, reason)
+                    if child_id in texts:
+                        add_text_layer(lines, layer_index, child_id, image.size)
+                    else:
+                        add_missing_layer(lines, layer_index, child_id, reason)
                     continue
                 layer_name = filename_for(name, natural, image.size, layer_index)
                 if single_layer:
@@ -602,7 +626,8 @@ def export_apng(sc, out: Path, decode_ktx, max_size=1000, name_filters=()):
             label = f"{count} 帧 · {fps} FPS" if count > 1 else "静态"
             group_start = start_group(lines, name)
             add_figure(lines, name, filename,
-                       f"组合图 · {label} · {size[0]}×{size[1]}")
+                       f"组合图 · {label} · {size[0]}×{size[1]}",
+                       overlay_text=any(child_id in texts for _, child_id in layers))
             drawable = {
                 layer_index for layer_index, child_id, layer_count in layer_counts
                 if child_id not in texts and
@@ -610,10 +635,11 @@ def export_apng(sc, out: Path, decode_ktx, max_size=1000, name_filters=()):
                     for frame in range(layer_count))
             }
             single_layer = (len(clips) == 1 and
-                            not sc.shapes_by_id.get(obj_id) and len(drawable) == 1)
+                            len(layers) == 1 and not sc.shapes_by_id.get(obj_id)
+                            and len(drawable) == 1)
             for layer_index, child_id, layer_count in layer_counts:
                 if child_id in texts:
-                    add_missing_layer(lines, layer_index, child_id, "文字层暂不渲染")
+                    add_text_layer(lines, layer_index, child_id, size)
                     continue
                 if layer_index not in drawable:
                     add_missing_layer(lines, layer_index, child_id, "无可绘制网格")
