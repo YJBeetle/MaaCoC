@@ -4,13 +4,13 @@ from __future__ import annotations
 
 import hashlib
 import html
-import io
 import math
 import os
 import re
+import shutil
 import struct
+import subprocess
 import tempfile
-import zlib
 from pathlib import Path
 
 from PIL import Image, ImageChops, ImageDraw
@@ -31,7 +31,7 @@ def compose(parent, child):
 
 
 def preview_header(title):
-    """PNG/APNG 浏览页共用的标题与符号名筛选框。"""
+    """PNG/WebP 浏览页共用的标题与符号名筛选框。"""
     return ["<!doctype html>", '<meta charset="utf-8">',
             f"<title>{html.escape(title)}</title>",
             "<style>body{font:14px system-ui;background:#1b1b1b;color:#eee;margin:24px}"
@@ -320,7 +320,7 @@ def root_layers(sc, obj_id, visible=None):
             if visible is None or i in visible]
 
 
-def filename_for(name, natural, size, layer=None):
+def filename_for(name, natural, size, layer=None, extension="png"):
     safe = re.sub(r"[^A-Za-z0-9_.-]+", "_", name).strip("._")[:80] or "symbol"
     suffix = hashlib.sha256(name.encode("utf-8")).hexdigest()[:10]
     filename = f"{safe}--{suffix}"
@@ -328,7 +328,7 @@ def filename_for(name, natural, size, layer=None):
         filename += f"--{natural[0]}x{natural[1]}-to-{size[0]}x{size[1]}"
     if layer is not None:
         filename += f"+layer-{layer:02d}"
-    return filename + ".png"
+    return filename + "." + extension
 
 
 def start_group(lines, name):
@@ -487,104 +487,61 @@ def render_frames(renderer, obj_id, count, max_size, bounds, layer=None):
         yield result[0] if result is not None else Image.new("RGBA", size)
 
 
-def png_chunks(image):
-    """用 Pillow 压缩单帧，再取 IHDR 和 IDAT 交给流式 APNG 写入器。"""
-    data = io.BytesIO()
-    image.save(data, format="PNG")
-    raw = data.getvalue()
-    if raw[:8] != b"\x89PNG\r\n\x1a\n":
-        raise ValueError("PNG 编码失败")
-    p, header, payloads = 8, None, []
-    while p < len(raw):
-        length = struct.unpack_from(">I", raw, p)[0]
-        tag = raw[p + 4:p + 8]
-        payload = raw[p + 8:p + 8 + length]
-        if tag == b"IHDR":
-            header = payload
-        elif tag == b"IDAT":
-            payloads.append(payload)
-        p += 12 + length
-    if header is None or not payloads:
-        raise ValueError("PNG 缺少 IHDR 或 IDAT")
-    return header, payloads
-
-
-def write_chunk(file, tag, payload):
-    file.write(struct.pack(">I", len(payload)))
-    file.write(tag)
-    file.write(payload)
-    file.write(struct.pack(">I", zlib.crc32(tag + payload)))
-
-
-def save_frames(frames, path, count, fps):
-    """流式写单文件 APNG；连续相同的画面合并时长。"""
+def save_web_frames(frames, path, count, fps):
+    """逐帧暂存并用 img2webp 编码；只保留当前画面和一个符号的临时帧。"""
     frames = iter(frames)
     first = next(frames)
     if count == 1:
-        first.save(path)
+        first.save(path, format="WEBP", quality=75, method=4)
         return
-    temp_name = None
-    try:
-        with tempfile.NamedTemporaryFile(dir=path.parent, prefix=".apng-",
-                                         delete=False) as file:
-            temp_name = file.name
-            file.write(b"\x89PNG\r\n\x1a\n")
-            header, _payloads = png_chunks(first)
-            write_chunk(file, b"IHDR", header)
-            animation_control_at = file.tell()
-            write_chunk(file, b"acTL", struct.pack(">II", 0, 0))
-            sequence = 0
-            encoded = 0
+    encoder = shutil.which("img2webp")
+    if encoder is None:
+        raise OSError("--web-out 需要 img2webp（libwebp 工具）")
+    with tempfile.TemporaryDirectory(prefix=".webp-", dir=path.parent) as temp:
+        temp = Path(temp)
+        commands = ["-loop 0"]
+        previous, duration, seen, encoded = first, 1, 1, 0
 
-            def write_frame(image, duration):
-                nonlocal sequence, encoded
-                frame_header, payloads = png_chunks(image)
-                if frame_header != header:
-                    raise ValueError("APNG 帧尺寸或颜色模式不一致")
-                width, height = image.size
-                control = struct.pack(">IIIIIHHBB", sequence, width, height,
-                                      0, 0, duration, fps, 0, 0)
-                write_chunk(file, b"fcTL", control)
-                sequence += 1
-                for payload in payloads:
-                    if encoded == 0:
-                        write_chunk(file, b"IDAT", payload)
-                    else:
-                        write_chunk(file, b"fdAT", struct.pack(">I", sequence) + payload)
-                        sequence += 1
-                encoded += 1
+        def write_frame(image, length):
+            nonlocal encoded
+            filename = f"{encoded:06d}.png"
+            image.save(temp / filename)
+            milliseconds = max(1, round(1000 * length / fps))
+            commands.append(f"-d {milliseconds} -lossy -q 75 {filename}")
+            encoded += 1
 
-            previous, duration, seen = first, 1, 1
-            for image in frames:
-                seen += 1
-                same = (image.size == previous.size and
-                        ImageChops.difference(previous, image).getbbox(
-                            alpha_only=False) is None)
-                if same and duration < 65535:
-                    duration += 1
-                else:
-                    write_frame(previous, duration)
-                    previous, duration = image, 1
-            if seen != count:
-                raise ValueError(f"APNG 预期 {count} 帧，实际 {seen} 帧")
-            write_frame(previous, duration)
-            write_chunk(file, b"IEND", b"")
-            file.seek(animation_control_at)
-            write_chunk(file, b"acTL", struct.pack(">II", encoded, 0))
-        os.replace(temp_name, path)
-    finally:
-        if temp_name and os.path.exists(temp_name):
-            os.unlink(temp_name)
+        for image in frames:
+            seen += 1
+            same = (image.size == previous.size and
+                    ImageChops.difference(previous, image).getbbox(
+                        alpha_only=False) is None)
+            if same:
+                duration += 1
+            else:
+                write_frame(previous, duration)
+                previous, duration = image, 1
+        if seen != count:
+            raise ValueError(f"WebP 预期 {count} 帧，实际 {seen} 帧")
+        write_frame(previous, duration)
+        commands.append("-o result.webp")
+        (temp / "args.txt").write_text("\n".join(commands) + "\n")
+        result = subprocess.run([encoder, "args.txt"], cwd=temp,
+                                capture_output=True, text=True, check=False)
+        if result.returncode:
+            raise OSError(f"img2webp 编码失败：{result.stderr.strip() or result.stdout.strip()}")
+        os.replace(temp / "result.webp", path)
 
 
-def export_apng(sc, out: Path, decode_ktx, max_size=1000, name_filters=()):
-    """导出组合图及各直属图层；各自有动画时用 APNG。"""
+def export_web(sc, out: Path, decode_ktx, max_size=1000, name_filters=()):
+    """导出 WebP 组合图及各直属图层和网页预览。"""
+    if shutil.which("img2webp") is None:
+        raise OSError("--web-out 需要 img2webp（libwebp 工具）")
     renderer = Renderer(sc, decode_ktx)
     filters = tuple(value.casefold() for value in name_filters)
     exports = {name: obj_id for name, obj_id in sc.exports()
                if not filters or any(value in name.casefold() for value in filters)}
     out.mkdir(parents=True, exist_ok=True)
-    lines = preview_header("SC 符号动画预览")
+    lines = preview_header("SC 符号网页预览")
     results, layer_exported, skipped, failed = [], 0, [], []
     texts = text_field_ids(sc)
     for index, (name, obj_id) in enumerate(sorted(exports.items()), 1):
@@ -618,10 +575,10 @@ def export_apng(sc, out: Path, decode_ktx, max_size=1000, name_filters=()):
             natural = (max(1, math.ceil(span_x * PIXELS_PER_UNIT)),
                        max(1, math.ceil(span_y * PIXELS_PER_UNIT)))
             size = canvas_size(bounds, max_size)
-            filename = filename_for(name, natural, size)
+            filename = filename_for(name, natural, size, extension="webp")
             path = out / filename
-            save_frames(render_frames(renderer, obj_id, count, max_size, bounds),
-                        path, count, fps)
+            save_web_frames(render_frames(renderer, obj_id, count, max_size, bounds),
+                            path, count, fps)
             results.append((name, path, count, fps))
             label = f"{count} 帧 · {fps} FPS" if count > 1 else "静态"
             group_start = start_group(lines, name)
@@ -644,16 +601,16 @@ def export_apng(sc, out: Path, decode_ktx, max_size=1000, name_filters=()):
                 if layer_index not in drawable:
                     add_missing_layer(lines, layer_index, child_id, "无可绘制网格")
                     continue
-                layer_name = filename_for(name, natural, size, layer_index)
+                layer_name = filename_for(name, natural, size, layer_index, "webp")
                 layer_path = out / layer_name
                 if single_layer:
                     layer_path.unlink(missing_ok=True)
                     continue
                 child_clips = sc.clips_by_id.get(child_id, ())
                 layer_fps = (child_clips[0].scalar(2, 1) or fps) if child_clips else fps
-                save_frames(render_frames(renderer, obj_id, layer_count,
-                                          max_size, bounds, layer_index),
-                            layer_path, layer_count, layer_fps)
+                save_web_frames(render_frames(renderer, obj_id, layer_count,
+                                              max_size, bounds, layer_index),
+                                layer_path, layer_count, layer_fps)
                 detail = (f"{layer_count} 帧 · {layer_fps} FPS"
                           if layer_count > 1 else "静态")
                 add_figure(lines, name, layer_name,

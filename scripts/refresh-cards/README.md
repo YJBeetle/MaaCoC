@@ -73,8 +73,8 @@ scripts/refresh-cards/sccards.py var/coc-unpack/sc/ui.sc
 ```bash
 scripts/refresh-cards/scframes.py var/coc-unpack/sc/ui.sc -o ui.frames.json
 scripts/refresh-cards/scframes.py var/coc-unpack/sc/ui.sc --png-out var/coc-unpack/frames
-scripts/refresh-cards/scframes.py var/coc-unpack/sc/ui.sc --apng-out var/coc-unpack/animations
-scripts/refresh-cards/scframes.py var/coc-unpack/sc/ui.sc --apng-out var/coc-unpack/animations --filter capacity_slot
+scripts/refresh-cards/scframes.py var/coc-unpack/sc/ui.sc --web-out var/coc-unpack/web
+scripts/refresh-cards/scframes.py var/coc-unpack/sc/ui.sc --web-out var/coc-unpack/web --filter capacity_slot
 scripts/refresh-cards/scframes.py var/coc-unpack/sc/ui.sc --textures-out var/coc-unpack/textures
 ```
 
@@ -86,18 +86,18 @@ scripts/refresh-cards/scframes.py var/coc-unpack/sc/ui.sc --textures-out var/coc
 `index.html` 浏览页。顶点到像素的倍率在 `scrender.py` 的 `PIXELS_PER_UNIT` 中，当前为 1。
 输出宽高默认各不超过 1000 像素；可用 `--max-size` 修改。超限时等比缩小，文件名会注明
 缩放前后的尺寸（例如 `--2400x1200-to-1000x500.png`），浏览页也会列出两种尺寸。
-普通 `--png-out` 取首帧。`--apng-out` 同样导出全部符号并生成 `index.html`：多帧
-MovieClip 的组合图导出为循环播放的 APNG，单帧符号的组合图导出为普通 PNG。
+`--png-out` 取首帧。`--web-out` 生成 `index.html`，将静态图和动画都编码为 WebP（质量 75），适合网页浏览；
+它需要系统安装 `img2webp`。`--png-out` 的 PNG 和浏览页仍可独立使用。
 两种输出都会保留组合图，并把根 MovieClip 中可绘制的直接子对象另存为
-`<组合图文件名去掉.png>+layer-序号.png`。图层保留透明背景，与组合图使用同一画布，
+`<组合图文件名去掉扩展名>+layer-序号.<扩展名>`。图层保留透明背景，与组合图使用同一画布，
 可以按子对象顺序叠回去。根 MovieClip 只有一个图层时只保存组合图，不重复导出图层。
 文字层在浏览页的组合图上居中叠加 `######`，并单独显示占位卡片；
 文字由浏览器以系统默认字体绘制，图片文件不包含文字。
-两种浏览页都把同一符号的组合图与图层放在一组；顶部可按符号名筛选整组，并显示匹配数量。
+浏览页都把同一符号的组合图与图层放在一组；顶部可按符号名筛选整组，并显示匹配数量。
 导出时可用 `--filter` 按符号名包含的文字筛选，不区分大小写；重复传入时匹配任一条件。
-筛选只影响 PNG/APNG 导出及其浏览页，已有目录中其他文件不会因此删除。
-在 `--apng-out` 中，各图层按自己的时间轴长度导出，组合图取最长图层的帧数。
-根 MovieClip 只有一帧、子对象有动画时也会导出 APNG。动画各帧共用一张固定大小的画布，
+筛选只影响 PNG/WebP 导出及其浏览页，已有目录中其他文件不会因此删除。
+在 `--web-out` 中，各图层按自己的时间轴长度导出，组合图取最长图层的帧数。
+根 MovieClip 只有一帧、子对象有动画时也会导出动画 WebP。动画各帧共用一张固定大小的画布，
 较短的时间轴结束后保留最后一帧。使用 `.sc` 记录的帧率；`--max-size` 同样控制画布宽高上限。
 相邻画面相同时，编码器可能合并帧，但会保留总播放时长。渲染会应用子对象的 2D 矩阵；
 嵌套 MovieClip 从首次出现时开始计帧，文本、颜色变换和裁剪遮罩尚未还原。

@@ -16,7 +16,7 @@ CoC 的卡面不是独立图片，而是 ui.sc 图集页上的一块矩形；引
 用法：
     python3 scripts/refresh-cards/scframes.py var/coc-unpack/sc/ui.sc -o ui.frames.json
     python3 scripts/refresh-cards/scframes.py var/coc-unpack/sc/ui.sc --png-out var/coc-unpack/frames
-    python3 scripts/refresh-cards/scframes.py var/coc-unpack/sc/ui.sc --apng-out var/coc-unpack/animations
+    python3 scripts/refresh-cards/scframes.py var/coc-unpack/sc/ui.sc --web-out var/coc-unpack/web
     python3 scripts/refresh-cards/scframes.py var/coc-unpack/sc/ui.sc --textures-out var/coc-unpack/textures
 """
 
@@ -401,17 +401,17 @@ def main(argv=None):
     ap.add_argument("-o", "--output", type=Path, help="写出 JSON 清单")
     ap.add_argument("--split", action="store_true", help="同名不合并，逐块列出")
     ap.add_argument("--png-out", type=Path, help="按顶点与 UV 导出符号 PNG 和浏览页")
-    ap.add_argument("--apng-out", type=Path, help="导出全部符号；多帧为 APNG，单帧为 PNG，附浏览页")
+    ap.add_argument("--web-out", type=Path, help="导出 WebP 符号动画和网页预览（需要 img2webp）")
     ap.add_argument("--filter", action="append", metavar="TEXT",
-                    help="按符号名筛选 PNG/APNG 导出，不区分大小写；可重复，任一匹配即可")
+                    help="按符号名筛选 PNG/WebP 导出，不区分大小写；可重复，任一匹配即可")
     ap.add_argument("--textures-out", type=Path, help="导出 TextureSets 纹理页的原尺寸 PNG")
     ap.add_argument("--max-size", type=int, default=PNG_MAX_SIZE,
-                    help="符号 PNG 宽高上限（默认 1000）")
+                    help="符号图片宽高上限（默认 1000）")
     args = ap.parse_args(argv)
     if args.max_size <= 0:
         ap.error("--max-size 必须大于 0")
-    if args.filter and not (args.png_out or args.apng_out):
-        ap.error("--filter 需要搭配 --png-out 或 --apng-out")
+    if args.filter and not (args.png_out or args.web_out):
+        ap.error("--filter 需要搭配 --png-out 或 --web-out")
 
     try:
         sc = ScFile(load_sc(args.source))
@@ -496,9 +496,9 @@ def main(argv=None):
              "frames": frames}, ensure_ascii=False, indent=1))
         print("写出 %s" % args.output)
     render_failed = False
-    if args.png_out or args.apng_out or args.textures_out:
+    if args.png_out or args.web_out or args.textures_out:
         try:
-            # 解码器是共用脚本；只在确实导出 PNG 时加载其依赖。
+            # 解码器是共用脚本；只在导出图片时加载其依赖。
             sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
             from sctx2png import ktx_image
             if args.png_out:
@@ -511,12 +511,12 @@ def main(argv=None):
                 render_failed = bool(failed)
                 for name, reason in failed[:5]:
                     print("  渲染失败：%s：%s" % (name, reason))
-            if args.apng_out:
-                from scrender import export_apng
-                results, layers, skipped, failed = export_apng(
-                    sc, args.apng_out, ktx_image, args.max_size, args.filter or ())
+            if args.web_out:
+                from scrender import export_web
+                results, layers, skipped, failed = export_web(
+                    sc, args.web_out, ktx_image, args.max_size, args.filter or ())
                 animated = sum(count > 1 for _, _, count, _ in results)
-                print(f"导出 {len(results):,} 张组合图、{layers:,} 张图层图 → {args.apng_out}"
+                print(f"导出 {len(results):,} 张组合 WebP、{layers:,} 张图层 WebP → {args.web_out}"
                       f"（组合图中动画 {animated:,} 个；浏览页 index.html；"
                       f"无网格 {len(skipped):,} 个，失败 {len(failed):,} 个）")
                 for name, reason in failed[:5]:
