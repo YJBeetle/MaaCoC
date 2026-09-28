@@ -377,21 +377,34 @@ def export(sc, out: Path, decode_ktx, max_size=1000):
         layers = root_layers(sc, obj_id, visible)
         if layers:
             bounds = renderer.bounds(list(renderer.meshes(obj_id)), obj_id)
+            layer_results = []
+            layer_errors = 0
             for layer_index, child_id in layers:
                 if child_id in texts:
-                    add_missing_layer(lines, layer_index, child_id, "文字层暂不渲染")
+                    layer_results.append((layer_index, child_id, None, "文字层暂不渲染"))
                     continue
                 try:
                     part = renderer.render(obj_id, max_size, bounds=bounds,
                                            layer=layer_index)
                 except ValueError as exc:
                     failed.append((f"{name}+layer-{layer_index:02d}", str(exc)))
+                    layer_errors += 1
                     continue
                 if part is None:
-                    add_missing_layer(lines, layer_index, child_id, "首帧无可绘制网格")
+                    layer_results.append((layer_index, child_id, None, "首帧无可绘制网格"))
                     continue
-                layer_image = part[0]
+                layer_results.append((layer_index, child_id, part[0], None))
+            drawable = [entry for entry in layer_results if entry[2] is not None]
+            single_layer = (layer_errors == 0 and len(clips) == 1 and
+                            not sc.shapes_by_id.get(obj_id) and len(drawable) == 1)
+            for layer_index, child_id, layer_image, reason in layer_results:
+                if reason is not None:
+                    add_missing_layer(lines, layer_index, child_id, reason)
+                    continue
                 layer_name = filename_for(name, natural, image.size, layer_index)
+                if single_layer:
+                    (out / layer_name).unlink(missing_ok=True)
+                    continue
                 layer_image.save(out / layer_name)
                 add_figure(lines, name, layer_name,
                            f"图层 [{layer_index}] · 对象 {child_id} · "
@@ -569,16 +582,26 @@ def export_apng(sc, out: Path, decode_ktx, max_size=1000):
             group_open = True
             add_figure(lines, name, filename,
                        f"组合图 · {label} · {size[0]}×{size[1]}")
+            drawable = {
+                layer_index for layer_index, child_id, layer_count in layer_counts
+                if child_id not in texts and
+                any(any(renderer.meshes(obj_id, frame=frame, layer=layer_index))
+                    for frame in range(layer_count))
+            }
+            single_layer = (len(clips) == 1 and
+                            not sc.shapes_by_id.get(obj_id) and len(drawable) == 1)
             for layer_index, child_id, layer_count in layer_counts:
                 if child_id in texts:
                     add_missing_layer(lines, layer_index, child_id, "文字层暂不渲染")
                     continue
-                if not any(any(renderer.meshes(obj_id, frame=frame, layer=layer_index))
-                           for frame in range(layer_count)):
+                if layer_index not in drawable:
                     add_missing_layer(lines, layer_index, child_id, "无可绘制网格")
                     continue
                 layer_name = filename_for(name, natural, size, layer_index)
                 layer_path = out / layer_name
+                if single_layer:
+                    layer_path.unlink(missing_ok=True)
+                    continue
                 child_clips = sc.clips_by_id.get(child_id, ())
                 layer_fps = (child_clips[0].scalar(2, 1) or fps) if child_clips else fps
                 save_frames(render_frames(renderer, obj_id, layer_count,
