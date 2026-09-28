@@ -499,20 +499,21 @@ def main(argv=None):
             from sctx2png import ktx_image
             if args.png_out:
                 from scrender import export as export_rendered_png
-                count, skipped, failed = export_rendered_png(
+                count, layers, skipped, failed = export_rendered_png(
                     sc, args.png_out, ktx_image, args.max_size)
-                print("导出 {:,} 张符号 PNG → {}（浏览页 index.html；无网格 {:,} 个，失败 {:,} 个）".format(
-                      count, args.png_out, len(skipped), len(failed)))
+                print("导出 {:,} 张组合 PNG、{:,} 张图层 PNG → {}"
+                      "（浏览页 index.html；无网格 {:,} 个，失败 {:,} 个）".format(
+                          count, layers, args.png_out, len(skipped), len(failed)))
                 render_failed = bool(failed)
                 for name, reason in failed[:5]:
                     print("  渲染失败：%s：%s" % (name, reason))
             if args.apng_out:
                 from scrender import export_apng
-                results, skipped, failed = export_apng(
+                results, layers, skipped, failed = export_apng(
                     sc, args.apng_out, ktx_image, args.max_size)
                 animated = sum(count > 1 for _, _, count, _ in results)
-                print(f"导出 {len(results):,} 张符号 PNG → {args.apng_out}"
-                      f"（其中动画 {animated:,} 个；浏览页 index.html；"
+                print(f"导出 {len(results):,} 张组合图、{layers:,} 张图层图 → {args.apng_out}"
+                      f"（组合图中动画 {animated:,} 个；浏览页 index.html；"
                       f"无网格 {len(skipped):,} 个，失败 {len(failed):,} 个）")
                 for name, reason in failed[:5]:
                     print(f"  渲染失败：{name}：{reason}")
