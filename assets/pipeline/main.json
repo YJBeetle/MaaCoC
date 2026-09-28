@@ -94,7 +94,7 @@
     "FindSoldier": {
         "focus": "FindSoldier!",
         "recognition": "TemplateMatch",
-        "template": "Soldier",
+        "template": "Cards/Soldier",
         "green_mask": true,
         "roi": [46,584,1191,135],
         "threshold": 0.95,
@@ -138,7 +138,7 @@
     "FindHero": {
         "focus": "FindHero!",
         "recognition": "TemplateMatch",
-        "template": "Hero",
+        "template": "Cards/Hero",
         "green_mask": true,
         "roi": [46,584,1191,135],
         "threshold": 0.95,
@@ -168,7 +168,7 @@
     "FindSpell": {
         "focus": "FindSpell!",
         "recognition": "TemplateMatch",
-        "template": "Spell",
+        "template": "Cards/Spell",
         "green_mask": true,
         "roi": [46,584,1191,135],
         "threshold": 0.95,

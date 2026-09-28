@@ -9,8 +9,6 @@
 /target/
 /vendor/
 /var/
-# 卡面全量导出是 sccards.py --all 的产物，2 秒就能重算，不入库
-/assets/image/cards/
 scratch/
 app/node_modules/
 app/dist/
