@@ -17,6 +17,7 @@ scripts/scframes.py 从 flatbuffers 里推出来。本脚本把那块矩形裁�
 from __future__ import annotations
 
 import argparse
+import collections
 import json
 import re
 import struct
@@ -133,6 +134,82 @@ def fit_cover(src, width, height):
                     (w - width) // 2 + width, (h - height) // 2 + height))
 
 
+def clip_of(sc, obj_id):
+    """卡面 MovieClip 用的裁剪遮罩对象 id（既不是 Shape 也不是 MovieClip 的那个孩子）。"""
+    for c in sc.clips_by_id.get(obj_id, ()):
+        for p in c.struct_pos(5, 2):
+            kid = struct.unpack_from("<H", c.b, p)[0]
+            if kid not in sc.shapes_by_id and kid not in sc.clips_by_id:
+                return kid
+    return None
+
+
+def kind(name, all_names):
+    """按官方命名规则给卡面分类。
+
+    只有"超级兵"这一条需要看有没有同名普通版，单看 elite_ 前缀会错：
+    21 个 icon_unit_elite_* 里 8 个（bowler/hogrider/minion/valkyrie/icehound/
+    infernodragon/barbarian_group_cc）根本没有普通版，elite_ 就是它们本体图块名。
+    """
+    if name.startswith("icon_spell_"):
+        return "spell"
+    if name.startswith("icon_unit_pet_"):
+        return "pet"
+    if name.startswith("icon_unit_siege_machine"):
+        return "siege"
+    if name.startswith("icon_hero"):
+        return "hero"
+    if name.startswith("icon_gear"):
+        return "gear"
+    if name.startswith("icon_2025"):
+        return "event"
+    if name.startswith("icon_league"):
+        return "league"
+    if name.startswith("icon_unit_elite_"):
+        base = name.replace("icon_unit_elite_", "icon_unit_").replace("_cc", "")
+        return "super" if base in all_names else "troop"
+    return "troop"
+
+
+def export_all(sc, pages, prefixes, out, manifest):
+    """把给定前缀下的全部卡面按官方符号名导出，并写一份带类别和矩形的清单。"""
+    ex = dict(sc.exports())
+    all_names = set(ex)
+    picked = sorted(n for n in all_names if n.startswith(tuple(prefixes)))
+    out.mkdir(parents=True, exist_ok=True)
+    rows, failed = {}, []
+    for name in picked:
+        tile, op = face_tile(sc, pages, ex[name])
+        if tile is None:
+            failed.append(name)
+            continue
+        rect = next((r for r in frame_rects(sc, ex[name])), None)
+        tile.save(out / (name + ".png"))
+        rows[name] = {"kind": kind(name, all_names), "clip": clip_of(sc, ex[name]),
+                      "orient": getattr(op, "name", "none"),
+                      "size": list(tile.size), "rect": rect}
+    manifest.write_text(json.dumps({"prefixes": list(prefixes), "cards": rows},
+                                   ensure_ascii=False, indent=1) + "\n")
+    counts = collections.Counter(r["kind"] for r in rows.values())
+    print("导出 %d 张 -> %s" % (len(rows), out))
+    print("类别: %s" % dict(counts.most_common()))
+    if failed:
+        print("裁不出 %d 个: %s" % (len(failed), ", ".join(failed[:10])))
+    print("清单 -> %s" % manifest)
+
+
+def frame_rects(sc, obj_id):
+    """对象覆盖到的图集矩形，取整后的 [页, x, y, 宽, 高]。"""
+    for s in leaf_shapes(sc, obj_id):
+        for _flags, page, count, start in sc.commands(s):
+            xs, ys, us, vs = np.array(sc.vertices(start, count), dtype=float).T
+            w, h = sc.page(page)
+            x0, y0 = round(us.min() / UV * w), round(vs.min() / UV * h)
+            x1, y1 = round(us.max() / UV * w), round(vs.max() / UV * h)
+            if x1 > x0 and y1 > y0:
+                yield [page, x0, y0, x1 - x0, y1 - y0]
+
+
 def build_symbols(sc, templates):
     """按 icon_unit_<小写名> 自动对一遍符号，对不上的留空等人工补。"""
     names = {n for n, _ in sc.exports()}
@@ -179,11 +256,21 @@ def main(argv=None):
     ap.add_argument("--apply", action="store_true", help="写盘，默认只报告")
     ap.add_argument("--auto", action="store_true", help="重写符号对照表")
     ap.add_argument("--review", type=Path, help="导出 icon_unit_* 对照图后退出")
+    ap.add_argument("--all", action="store_true",
+                    help="导出全部卡面，文件名直接用官方符号名")
+    ap.add_argument("--prefix", action="append",
+                    help="--all 要导出的符号前缀，可重复（默认 icon_unit_ 和 icon_spell_）")
+    ap.add_argument("--out", type=Path, default=REPO / "assets/image/cards")
+    ap.add_argument("--manifest", type=Path, default=REPO / "assets/config/cards.json")
     args = ap.parse_args(argv)
 
     templates = sorted(args.templates.glob("*.png"))
     sc = scframes.ScFile(scframes.load_sc(args.source, args.sc))
     pages = [sctx2png.ktx_image(sc.page_ktx(i)) for i in range(len(sc.tsets))]
+    prefixes = args.prefix or ["icon_unit_", "icon_spell_"]
+    if args.all:
+        export_all(sc, pages, prefixes, args.out, args.manifest)
+        return 0
     if args.review:
         review_sheet(sc, pages, args.review)
         return 0
