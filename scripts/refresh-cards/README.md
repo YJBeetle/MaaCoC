@@ -73,16 +73,23 @@ scripts/refresh-cards/sccards.py var/coc-unpack/sc/ui.sc
 
 导出的 PNG **不入库**（16MB，而仓库 `.git` 才 13MB，且随时能重算），只入 `cards.json` 那份索引。
 
-## 只看矩形、不要图
+## 查看通用 SC 的推导结果
 
 ```bash
 scripts/refresh-cards/scframes.py var/coc-unpack/sc/ui.sc -o ui.frames.json
+scripts/refresh-cards/scframes.py var/coc-unpack/sc/ui.sc --png-out var/coc-unpack/frames
+scripts/refresh-cards/scframes.py var/coc-unpack/sc/ui.sc --textures-out var/coc-unpack/textures
 ```
 
 它会检查保留下来的非零面积矩形是否落在对应纹理页内；无效页号、顶点范围等结构错误会直接报错。
 输出 `越界自检: 0 处异常` 说明这批矩形通过了边界检查，但不代表卡面朝向和选块都正确。
 树状输出会列出各分块的已读字段和最多 6 个示例；`TextFields` 等未用于卡面推导的内容只统计数量。
 `-o` 写出的 JSON 仍包含全部矩形。
+`--png-out` 按推导出的矩形裁图，并生成 `index.html` 供浏览；同一符号的多块矩形会分别显示。
+默认 PNG 是最长边 256 像素的预览图，页面标注图集中的原始坐标和尺寸；如需原尺寸裁图，
+加 `--png-size 0`。这是矩形推导的可视化，不会合成 MovieClip 或校正朝向。
+`--textures-out` 导出 TextureSets 的各纹理页原尺寸 PNG（`page-000.png` 等），
+并生成 `textures.html` 浏览页。每页按 TextureSets 页号读取，优先使用 highres 槽。
 
 ## 验收要看什么
 

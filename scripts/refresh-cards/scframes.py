@@ -15,14 +15,20 @@ CoC 的卡面不是独立图片，而是 ui.sc 图集页上的一块矩形；引
 
 用法：
     python3 scripts/refresh-cards/scframes.py var/coc-unpack/sc/ui.sc -o ui.frames.json
+    python3 scripts/refresh-cards/scframes.py var/coc-unpack/sc/ui.sc --png-out var/coc-unpack/frames
+    python3 scripts/refresh-cards/scframes.py var/coc-unpack/sc/ui.sc --textures-out var/coc-unpack/textures
 """
 
 from __future__ import annotations
 
 import argparse
+import hashlib
+import html
 import json
+import re
 import struct
 import sys
+from urllib.parse import quote
 from pathlib import Path
 
 import zstandard
@@ -32,6 +38,7 @@ CHUNK_ORDER = ["resources", "exports", "textfields", "shapes",
 ZSTD_FRAME = b"\x28\xb5\x2f\xfd"
 UV_SCALE = 65536.0          # 顶点 uv 是 16 位归一化坐标
 PREVIEW_LIMIT = 6
+PNG_PREVIEW_EDGE = 256
 
 
 def u16(b, p):
@@ -362,12 +369,97 @@ def load_sc(source):
     return data
 
 
+def export_png_previews(sc: ScFile, frames, out: Path, decode_ktx,
+                        max_edge=PNG_PREVIEW_EDGE):
+    """将推导出的矩形裁成 PNG，并生成可按符号浏览的索引。"""
+    from PIL import Image
+
+    # 按页解码，避免七张 4096² 图集同时驻留内存。
+    by_page = {}
+    gallery = {}
+    for name in sorted(frames):
+        safe = re.sub(r"[^A-Za-z0-9_.-]+", "_", name).strip("._")[:80] or "symbol"
+        suffix = hashlib.sha256(name.encode("utf-8")).hexdigest()[:10]
+        for index, rect in enumerate(frames[name], 1):
+            filename = f"{safe}--{suffix}--{index}.png"
+            by_page.setdefault(rect["page"], []).append((filename, rect))
+            gallery.setdefault(name, []).append((filename, rect))
+
+    out.mkdir(parents=True, exist_ok=True)
+    for page_index, entries in sorted(by_page.items()):
+        image = decode_texture_page(sc, page_index, decode_ktx)
+        for filename, rect in entries:
+            crop = image.crop((rect["x"], rect["y"],
+                               rect["x"] + rect["w"], rect["y"] + rect["h"]))
+            if max_edge and max(crop.size) > max_edge:
+                crop.thumbnail((max_edge, max_edge), Image.Resampling.LANCZOS)
+            crop.save(out / filename)
+        del image
+
+    lines = ["<!doctype html>", '<meta charset="utf-8">',
+             "<title>SC 符号矩形预览</title>",
+             "<style>body{font:14px system-ui;background:#1b1b1b;color:#eee;margin:24px}"
+             "h2{font-size:16px;margin:24px 0 8px;overflow-wrap:anywhere}"
+             ".row{display:flex;flex-wrap:wrap;gap:12px}figure{margin:0;width:270px}"
+             "img{max-width:256px;max-height:256px;background:#444}"
+             "figcaption{font-size:12px;color:#aaa}</style>",
+             "<h1>SC 符号矩形预览</h1>",
+             "<p>每张图对应一个推导矩形；多块符号分别显示。PNG 为浏览缩略图，"
+             "下方坐标与尺寸是图集原始值；不合成 MovieClip，也不校正朝向。</p>"]
+    for name, entries in gallery.items():
+        lines.append(f"<h2>{html.escape(name)}</h2><div class=\"row\">")
+        for filename, rect in entries:
+            caption = (f"页 {rect['page']} · ({rect['x']}, {rect['y']}) "
+                       f"{rect['w']} × {rect['h']}")
+            lines.append(f'<figure><img loading="lazy" src="{quote(filename)}" '
+                         f'alt="{html.escape(name, quote=True)}">'
+                         f'<figcaption>{caption}</figcaption></figure>')
+        lines.append("</div>")
+    (out / "index.html").write_text("\n".join(lines) + "\n", encoding="utf-8")
+    return sum(map(len, gallery.values()))
+
+
+def decode_texture_page(sc: ScFile, index, decode_ktx):
+    """按 TextureSets 页号解码 KTX，校验图像尺寸。"""
+    raw = sc.page_ktx(index)
+    image = decode_ktx(raw) if raw is not None else None
+    if image is None or image.size != sc.page(index):
+        raise ValueError("纹理页 %d 无法解码或尺寸不符" % index)
+    return image
+
+
+def export_texture_pages(sc: ScFile, out: Path, decode_ktx):
+    """导出 TextureSets 中各页的原尺寸 PNG。"""
+    out.mkdir(parents=True, exist_ok=True)
+    lines = ["<!doctype html>", '<meta charset="utf-8">',
+             "<title>SC TextureSets</title>",
+             "<style>body{font:14px system-ui;background:#1b1b1b;color:#eee;margin:24px}"
+             "img{display:block;max-width:100%;max-height:75vh;background:#444}"
+             "figure{margin:24px 0}</style>",
+             "<h1>TextureSets 纹理页</h1>"]
+    for index in range(len(sc.tsets)):
+        image = decode_texture_page(sc, index, decode_ktx)
+        filename = f"page-{index:03d}.png"
+        image.save(out / filename)
+        lines.append(f'<figure><figcaption>页 [{index}]：{image.width} × {image.height}'
+                     f'</figcaption><img loading="lazy" src="{filename}" alt="页 {index}"></figure>')
+        del image
+    (out / "textures.html").write_text("\n".join(lines) + "\n", encoding="utf-8")
+    return len(sc.tsets)
+
+
 def main(argv=None):
     ap = argparse.ArgumentParser(description=__doc__.splitlines()[0])
     ap.add_argument("source", type=Path, help="已解压的 .sc 文件")
     ap.add_argument("-o", "--output", type=Path, help="写出 JSON 清单")
     ap.add_argument("--split", action="store_true", help="同名不合并，逐块列出")
+    ap.add_argument("--png-out", type=Path, help="导出推导矩形的 PNG 缩略图和浏览页")
+    ap.add_argument("--textures-out", type=Path, help="导出 TextureSets 纹理页的原尺寸 PNG")
+    ap.add_argument("--png-size", type=int, default=PNG_PREVIEW_EDGE,
+                    help="PNG 预览最长边像素数，0 为原尺寸（默认 256）")
     args = ap.parse_args(argv)
+    if args.png_size < 0:
+        ap.error("--png-size 不能为负数")
 
     try:
         sc = ScFile(load_sc(args.source))
@@ -451,6 +543,21 @@ def main(argv=None):
              "pages": [{"w": w, "h": h} for w, h in pages],
              "frames": frames}, ensure_ascii=False, indent=1))
         print("写出 %s" % args.output)
+    if args.png_out or args.textures_out:
+        try:
+            # 解码器是共用脚本；只在确实导出 PNG 时加载其依赖。
+            sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
+            from sctx2png import ktx_image
+            if args.png_out:
+                count = export_png_previews(sc, frames, args.png_out, ktx_image,
+                                            args.png_size)
+                print("导出 {:,} 张 PNG → {}（浏览页 index.html）".format(count, args.png_out))
+            if args.textures_out:
+                count = export_texture_pages(sc, args.textures_out, ktx_image)
+                print("导出 {:,} 张纹理页 PNG → {}（浏览页 textures.html）".format(
+                      count, args.textures_out))
+        except (ImportError, OSError, ValueError) as exc:
+            ap.exit(1, "%s: %s\n" % (ap.prog, exc))
     return 0
 
 
