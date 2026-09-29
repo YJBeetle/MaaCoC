@@ -132,9 +132,9 @@ class Renderer:
             image = self.decode_ktx(raw) if raw is not None else None
             if image is None or image.size != self.sc.page(index):
                 raise ValueError(f"纹理页 {index} 无法解码或尺寸不符")
-            # Pillow 会在每次 RGBA affine transform 前预乘整张纹理的 alpha。
-            # 缓存 RGBa，避免每个三角形都重新转换一张 4096² 图集。
-            self.pages[index] = image.convert("RGBa")
+            # SC 图集已经是预乘 alpha。按 RGBa 解释原始字节，避免
+            # convert("RGBa") 再乘一次，导致 PNG 和 WebP 的半透明边缘发黑。
+            self.pages[index] = Image.frombytes("RGBa", image.size, image.tobytes())
         return self.pages[index]
 
     def clip_elements(self, clip, frame=0):
