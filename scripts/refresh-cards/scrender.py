@@ -263,12 +263,28 @@ class Renderer:
         size = (min(max_size, max(1, math.ceil(span_x * effective_scale))),
                 min(max_size, max(1, math.ceil(span_y * effective_scale))))
         canvas = Image.new("RGBA", size)
+        self.draw_meshes(canvas, meshes, bounds,
+                         scale=(effective_scale, effective_scale))
+        return canvas, natural, sorted({page for page, _ in meshes})
+
+    def draw_meshes(self, canvas, meshes, bounds, scale=None, clip_box=None):
+        """把网格直接绘制到已有画布；可限制绘制区域。"""
+        min_x, min_y, max_x, max_y = bounds
+        if scale is None:
+            scale = (canvas.width / (max_x - min_x),
+                     canvas.height / (max_y - min_y))
+        scale_x, scale_y = scale
+        if clip_box is not None:
+            clip_left = max(0, math.floor((clip_box[0] - min_x) * scale_x))
+            clip_top = max(0, math.floor((clip_box[1] - min_y) * scale_y))
+            clip_right = min(canvas.width, math.ceil((clip_box[2] - min_x) * scale_x))
+            clip_bottom = min(canvas.height, math.ceil((clip_box[3] - min_y) * scale_y))
         for page, points in meshes:
             texture = self.page(page)
             for i in range(len(points) - 2):
                 triangle = points[i:i + 3]
-                dest = [((p[0] - min_x) * effective_scale,
-                         (p[1] - min_y) * effective_scale) for p in triangle]
+                dest = [((p[0] - min_x) * scale_x,
+                         (p[1] - min_y) * scale_y) for p in triangle]
                 source = [(p[2], p[3]) for p in triangle]
                 (x0, y0), (x1, y1), (x2, y2) = dest
                 dx1, dy1, dx2, dy2 = x1 - x0, y1 - y0, x2 - x0, y2 - y0
@@ -284,8 +300,11 @@ class Renderer:
                 vc = v0 - va * x0 - vb * y0
                 left = max(0, math.floor(min(p[0] for p in dest)))
                 top = max(0, math.floor(min(p[1] for p in dest)))
-                right = min(size[0], math.ceil(max(p[0] for p in dest)))
-                bottom = min(size[1], math.ceil(max(p[1] for p in dest)))
+                right = min(canvas.width, math.ceil(max(p[0] for p in dest)))
+                bottom = min(canvas.height, math.ceil(max(p[1] for p in dest)))
+                if clip_box is not None:
+                    left, top = max(left, clip_left), max(top, clip_top)
+                    right, bottom = min(right, clip_right), min(bottom, clip_bottom)
                 if right <= left or bottom <= top:
                     continue
                 region_size = (right - left, bottom - top)
@@ -298,7 +317,6 @@ class Renderer:
                     [(x - left, y - top) for x, y in dest], fill=255)
                 tile.putalpha(ImageChops.multiply(tile.getchannel("A"), mask))
                 canvas.alpha_composite(tile, (left, top))
-        return canvas, natural, sorted({page for page, _ in meshes})
 
     @staticmethod
     def bounds(meshes, obj_id):

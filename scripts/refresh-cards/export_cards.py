@@ -16,7 +16,7 @@ import tempfile
 from pathlib import Path
 from typing import NamedTuple
 
-from PIL import Image, ImageDraw, ImageOps
+from PIL import Image, ImageDraw
 
 # 同级拿 scframes，上一级 scripts/ 拿共用的 KTX 解码 sctx2png
 HERE = Path(__file__).resolve().parent
@@ -27,13 +27,14 @@ import sctx2png          # noqa: E402
 
 REPO = HERE.parents[1]
 
-# 卡牌名、SC 符号、可选的卡面图层，以及对应卡底的图层。
+# 卡牌名、SC 符号、可选的卡面图层，以及特殊卡底。
 # Soldier 沿用原模板的编号前缀，方便按兵种顺序浏览。
 class CardSpec(NamedTuple):
     name: str
     symbol: str
     image_layer: int | None = None
-    background_layer: int = 0
+    background_layer: int | None = None
+    background_symbol: str | None = None
     extra_masks: tuple[tuple[float, float, float, float], ...] = ()
 
 
@@ -67,28 +68,29 @@ SOLDIER_CARDS = (
     CardSpec("59_ApprenticeWarden", "icon_unit_apprentice"),
     CardSpec("60_Druid", "icon_unit_druid_bear"),
     CardSpec("61_Furnace", "icon_unit_furnace"),
-    CardSpec("100_Broom", "icon_unit_majo"),
-    CardSpec("101_BarbarianKicker", "icon_unit_footballbarbarian"),
-    CardSpec("102_M.E.C.H.A", "icon_unit_mecha"),
-    CardSpec("103_BattleRam", "icon_unit_battleram_cc"),
-    CardSpec("104_IceWizard", "icon_unit_icewizard"),
-    CardSpec("105_DebtCollector", "icon_unit_goblin_tax_collector"),
-    CardSpec("106_GiantThrower", "icon_unit_footballgiant"),
-    CardSpec("107_Firecracker", "icon_unit_firecracker"),
-    CardSpec("108_RamRider", "icon_unit_cookie_ramrider"),
-    CardSpec("109_PartyWizard", "icon_unit_partyWizard"),
-    CardSpec("110_MeteorGolem", "icon_unit_splitgolem"),
-    CardSpec("111_IceMinion", "icon_unit_ice_minion"),
-    CardSpec("112_Lavaloon", "icon_unit_lavaloon"),
-    CardSpec("113_Barcher", "icon_unit_barcher"),
-    CardSpec("SuperBalloon", "icon_unit_elite_balloon", background_layer=1),
-    CardSpec("SuperDragon", "icon_unit_elite_dragon", background_layer=1),
-    CardSpec("SuperMiner", "icon_unit_elite_miner", background_layer=1),
-    CardSpec("SuperWitch", "icon_unit_elite_witch", background_layer=1),
+    CardSpec("100_Broom", "icon_unit_majo", background_layer=2),
+    CardSpec("101_BarbarianKicker", "icon_unit_footballbarbarian", background_layer=2),
+    CardSpec("102_M.E.C.H.A", "icon_unit_mecha", background_layer=2),
+    CardSpec("103_BattleRam", "icon_unit_battleram_cc", background_layer=2),
+    CardSpec("104_IceWizard", "icon_unit_icewizard", background_layer=2),
+    CardSpec("105_DebtCollector", "icon_unit_goblin_tax_collector", background_layer=2),
+    CardSpec("106_GiantThrower", "icon_unit_footballgiant", background_layer=2),
+    CardSpec("107_Firecracker", "icon_unit_firecracker", background_layer=2),
+    CardSpec("108_RamRider", "icon_unit_cookie_ramrider", background_layer=2),
+    CardSpec("109_PartyWizard", "icon_unit_partyWizard", background_layer=2),
+    CardSpec("110_MeteorGolem", "icon_unit_splitgolem", background_layer=2),
+    CardSpec("111_IceMinion", "icon_unit_ice_minion", background_layer=2),
+    CardSpec("112_Lavaloon", "icon_unit_lavaloon", background_layer=2),
+    CardSpec("113_Barcher", "icon_unit_barcher", background_layer=2),
+    CardSpec("SuperBalloon", "icon_unit_elite_balloon", background_layer=1,
+             background_symbol="capacity_slot"),
+    CardSpec("SuperDragon", "icon_unit_elite_dragon", background_layer=1,
+             background_symbol="capacity_slot"),
+    CardSpec("SuperMiner", "icon_unit_elite_miner", background_layer=1,
+             background_symbol="capacity_slot"),
+    CardSpec("SuperWitch", "icon_unit_elite_witch", background_layer=1,
+             background_symbol="capacity_slot"),
 )
-
-# Soldier 卡面合成时使用 capacity_slot 的背景图层。
-SOLDIER_BACKGROUND = "capacity_slot"
 
 HERO_CARDS = (
     CardSpec("King", "icon_hero_barbarianKing"),
@@ -103,26 +105,29 @@ SPELL_CARDS = (
     CardSpec("SpellRage", "icon_spell_rage"),
     CardSpec("SpellSpeed", "icon_spell_speedup"),
 )
-# 卡面在各卡底中的位置，比例相对各自的整张卡。
-SOLDIER_FACE_BOX = (3 / 71, 22 / 94, 68 / 71, 91 / 94)
-HERO_FACE_BOX = (2 / 70, 2 / 92, 68 / 70, 90 / 92)
-SPELL_FACE_BOX = (2 / 70, 20 / 92, 68 / 70, 90 / 92)
-# locked 英雄卡底的原始画布为 84×112，实机卡牌比直接乘统一倍率更小。
-HERO_SOURCE_SCALE = 7 / 8
-# 英雄肖像相对卡底向上移动 5 个 SC 画布像素，卡底及裁切范围不动。
-HERO_FACE_Y_OFFSET = -5
+# 卡面在各自卡底的原始 SC 画布中的位置。普通卡面约为 83×83，英雄为 83×113。
+SOLDIER_FACE_BOX = (3.5, 24.4, 78.5, 99)
+HERO_FACE_BOX = (2.5, -4, 76.5, 98)
+SPELL_FACE_BOX = (2.5, 24.4, 77, 99)
+SUPER_FACE_BOX = (3, 22, 68, 91)
+# 英雄肖像的可见网格略有差异，但共享同一个 166×225 的 SC 画布。
+HERO_ICON_BOUNDS = (-83, -144.5, 83, 80.5)
 # 数量、等级等动态内容由 MAAFW 的 green_mask 跳过。
-SOLDIER_MASKS = ((0.39, 0.02, 0.95, 0.21), (0.04, 0.68, 0.42, 0.95))
-HERO_MASKS = ((0.02, 0.04, 0.43, 0.36), (0.02, 0.68, 0.37, 0.96))
-SPELL_MASKS = ((0.62, 0.02, 0.96, 0.21), (0.04, 0.71, 0.36, 0.94))
+SOLDIER_MASKS = ((0.39, 0.03, 0.95, 0.2), (0.06, 0.68, 0.4, 0.91))
+HERO_MASKS = ((0.03, 0.06, 0.43, 0.36), (0.05, 0.68, 0.38, 0.93))
+SPELL_MASKS = ((0.39, 0.03, 0.95, 0.21), (0.05, 0.68, 0.38, 0.91))
 CARD_GROUPS = (
-    ("Soldier", SOLDIER_CARDS, SOLDIER_BACKGROUND, SOLDIER_FACE_BOX, SOLDIER_MASKS, 1.0, 0),
-    ("Hero", HERO_CARDS, "capacity_slot_hero_locked", HERO_FACE_BOX, HERO_MASKS,
-     HERO_SOURCE_SCALE, HERO_FACE_Y_OFFSET),
-    ("Spell", SPELL_CARDS, "capacity_slot_spell", SPELL_FACE_BOX, SPELL_MASKS, 1.0, 0),
+    ("Soldier", SOLDIER_CARDS, "unit_slot", 1, SOLDIER_FACE_BOX, SOLDIER_MASKS),
+    ("Hero", HERO_CARDS, "hero_slot", 2, HERO_FACE_BOX, HERO_MASKS),
+    ("Spell", SPELL_CARDS, "spell_slot", 1, SPELL_FACE_BOX, SPELL_MASKS),
 )
 GREEN = (0, 255, 0, 255)
 MAX_SIZE = 1000
+# 根据设备截图缩至 720 高后的实测卡牌尺寸区分卡底倍率。
+SOLDIER_CARD_SCALE = 1.69 * 720 / 1080
+HERO_SPELL_CARD_SCALE = 1.69 * 720 / 1080
+# 旧的 capacity_slot or attack_confirm_troop 约 71×94，超级兵暂沿用它的红底并校正到相近的输出尺寸。
+SUPER_CARD_SCALE = 1.25
 
 
 def scaled_box(box, size):
@@ -143,24 +148,45 @@ def soldier_icon_bounds(mesh_bounds):
     return mesh_bounds
 
 
-def compose_card(background, face, scale, face_box, masks, face_y_offset=0):
-    """将 SC 卡面铺入卡底，并将动态区域及透明边角设为 green_mask。"""
-    card = background.convert("RGBA").copy()
-    left, top, right, bottom = scaled_box(face_box, card.size)
-    face = ImageOps.fit(face.convert("RGBA"), (right - left, bottom - top),
-                        method=Image.Resampling.LANCZOS)
-    card.alpha_composite(face, (left, top + face_y_offset))
+def fit_face_meshes(meshes, face_bounds, canvas_bounds, face_box):
+    """按同类卡牌的固定位置把顶点映射到卡底画布。"""
+    left, top, right, bottom = face_box
+    min_x, min_y, max_x, max_y = face_bounds
+    face_width = math.ceil(max_x - min_x)
+    face_height = math.ceil(max_y - min_y)
+    factor = max((right - left) / face_width, (bottom - top) / face_height)
+    source_center_x = min_x + face_width / 2
+    source_center_y = min_y + face_height / 2
+    target_center_x = canvas_bounds[0] + (left + right) / 2
+    target_center_y = canvas_bounds[1] + (top + bottom) / 2
+    fitted = [(page, [(target_center_x + (x - source_center_x) * factor,
+                       target_center_y + (y - source_center_y) * factor, u, v)
+                      for x, y, u, v in points])
+              for page, points in meshes]
+    clip_box = (canvas_bounds[0] + left, canvas_bounds[1] + top,
+                canvas_bounds[0] + right, canvas_bounds[1] + bottom)
+    return fitted, clip_box
 
-    size = tuple(max(1, round(value * scale)) for value in card.size)
+
+def compose_card(renderer, background_meshes, background_bounds, face_meshes,
+                 face_bounds, scale, face_box, masks):
+    """卡底、卡面网格在同一画布各绘制一次，再覆盖动态区域。"""
+    natural = (math.ceil(background_bounds[2] - background_bounds[0]),
+               math.ceil(background_bounds[3] - background_bounds[1]))
+    size = tuple(max(1, round(value * scale)) for value in natural)
     if max(size) > MAX_SIZE:
         raise ValueError(f"缩放后尺寸 {size[0]}×{size[1]} 超过 {MAX_SIZE} 像素上限")
-    if size != card.size:
-        card = card.resize(size, Image.Resampling.LANCZOS)
+    canvas_bounds = (background_bounds[0], background_bounds[1],
+                     background_bounds[0] + natural[0],
+                     background_bounds[1] + natural[1])
+    card = Image.new("RGBA", size)
+    renderer.draw_meshes(card, background_meshes, canvas_bounds)
     # 卡底图层的不透明度低于 50% 时，才把对应位置覆盖成纯绿。
-    alpha = background.getchannel("A")
-    if alpha.size != size:
-        alpha = alpha.resize(size, Image.Resampling.LANCZOS)
-    card.paste(GREEN, mask=alpha.point(lambda value: 255 if value < 128 else 0))
+    alpha = card.getchannel("A")
+    fitted, clip_box = fit_face_meshes(face_meshes, face_bounds, canvas_bounds,
+                                       face_box)
+    renderer.draw_meshes(card, fitted, canvas_bounds, clip_box=clip_box)
+    card.paste(GREEN, mask=alpha.point(lambda value: 255 if value < 128 else 0)) # 绿色蒙版 Alpha 阈值
     draw = ImageDraw.Draw(card)
     for box in masks:
         x0, y0, x1, y1 = scaled_box(box, size)
@@ -168,43 +194,55 @@ def compose_card(background, face, scale, face_box, masks, face_y_offset=0):
     return card.convert("RGB")
 
 
-def render_cards(sc, out, scale):
+def render_cards(sc, out):
     exports = dict(sc.exports())
     renderer = scrender.Renderer(sc, sctx2png.ktx_image)
     out.parent.mkdir(parents=True, exist_ok=True)
     with tempfile.TemporaryDirectory(prefix=".cards-", dir=out.parent) as stage_name:
         stage = Path(stage_name)
-        for group, cards, background_name, face_box, masks, source_scale, face_y_offset in CARD_GROUPS:
-            background_id = exports.get(background_name)
-            if background_id is None:
-                raise ValueError(f"{group} 缺少卡底符号 {background_name}")
-            meshes = list(renderer.meshes(background_id))
-            if not meshes:
-                raise ValueError(f"卡底符号 {background_name} 没有可绘制网格")
-            bounds = renderer.bounds(meshes, background_id)
-            backgrounds = {}
-            for layer in {card.background_layer for card in cards}:
-                result = renderer.render(background_id, bounds=bounds, layer=layer)
-                if result is None:
-                    raise ValueError(f"卡底符号 {background_name} 图层 {layer} 不可绘制")
-                backgrounds[layer] = result[0]
+        backgrounds = {}
+        for group, cards, background_name, default_layer, face_box, masks in CARD_GROUPS:
             group_stage = stage / group
             group_stage.mkdir()
             for card in cards:
+                selected_background = card.background_symbol or background_name
+                selected_layer = (card.background_layer if card.background_layer is not None
+                                  else default_layer)
+                key = (selected_background, selected_layer)
+                if key not in backgrounds:
+                    background_id = exports.get(selected_background)
+                    if background_id is None:
+                        raise ValueError(f"{group} 缺少卡底符号 {selected_background}")
+                    layer_meshes = list(renderer.meshes(background_id,
+                                                        layer=selected_layer))
+                    if not layer_meshes:
+                        raise ValueError(f"卡底符号 {selected_background} 图层 {selected_layer} 不可绘制")
+                    # hero_slot 顶部还有独立装饰，卡牌画布以指定卡底图层为准。
+                    bounds = renderer.bounds(layer_meshes, background_id)
+                    if selected_background == "unit_slot":
+                        whole = list(renderer.meshes(background_id))
+                        bounds = renderer.bounds(whole, background_id)
+                    backgrounds[key] = layer_meshes, bounds
                 obj_id = exports.get(card.symbol)
                 if obj_id is None:
                     raise ValueError(f"{card.name} 缺少卡面符号 {card.symbol}")
-                face_bounds = None
-                if group == "Soldier":
-                    meshes = list(renderer.meshes(obj_id, layer=card.image_layer))
-                    if meshes:
-                        face_bounds = soldier_icon_bounds(renderer.bounds(meshes, obj_id))
-                result = renderer.render(obj_id, bounds=face_bounds, layer=card.image_layer)
-                if result is None:
+                face_meshes = list(renderer.meshes(obj_id, layer=card.image_layer))
+                if not face_meshes:
                     raise ValueError(f"{card.name} 的卡面图层不可绘制：{card.symbol}")
-                image = compose_card(backgrounds[card.background_layer], result[0],
-                                     scale * source_scale, face_box, masks + card.extra_masks,
-                                     face_y_offset)
+                face_bounds = renderer.bounds(face_meshes, obj_id)
+                if group == "Soldier":
+                    face_bounds = soldier_icon_bounds(face_bounds)
+                elif group == "Hero":
+                    face_bounds = HERO_ICON_BOUNDS
+                layer_meshes, bounds = backgrounds[key]
+                is_super = selected_background == "capacity_slot"
+                scale = (SUPER_CARD_SCALE if is_super else
+                         SOLDIER_CARD_SCALE if group == "Soldier" else
+                         HERO_SPELL_CARD_SCALE)
+                image = compose_card(renderer, layer_meshes, bounds, face_meshes,
+                                     face_bounds, scale,
+                                     SUPER_FACE_BOX if is_super else face_box,
+                                     masks + card.extra_masks)
                 image.save(group_stage / f"{card.name}.png")
         for group, cards, *_ in CARD_GROUPS:
             target = out / group
@@ -220,14 +258,10 @@ def main(argv=None):
     ap.add_argument("source", type=Path, help="已解压的 .sc 文件")
     ap.add_argument("--out", type=Path, default=REPO / "assets/image/Cards",
                     help="合成模板的输出根目录（默认 assets/image/Cards）")
-    ap.add_argument("--scale", type=float, default=1.0,
-                    help="整张卡的缩放比例，默认 1")
     args = ap.parse_args(argv)
-    if not math.isfinite(args.scale) or args.scale <= 0:
-        ap.error("--scale 必须是大于 0 的有限数字")
     try:
         sc = scframes.ScFile(scframes.load_sc(args.source))
-        render_cards(sc, args.out, args.scale)
+        render_cards(sc, args.out)
     except (OSError, ValueError) as exc:
         ap.exit(1, f"{ap.prog}: {exc}\n")
     return 0

@@ -4,9 +4,11 @@
 
 ## 为什么需要工具
 
-卡底和人物图分存在 `ui.sc` 的不同符号里。脚本按顶点与 UV 渲染卡面，再放进对应的卡底：
-普通兵与超级兵用 `capacity_slot` 的图层 0/1，英雄用 `capacity_slot_hero_locked` 的图层 0，法术用
-`capacity_slot_spell`。数量、等级及卡底 alpha 低于 50% 的边角填成纯绿，供 MAAFW 的
+卡底和人物图分存在 `ui.sc` 的不同符号里。脚本将两者的网格映射到同一画布，
+按顶点与 UV 直接绘制成卡牌：
+普通兵用 `unit_slot` 图层 1，编号 100 起的活动兵用图层 2；`icon_unit_elite_*` 超级兵
+暂沿用 `capacity_slot` 的红底图层 1。英雄用 `hero_slot` 图层 2，法术用 `spell_slot` 图层 1。
+数量、等级及卡底 alpha 低于 50% 的边角填成纯绿，供 MAAFW 的
 `green_mask` 跳过。
 每类卡牌共用一套遮罩位置；咏王另遮住右下角的模式切换开关。
 兵种图标按 SC 顶点所在的方形画布定位；可见网格缺少一侧时保留透明留白，避免拉伸后偏移。
@@ -54,8 +56,8 @@ unzip -o -j var/coc-unpack/apk/split_install_time_asset_pack.apk assets/sc/ui.sc
 ## 合成卡牌模板
 
 ```bash
-scripts/refresh-cards/export_cards.py var/coc-unpack/sc/ui.sc --scale 1.2
-scripts/refresh-cards/export_cards.py var/coc-unpack/sc/ui.sc --out /tmp/cards --scale 2
+scripts/refresh-cards/export_cards.py var/coc-unpack/sc/ui.sc
+scripts/refresh-cards/export_cards.py var/coc-unpack/sc/ui.sc --out /tmp/cards
 ```
 
 默认输出到 `assets/image/Cards/{Soldier,Hero,Spell}/<卡牌名>.png`，与旧模板目录分开；
@@ -64,10 +66,10 @@ scripts/refresh-cards/export_cards.py var/coc-unpack/sc/ui.sc --out /tmp/cards -
 三个数组中追加卡牌及其 SC 符号，不扫描旧模板目录，也不导出建筑大师卡牌。
 Soldier 文件名沿用原模板编号（如 `0_Barbarian.png`、`13_ElectroDragon.png`），
 超级兵仍用原来的无编号名称，方便在文件夹中浏览。
-`--scale` 将整张卡统一缩放，默认 1；缩放后宽高上限为 1000 像素。
-英雄卡底的 SC 原始画布较大，先乘 `7/8` 的尺寸校正，再应用 `--scale`。
-英雄肖像在卡底内向上移动 5 个 SC 画布像素；卡底位置和透明边角的裁切方式不变。
-当前生成的模板按 `--scale 1.2` 生成；此比例已用 1280×720 的实机战斗画面核对。
+输出倍率由 `export_cards.py` 顶部的 `SOLDIER_CARD_SCALE`、
+`HERO_SPELL_CARD_SCALE` 和 `SUPER_CARD_SCALE` 分别控制。缩放后宽高上限为 1000 像素。
+卡面按各类 slot 的固定位置映射到卡底；英雄肖像使用统一的 SC 画布范围保留留白。
+需要按 720 高的实机战斗画面对比倍率时，修改对应常量后重新导出。
 卡牌用尽后会变灰，三个 `Find*` 节点均使用反向 `TM_SQDIFF_NORMED`
 （`method: 10001`），按像素差异区分彩色可用卡和灰卡。
 实机截图核对后的阈值为兵种 `0.8`、英雄 `0.85`、法术 `0.85`。
@@ -76,7 +78,6 @@ Soldier 文件名沿用原模板编号（如 `0_Barbarian.png`、`13_ElectroDrag
 
 | 参数 | 作用 |
 |---|---|
-| `--scale 2` | 将卡底、卡面和绿块一起放大 2 倍 |
 | `--out /tmp/cards` | 将三类模板写到独立输出根目录 |
 
 重复导出会覆盖同名文件，但不会自动删除输出目录里本次未生成的旧 PNG。
@@ -123,7 +124,7 @@ scripts/refresh-cards/scframes.py var/coc-unpack/sc/ui.sc --textures-out var/coc
 
 1. 检查新模板中的卡面、卡底是否对齐，普通兵为蓝底、超级兵为红底。
 2. 检查数量、等级以及卡底 alpha 低于 50% 的边角是否为纯 `(0,255,0)`。
-3. 按 MAAFW 的 720 高度匹配实际画面，调整 `--scale` 并验证 TemplateMatch 分数。
+3. 按 MAAFW 的 720 高度匹配实际画面，必要时调整 `CARD_SCALE` 并验证 TemplateMatch 分数。
 
 卡面位置和动态区域目前按 `ui.sc` 这份样本及现有模板确定；游戏更新后如果卡底布局改变，
 需复查 `export_cards.py` 中的 `*_FACE_BOX` 与 `*_MASKS`。卡牌名与 SC 符号的对应关系
