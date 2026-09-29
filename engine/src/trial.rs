@@ -163,9 +163,9 @@ pub fn trial_node(
         });
     };
 
+    apply_overrides(&mut params, threshold, roi);
     let used_threshold = first_number(&params, "threshold");
     let used_roi = params.get("roi").and_then(parse_box);
-    apply_overrides(&mut params, threshold, roi);
 
     let mut buffer = MaaImageBuffer::new()?;
     buffer.set_encoded(png)?;

@@ -236,7 +236,7 @@ fn regress(assets: &Path, dir: Option<String>) -> Result<(), Error> {
             &record.node,
             &png,
             None,
-            None,
+            record.roi,
         )?;
         let ok = trial.hit && trial.error.is_none();
         if !ok {

@@ -17,6 +17,8 @@ pub struct FrameRecord {
     pub digest: String,
     pub width: u32,
     pub height: u32,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub roi: Option<[i32; 4]>,
 }
 
 /// PNG header carries width/height at fixed offsets; avoids an image decode.
@@ -86,6 +88,7 @@ impl FrameStore {
             digest: String::new(),
             width,
             height,
+            roi: None,
         };
         let line = serde_json::to_string(&record)?;
         use std::io::Write;

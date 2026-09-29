@@ -483,10 +483,7 @@ mod tests {
             .filter(|(a, b)| a != b)
             .collect();
         assert_eq!(changed.len(), 1, "只该有一行不同，实际 {changed:?}");
-        assert_eq!(
-            load(&patched).unwrap()["FindUnit"]["threshold"],
-            serde_json::json!(0.8)
-        );
+        assert_eq!(load(&patched).unwrap()["FindUnit"]["threshold"], serde_json::json!(0.8));
     }
 
     #[test]
