@@ -26,6 +26,8 @@ export interface Status {
   battles: number;
   uptimeMs: number;
   currentNode: string;
+  /** Physical and current panel size, as `wm size` reports them. */
+  panel: string;
 }
 
 export interface Settings {
@@ -64,6 +66,9 @@ export interface EngineApi {
   saveSettings(next: Settings): Promise<Settings>;
   connect(): Promise<Status>;
   disconnect(): Promise<Status>;
+  /** `wm size 1080x1920` on the device, or `wm size reset` when `reset`. The
+     command re-reads the panel, so the new size arrives via the next status. */
+  setScreenSize(reset: boolean): Promise<void>;
   start(): Promise<Status>;
   stop(): Promise<Status>;
   status(): Promise<Status>;

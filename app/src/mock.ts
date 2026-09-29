@@ -26,7 +26,7 @@ const SCRIPT: Array<Partial<NodeEvent> & { at: number; node: string; kind: strin
 
 export function createMockApi(): EngineApi {
   let settings: Settings = { ...DEFAULT_SETTINGS };
-  let status: Status = { phase: "idle", detail: "", battles: 0, uptimeMs: 0, currentNode: "" };
+  let status: Status = { phase: "idle", detail: "", battles: 0, uptimeMs: 0, currentNode: "", panel: "" };
   let cursor = 0;
   let clock = 0;
 
@@ -51,14 +51,22 @@ export function createMockApi(): EngineApi {
       return settings;
     },
     async connect() {
-      status = { ...status, phase: settings.autoStart ? "running" : "ready", detail: "K40 @ f5d66ad2" };
+      status = {
+        ...status,
+        phase: settings.autoStart ? "running" : "ready",
+        detail: "K40 @ f5d66ad2",
+        panel: "物理 1080×2400 · 当前 1080×1920",
+      };
       return status;
     },
     async disconnect() {
-      status = { phase: "idle", detail: "", battles: 0, uptimeMs: 0, currentNode: "" };
+      status = { phase: "idle", detail: "", battles: 0, uptimeMs: 0, currentNode: "", panel: "" };
       cursor = 0;
       clock = 0;
       return status;
+    },
+    async setScreenSize(reset) {
+      status = { ...status, panel: reset ? "物理 1080×2400 · 当前 1080×2400" : "物理 1080×2400 · 当前 1080×1920" };
     },
     async start() {
       status = { ...status, phase: "running" };

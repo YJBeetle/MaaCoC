@@ -78,6 +78,9 @@ body { overflow: hidden; user-select: none; }
 .stage .void { display: grid; place-items: center; gap: 8px; color: var(--md-sys-color-on-surface-variant); font-size: 13px; }
 .stage .res { position: absolute; top: 10px; right: 10px; max-width: calc(100% - 20px); padding: 3px 8px; border-radius: 6px; background: rgb(0 0 0 / 0.6); font: 11px ui-monospace, Menlo, monospace; color: var(--md-sys-color-surface-bright); }
 .stage .res.warn { background: var(--md-sys-color-error-container); color: var(--md-sys-color-on-error-container); font-family: inherit; }
+/* Physical vs current panel size, bottom-left, so the 1080×1920 lock is
+   verifiable at a glance without a terminal. */
+.stage .panel { position: absolute; bottom: 10px; left: 10px; padding: 3px 8px; border-radius: 6px; background: rgb(0 0 0 / 0.6); font: 11px ui-monospace, Menlo, monospace; color: var(--md-sys-color-surface-bright); }
 /* One control carries both the connection state and the action: the state is
    what you read, the action is what you get when you aim at it. Both labels
    share one grid cell so the button is as wide as the longer of the two and
@@ -111,7 +114,13 @@ body { overflow: hidden; user-select: none; }
 
 /* In flow at the bottom of the left column, not floating: a fixed overlay was
    sitting on top of the node log. */
-.actions { flex: none; display: flex; align-items: center; gap: 12px; }
+.actions { flex: none; display: flex; flex-direction: column; align-items: flex-start; gap: 8px; }
+/* Auxiliary device setup, on its own row under the primary FAB and in the
+   quieter text-button treatment so it does not compete with 开始战斗. */
+.secondary { display: flex; flex-wrap: wrap; gap: 4px; }
+.secondary md-text-button {
+  --md-text-button-label-text-color: var(--md-sys-color-on-surface-variant);
+}
 /* md-fab ships no disabled state, so the inert look is ours: MD3's disabled
    palette over the primary variant, and no pointer events to act on. */
 #fab[aria-disabled="true"] {

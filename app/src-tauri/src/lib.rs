@@ -5,7 +5,7 @@
 //! browser against the same commands.
 
 use base64::Engine as _;
-use maacoc_engine::{frames::FrameStore, DeviceTarget, NodeEvent, Runner};
+use maacoc_engine::{frames::FrameStore, DeviceTarget, NodeEvent, Runner, DEVICE_MATCH_SIZE};
 use serde::{Deserialize, Serialize};
 use std::{
     collections::VecDeque,
@@ -61,6 +61,8 @@ pub struct Status {
     pub battles: usize,
     pub uptime_ms: u64,
     pub current_node: String,
+    /// The panel's physical and current size, as `wm size` reports them.
+    pub panel: String,
 }
 
 #[derive(Debug, Clone, Serialize)]
@@ -90,6 +92,7 @@ struct Inner {
     battles: usize,
     phase: Phase,
     detail: String,
+    panel: String,
 }
 
 #[derive(Debug, Clone, Serialize)]
@@ -116,6 +119,7 @@ impl AppState {
                 battles: 0,
                 phase: Phase::Idle,
                 detail: String::new(),
+                panel: String::new(),
             }),
         }
     }
@@ -252,6 +256,9 @@ async fn connect<R: Runtime>(app: AppHandle<R>, state: State<'_, AppState>) -> R
             inner.detail = runner.label.clone();
             inner.phase = Phase::Ready;
             inner.runner = Some(runner);
+            if let Some(runner) = inner.runner.as_ref() {
+                inner.panel = panel_sizes(runner).unwrap_or_default();
+            }
             apply_recording(&mut inner, &app)?;
             if inner.settings.auto_start {
                 // 连接成功就开跑；起不来仍然算连上了，把原因显示出来供手动重试。
@@ -306,8 +313,47 @@ async fn disconnect(state: State<'_, AppState>) -> Result<Status, String> {
     }
     inner.phase = Phase::Idle;
     inner.detail = String::new();
+    inner.panel = String::new();
     inner.started = None;
     Ok(status_of(&inner))
+}
+
+/// Read `wm size` and render it as "物理 W×H · 当前 W×H". A device with no
+/// override reports the physical size once, so current equals physical.
+fn panel_sizes(runner: &Runner) -> Result<String, String> {
+    let out = runner.shell("wm size").map_err(|e| e.to_string())?;
+    let grab = |key: &str| {
+        out.lines()
+            .find_map(|line| line.strip_prefix(key))
+            .map(|rest| rest.trim().replace('x', "×"))
+    };
+    let physical = grab("Physical size:").unwrap_or_default();
+    let current = grab("Override size:").unwrap_or_else(|| physical.clone());
+    if physical.is_empty() {
+        return Ok(String::new());
+    }
+    Ok(format!("物理 {physical} · 当前 {current}"))
+}
+
+/// `wm size` through the framework's own channel: pin the panel to the 16:9
+/// logical size the assets were cropped for, or hand the phone its stock
+/// geometry back. Re-reads the panel so the stage badge shows the new size.
+#[tauri::command]
+async fn screen_size(state: State<'_, AppState>, reset: bool) -> Result<(), String> {
+    let mut inner = state.inner.lock().unwrap();
+    let runner = inner.runner.as_ref().ok_or("尚未连接设备")?;
+    if runner.running() {
+        // The panel re-layouts mid-battle, so every tap in flight is wrong.
+        return Err("战斗进行中，请先停止再改分辨率".into());
+    }
+    let cmd = if reset {
+        "wm size reset".to_owned()
+    } else {
+        format!("wm size {DEVICE_MATCH_SIZE}")
+    };
+    runner.shell(&cmd).map_err(|e| e.to_string())?;
+    inner.panel = panel_sizes(runner)?;
+    Ok(())
 }
 
 fn status_of(inner: &Inner) -> Status {
@@ -317,6 +363,7 @@ fn status_of(inner: &Inner) -> Status {
         battles: inner.battles,
         uptime_ms: inner.started.map(|t| t.elapsed().as_millis() as u64).unwrap_or(0),
         current_node: inner.events.back().map(|e| e.label().to_string()).unwrap_or_default(),
+        panel: inner.panel.clone(),
     }
 }
 
@@ -417,6 +464,7 @@ pub fn run() {
             start,
             stop,
             disconnect,
+            screen_size,
             status,
             events,
             frame

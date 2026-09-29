@@ -8,15 +8,10 @@
 
 ## 环境要求
 
-- **设备分辨率必须是 1080x1920**，否则所有模板都对不上：
-
-  ```bash
-  adb shell wm size 1080x1920    # 设置
-  adb shell wm size reset        # 恢复
-  ```
-
-  MaaFramework 会把截图缩到短边 720 再做识别，因此所有模板和 ROI 都写在
-  **1280x720 这一套坐标空间**里。这是整个项目最重要的一条约定。
+- **设备分辨率必须是 1080x1920**，否则所有模板都对不上。挂机页底部有「设为
+  1080×1920」「恢复默认」两个按钮，走 MaaFramework 自己的 adb 通道执行；画面
+  左下角会显示 `物理 · 当前` 两个尺寸供核对。之所以要这个尺寸：MaaFramework 把
+  截图缩到短边 720 再识别，所有模板和 ROI 都写在 **1280x720 坐标空间**里。
 - 已开启 USB 调试、用数据线连好的设备或模拟器。
 - Rust stable（`rust-toolchain.toml` 会带上 clippy 和 rustfmt）、Node 22。
 
@@ -52,6 +47,7 @@ cd app
 ```bash
 cargo run --bin maacoc-engine -- devices                     # 列设备
 cargo run --bin maacoc-engine -- snap frame.png              # 截一帧，报告匹配空间尺寸
+cargo run --bin maacoc-engine -- shell wm size               # 通过 MaaFramework 在设备上执行命令
 cargo run --bin maacoc-engine -- load                        # 加载资源并列出节点
 cargo run --bin maacoc-engine -- run --minutes 10            # 跑自动战斗并打印时间轴
 cargo run --bin maacoc-engine -- reco FindUnit frame.png     # 在静态帧上试跑某个节点

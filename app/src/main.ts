@@ -26,7 +26,7 @@ const stateLabels: Record<Phase, string> = {
   error: "出错",
 };
 
-const idle: Status = { phase: "idle", detail: "", battles: 0, uptimeMs: 0, currentNode: "" };
+const idle: Status = { phase: "idle", detail: "", battles: 0, uptimeMs: 0, currentNode: "", panel: "" };
 
 const state = {
   page: "run" as "run" | "stats" | "settings",
@@ -59,6 +59,7 @@ async function loadApi(): Promise<EngineApi> {
       saveSettings: (next) => call("save_settings", { next }),
       connect: () => call("connect"),
       disconnect: () => call("disconnect"),
+      setScreenSize: (reset) => call("screen_size", { reset }),
       start: () => call("start"),
       stop: () => call("stop"),
       status: () => call("status"),
@@ -102,11 +103,18 @@ const ui = {
   stage: el("div", { class: "stage", id: "stage" }),
   frameImg: el("img", { id: "frame-img", alt: "设备画面" }),
   badge: el("span", { class: "res", text: "" }),
+  panel: el("span", { class: "panel", id: "panel-size", text: "" }),
   overlay: el("canvas", { id: "overlay" }) as HTMLCanvasElement,
   void: el("div", { class: "void", text: "未连接设备" }),
   timeline: el("div", { class: "timeline", id: "timeline" }),
   fab: el("md-fab", { id: "fab" }),
+  secondary: el("div", { class: "secondary" }),
   link: el("md-outlined-button", { id: "btn-link" }),
+  sizeSet: el("md-text-button", {
+    id: "btn-size-set",
+    title: "把设备锁成 1080×1920，横屏画面才正好缩到 1280×720 匹配空间",
+  }),
+  sizeReset: el("md-text-button", { id: "btn-size-reset", title: "还回设备自己的分辨率" }),
   actions: el("div", { class: "actions", id: "actions" }),
   pages: {} as Record<string, HTMLElement>,
 };
@@ -142,7 +150,14 @@ function buildShell() {
   ui.fab.setAttribute("variant", "primary");
   ui.fab.appendChild(el("md-icon", { slot: "icon", text: "play_arrow" }));
   ui.fab.addEventListener("click", () => void toggleRun());
-  ui.actions.appendChild(ui.fab);
+  ui.sizeSet.appendChild(el("span", { text: "设为 1080×1920" }));
+  ui.sizeReset.appendChild(el("span", { text: "恢复默认" }));
+  ui.sizeSet.addEventListener("click", () => void changeScreenSize(false));
+  ui.sizeReset.addEventListener("click", () => void changeScreenSize(true));
+  // The FAB is the one primary action; the resolution pair is device setup and
+  // belongs on a quieter second row, not competing for the same line.
+  ui.secondary.append(ui.sizeSet, ui.sizeReset);
+  ui.actions.append(ui.fab, ui.secondary);
 
   ui.pages.run = buildRunPage();
   ui.pages.stats = buildStatsPage();
@@ -340,6 +355,26 @@ async function disconnectNow() {
   render();
 }
 
+let sizeBusy = false;
+
+/** `wm size` over the framework's own adb channel. Both directions live here
+    because the phone has to be told twice a session at most. The command
+    re-reads the panel afterwards, so a status poll picks up the new size and
+    the stage badge updates itself. */
+async function changeScreenSize(reset: boolean) {
+  state.error = "";
+  sizeBusy = true;
+  render();
+  try {
+    await api.setScreenSize(reset);
+    state.status = await api.status();
+  } catch (err) {
+    state.error = String(err);
+  }
+  sizeBusy = false;
+  render();
+}
+
 /** The start/stop button is a fixture of the run page, not a reward for
     connecting: it stays put and goes inert until a device is ready, so the
     layout does not jump when the first connection lands. */
@@ -353,6 +388,8 @@ function renderActions() {
   ui.fab.setAttribute("label", running ? "停止" : "开始战斗");
   const icon = ui.fab.querySelector("md-icon");
   if (icon) icon.textContent = running ? "stop" : "play_arrow";
+
+  for (const button of [ui.sizeSet, ui.sizeReset]) button.toggleAttribute("disabled", !connected || sizeBusy);
 
   // Swap text in place: rebuilding the button on every 4 Hz render flickered.
   setLabel(ui.link, "state", stateLabels[phase]);
@@ -437,7 +474,9 @@ function renderStage() {
   swapFrameSrc(frame.dataUrl);
   ui.badge.textContent = `${frame.width}×${frame.height}`;
   ui.badge.classList.toggle("warn", !frame.landscape);
+  ui.panel.textContent = state.status.panel;
   const children: HTMLElement[] = [ui.frameImg, ui.badge];
+  if (state.status.panel) children.push(ui.panel);
   if (!frame.landscape) children.push(el("div", { class: "void", text: "设备处于竖屏，游戏不在前台" }));
   // In portrait the events on screen came from a landscape frame, so their
   // boxes land anywhere but where the button actually is.
