@@ -7,7 +7,7 @@
 卡底和人物图分存在 `ui.sc` 的不同符号里。脚本将两者的网格映射到同一画布，
 按顶点与 UV 直接绘制成卡牌：
 普通兵用 `unit_slot` 图层 1，编号 100 起的活动兵用图层 2；`icon_unit_elite_*` 超级兵
-暂沿用 `capacity_slot` 的红底图层 1。英雄用 `hero_slot` 图层 2，法术用 `spell_slot` 图层 1。
+用图层 3，并应用该图层在 SC 中记录的红色变换。英雄用 `hero_slot` 图层 2，法术用 `spell_slot` 图层 1。
 数量、等级及卡底 alpha 低于 50% 的边角填成纯绿，供 MAAFW 的
 `green_mask` 跳过。
 每类卡牌共用一套遮罩位置；咏王另遮住右下角的模式切换开关。
@@ -66,8 +66,8 @@ scripts/refresh-cards/export_cards.py var/coc-unpack/sc/ui.sc --out /tmp/cards
 三个数组中追加卡牌及其 SC 符号，不扫描旧模板目录，也不导出建筑大师卡牌。
 Soldier 文件名沿用原模板编号（如 `0_Barbarian.png`、`13_ElectroDragon.png`），
 超级兵仍用原来的无编号名称，方便在文件夹中浏览。
-输出倍率由 `export_cards.py` 顶部的 `SOLDIER_CARD_SCALE`、
-`HERO_SPELL_CARD_SCALE` 和 `SUPER_CARD_SCALE` 分别控制。缩放后宽高上限为 1000 像素。
+输出倍率由 `export_cards.py` 顶部的 `CARD_SCALE` 控制。
+缩放后宽高上限为 1000 像素。
 卡面按各类 slot 的固定位置映射到卡底；英雄肖像使用统一的 SC 画布范围保留留白。
 需要按 720 高的实机战斗画面对比倍率时，修改对应常量后重新导出。
 卡牌用尽后会变灰，三个 `Find*` 节点均使用反向 `TM_SQDIFF_NORMED`
@@ -117,7 +117,7 @@ scripts/refresh-cards/scframes.py var/coc-unpack/sc/ui.sc --textures-out var/coc
 网页上的各图层动画独立循环，不对齐根对象的时间轴。动画各帧共用一张固定大小的画布。
 使用 `.sc` 记录的帧率；`--max-size` 同样控制画布宽高上限。
 相邻画面相同时，编码器可能合并帧，但会保留总播放时长。渲染会应用子对象的 2D 矩阵；
-嵌套 MovieClip 从首次出现时开始计帧，文本、颜色变换和裁剪遮罩尚未还原。
+嵌套 MovieClip 从首次出现时开始计帧，实例的颜色变换会随层级叠加；文本和裁剪遮罩尚未还原。
 `--textures-out` 导出 TextureSets 的各纹理页原尺寸 PNG（`page-000.png` 等），
 并生成 `textures.html` 浏览页。每页按 TextureSets 页号读取，优先使用 highres 槽。
 

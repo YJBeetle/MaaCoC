@@ -19,6 +19,7 @@ from PIL import Image, ImageChops, ImageDraw
 IDENTITY = (1.0, 0.0, 0.0, 1.0, 0.0, 0.0)
 UV_SCALE = 65536.0
 PIXELS_PER_UNIT = 1.0
+IDENTITY_COLOR = (255, 255, 255, 255, 0, 0, 0)
 
 
 def compose(parent, child):
@@ -28,6 +29,13 @@ def compose(parent, child):
     return (a * e + c * f, b * e + d * f,
             a * g + c * h, b * g + d * h,
             a * ux + c * uy + tx, b * ux + d * uy + ty)
+
+
+def compose_color(parent, child):
+    """子对象先着色，再应用父对象的乘法色与加法色。"""
+    return (tuple(parent[i] * child[i] / 255 for i in range(4)) +
+            tuple(parent[i] * child[4 + i] / 255 + parent[4 + i]
+                  for i in range(3)))
 
 
 def preview_header(title):
@@ -108,6 +116,8 @@ class Renderer:
         self.frame_elements = resources.b
         self.banks = resources.tables(6)
         self.matrix_cache = {}
+        self.color_cache = {}
+        self.color_luts = {}
         self.clip_elements_cache = {}
         self.clip_frame_cache = {}
         self.clip_appearance_cache = {}
@@ -128,6 +138,32 @@ class Renderer:
             self.matrix_cache[key] = struct.unpack_from(
                 "<6f", bank.b, start + matrix_index * 24)
         return self.matrix_cache[key]
+
+    def color(self, bank_index, color_index):
+        if color_index == 0xFFFF:
+            return IDENTITY_COLOR
+        key = (bank_index, color_index)
+        if key not in self.color_cache:
+            if bank_index >= len(self.banks):
+                raise ValueError(f"颜色组 {bank_index} 越界")
+            bank = self.banks[bank_index]
+            count, start = bank.vec(1, 7)
+            if color_index >= count:
+                raise ValueError(f"颜色变换 {bank_index}:{color_index} 越界")
+            self.color_cache[key] = tuple(
+                bank.b[start + 7 * color_index:start + 7 * (color_index + 1)])
+        return self.color_cache[key]
+
+    def apply_color(self, image, color):
+        if color == IDENTITY_COLOR:
+            return image
+        if color not in self.color_luts:
+            self.color_luts[color] = tuple(
+                [max(0, min(255, round(value * color[i] / 255 +
+                                       (color[4 + i] if i < 3 else 0))))
+                 for value in range(256)] for i in range(4))
+        return Image.merge("RGBA", [channel.point(lut) for channel, lut in
+                                    zip(image.split(), self.color_luts[color])])
 
     def page(self, index):
         if index not in self.pages:
@@ -219,9 +255,10 @@ class Renderer:
         child_at = clip.struct_pos(5, 2)[layer_index]
         child_id = struct.unpack_from("<H", clip.b, child_at)[0]
         bank = clip.scalar(10)
-        for _, matrix_index, _color in elements:
+        for _, matrix_index, color_index in elements:
             transform = self.matrix(bank, matrix_index)
-            yield from self.meshes(child_id, transform, frame=frame)
+            yield from self.meshes(child_id, transform, frame=frame,
+                                   color=self.color(bank, color_index))
 
     def layer_span(self, obj_id, layer_index, child_id):
         """按独立图层的父层变化和自身动画求有效帧数与画布边界。"""
@@ -245,7 +282,7 @@ class Renderer:
         return last_change + 1, bounds
 
     def meshes(self, obj_id, transform=IDENTITY, stack=frozenset(), frame=0,
-               layer=None):
+               layer=None, color=IDENTITY_COLOR):
         """按帧取网格；layer 只保留根 MovieClip 的指定子对象。"""
         if obj_id in stack:
             return
@@ -260,22 +297,23 @@ class Renderer:
                 for x, y, u, v in self.sc.vertices(start, count):
                     points.append((a * x + c * y + tx, b * x + d * y + ty,
                                    u / UV_SCALE * w, v / UV_SCALE * h))
-                yield page, points
+                yield page, points, color
         for clip in self.sc.clips_by_id.get(obj_id, ()):
             children = [struct.unpack_from("<H", clip.b, p)[0]
                         for p in clip.struct_pos(5, 2)]
             bank = clip.scalar(10)
             appearances = self.clip_appearances(clip) if frame else None
-            for child_index, matrix_index, _color in self.clip_elements(clip, frame):
+            for child_index, matrix_index, color_index in self.clip_elements(clip, frame):
                 if child_index >= len(children):
                     raise ValueError(f"MovieClip {obj_id} 的子对象下标越界")
                 if layer is not None and child_index != layer:
                     continue
                 child_transform = compose(transform, self.matrix(bank, matrix_index))
+                child_color = compose_color(color, self.color(bank, color_index))
                 child_frame = (max(0, frame - appearances[child_index][0])
                                if appearances else 0)
                 yield from self.meshes(children[child_index], child_transform,
-                                       stack, child_frame)
+                                       stack, child_frame, color=child_color)
 
     def render(self, obj_id, max_size=1000, frame=0, bounds=None, layer=None,
                solo=False):
@@ -299,7 +337,7 @@ class Renderer:
         canvas = Image.new("RGBA", size)
         self.draw_meshes(canvas, meshes, bounds,
                          scale=(effective_scale, effective_scale))
-        return canvas, natural, sorted({page for page, _ in meshes})
+        return canvas, natural, sorted({page for page, _, _ in meshes})
 
     def draw_meshes(self, canvas, meshes, bounds, scale=None, clip_box=None):
         """把网格直接绘制到已有画布；可限制绘制区域。"""
@@ -313,7 +351,7 @@ class Renderer:
             clip_top = max(0, math.floor((clip_box[1] - min_y) * scale_y))
             clip_right = min(canvas.width, math.ceil((clip_box[2] - min_x) * scale_x))
             clip_bottom = min(canvas.height, math.ceil((clip_box[3] - min_y) * scale_y))
-        for page, points in meshes:
+        for page, points, color in meshes:
             texture = self.page(page)
             projected = [((p[0] - min_x) * scale_x,
                           (p[1] - min_y) * scale_y) for p in points]
@@ -361,12 +399,13 @@ class Renderer:
                 # 同一网格的相邻三角形共用边，边上的像素只能写一次。
                 # 逐三角形 alpha_composite 会把半透明像素叠加两遍，形成对角线。
                 mesh_layer.paste(tile, (left - mesh_left, top - mesh_top), mask)
-            canvas.alpha_composite(mesh_layer, (mesh_left, mesh_top))
+            canvas.alpha_composite(self.apply_color(mesh_layer, color),
+                                   (mesh_left, mesh_top))
 
     @staticmethod
     def bounds(meshes, obj_id):
-        xs = [point[0] for _, points in meshes for point in points]
-        ys = [point[1] for _, points in meshes for point in points]
+        xs = [point[0] for _, points, _ in meshes for point in points]
+        ys = [point[1] for _, points, _ in meshes for point in points]
         if not all(math.isfinite(v) for v in xs + ys):
             raise ValueError(f"对象 {obj_id} 的顶点坐标无效")
         return min(xs), min(ys), max(xs), max(ys)

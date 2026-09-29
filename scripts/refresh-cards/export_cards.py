@@ -82,14 +82,10 @@ SOLDIER_CARDS = (
     CardSpec("111_IceMinion", "icon_unit_ice_minion", background_layer=2),
     CardSpec("112_Lavaloon", "icon_unit_lavaloon", background_layer=2),
     CardSpec("113_Barcher", "icon_unit_barcher", background_layer=2),
-    CardSpec("SuperBalloon", "icon_unit_elite_balloon", background_layer=1,
-             background_symbol="capacity_slot"),
-    CardSpec("SuperDragon", "icon_unit_elite_dragon", background_layer=1,
-             background_symbol="capacity_slot"),
-    CardSpec("SuperMiner", "icon_unit_elite_miner", background_layer=1,
-             background_symbol="capacity_slot"),
-    CardSpec("SuperWitch", "icon_unit_elite_witch", background_layer=1,
-             background_symbol="capacity_slot"),
+    CardSpec("SuperBalloon", "icon_unit_elite_balloon", background_layer=3),
+    CardSpec("SuperDragon", "icon_unit_elite_dragon", background_layer=3),
+    CardSpec("SuperMiner", "icon_unit_elite_miner", background_layer=3),
+    CardSpec("SuperWitch", "icon_unit_elite_witch", background_layer=3),
 )
 
 HERO_CARDS = (
@@ -109,7 +105,6 @@ SPELL_CARDS = (
 SOLDIER_FACE_BOX = (3.5, 24.4, 78.5, 99)
 HERO_FACE_BOX = (2.5, -4, 76.5, 98)
 SPELL_FACE_BOX = (2.5, 24.4, 77, 99)
-SUPER_FACE_BOX = (3, 22, 68, 91)
 # 英雄肖像的可见网格略有差异，但共享同一个 166×225 的 SC 画布。
 HERO_ICON_BOUNDS = (-83, -144.5, 83, 80.5)
 # 数量、等级等动态内容由 MAAFW 的 green_mask 跳过。
@@ -124,10 +119,7 @@ CARD_GROUPS = (
 GREEN = (0, 255, 0, 255)
 MAX_SIZE = 1000
 # 根据设备截图缩至 720 高后的实测卡牌尺寸区分卡底倍率。
-SOLDIER_CARD_SCALE = 1.69 * 720 / 1080
-HERO_SPELL_CARD_SCALE = 1.69 * 720 / 1080
-# 旧的 capacity_slot or attack_confirm_troop 约 71×94，超级兵暂沿用它的红底并校正到相近的输出尺寸。
-SUPER_CARD_SCALE = 1.25
+CARD_SCALE = 1.69 * 720 / 1080
 
 
 def scaled_box(box, size):
@@ -161,8 +153,8 @@ def fit_face_meshes(meshes, face_bounds, canvas_bounds, face_box):
     target_center_y = canvas_bounds[1] + (top + bottom) / 2
     fitted = [(page, [(target_center_x + (x - source_center_x) * factor,
                        target_center_y + (y - source_center_y) * factor, u, v)
-                      for x, y, u, v in points])
-              for page, points in meshes]
+                      for x, y, u, v in points], color)
+              for page, points, color in meshes]
     clip_box = (canvas_bounds[0] + left, canvas_bounds[1] + top,
                 canvas_bounds[0] + right, canvas_bounds[1] + bottom)
     return fitted, clip_box
@@ -235,14 +227,9 @@ def render_cards(sc, out):
                 elif group == "Hero":
                     face_bounds = HERO_ICON_BOUNDS
                 layer_meshes, bounds = backgrounds[key]
-                is_super = selected_background == "capacity_slot"
-                scale = (SUPER_CARD_SCALE if is_super else
-                         SOLDIER_CARD_SCALE if group == "Soldier" else
-                         HERO_SPELL_CARD_SCALE)
                 image = compose_card(renderer, layer_meshes, bounds, face_meshes,
-                                     face_bounds, scale,
-                                     SUPER_FACE_BOX if is_super else face_box,
-                                     masks + card.extra_masks)
+                                     face_bounds, CARD_SCALE,
+                                     face_box, masks + card.extra_masks)
                 image.save(group_stage / f"{card.name}.png")
         for group, cards, *_ in CARD_GROUPS:
             target = out / group
