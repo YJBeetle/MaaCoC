@@ -234,4 +234,13 @@ impl Runner {
         let image = controller.cached_image()?;
         image.to_vec().ok_or_else(|| "截图缓冲区为空".into())
     }
+
+    /// Run a shell command through the framework's own adb channel and return
+    /// whatever it printed. Going through MAA rather than spawning a second adb
+    /// client keeps one connection and one set of sockets on the device.
+    pub fn shell(&self, cmd: &str) -> Result<String> {
+        let controller = self.controller.as_ref().ok_or("当前无设备，无法执行命令")?;
+        check(controller.wait(controller.post_shell(cmd, 10_000)?), "执行命令")?;
+        Ok(controller.shell_output()?)
+    }
 }

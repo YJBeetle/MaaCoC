@@ -14,6 +14,11 @@ pub use runner::{DeviceTarget, Runner};
 /// is authored there. Never switch the controller to raw screenshots.
 pub const MATCH_SIZE: (u32, u32) = (1280, 720);
 
+/// The phone's logical size to set with `wm size`: landscape 1920x1080 is the
+/// only 16:9 panel that downscales to MATCH_SIZE exactly. Taller stock sizes
+/// (20:9 → 1600x720) leave the game letterboxed inside the frame.
+pub const DEVICE_MATCH_SIZE: &str = "1080x1920";
+
 /// Where MaaFramework writes its own log file. Left unset it writes to
 /// `./debug`, which is neither writable nor findable from a bundled app.
 pub fn set_log_dir(dir: &std::path::Path) -> Result<()> {

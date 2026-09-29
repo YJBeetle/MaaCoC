@@ -30,6 +30,7 @@ fn usage() {
 
   devices                        列出 ADB 设备
   snap [输出.png]                 截一帧，报告设备与匹配空间尺寸
+  shell <命令...>                 通过 MaaFramework 在设备上执行 adb shell 命令
   load [assets]                  加载资源并列出节点
   run [--minutes N] [--entry E]  跑自动战斗循环并打印节点时间轴
   reco <节点> <帧.png> [阈值]     在一张静态帧上试跑该节点的识别
@@ -58,6 +59,7 @@ fn run() -> Result<(), Error> {
     match args.first().map(String::as_str) {
         Some("devices") => devices(),
         Some("snap") => snap(assets, args.get(1).map(String::as_str), preferred.as_deref()),
+        Some("shell") => shell(assets, &args[1..], preferred.as_deref()),
         Some("load") => load(assets),
         Some("run") => battle(assets, &args, preferred.as_deref()),
         Some("reco") => reco(assets, &args),
@@ -101,6 +103,15 @@ fn snap(assets: &Path, output: Option<&str>, preferred: Option<&str>) -> Result<
         target,
         png.len()
     );
+    Ok(())
+}
+
+fn shell(assets: &Path, cmd: &[String], preferred: Option<&str>) -> Result<(), Error> {
+    if cmd.is_empty() {
+        return Err("缺少要执行的命令".into());
+    }
+    let runner = Runner::connect(assets, DeviceTarget::Adb, preferred)?;
+    println!("{}", runner.shell(&cmd.join(" "))?.trim_end());
     Ok(())
 }
 
