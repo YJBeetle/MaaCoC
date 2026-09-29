@@ -340,16 +340,16 @@ async function disconnectNow() {
   render();
 }
 
-/** MD3 keeps exactly one primary action per view, and a FAB is never shown
-    disabled — so before a device is connected the connect button *is* the
-    primary action (Filled) and there is no FAB at all; afterwards the extended
-    FAB takes that role and connecting/dropping becomes a text button. */
+/** The start/stop button is a fixture of the run page, not a reward for
+    connecting: it stays put and goes inert until a device is ready, so the
+    layout does not jump when the first connection lands. */
 function renderActions() {
   const phase = state.status.phase;
   const connected = phase === "ready" || phase === "running";
   const running = phase === "running";
 
-  ui.fab.hidden = !connected;
+  if (connected) ui.fab.removeAttribute("aria-disabled");
+  else ui.fab.setAttribute("aria-disabled", "true");
   ui.fab.setAttribute("label", running ? "停止" : "开始战斗");
   const icon = ui.fab.querySelector("md-icon");
   if (icon) icon.textContent = running ? "stop" : "play_arrow";

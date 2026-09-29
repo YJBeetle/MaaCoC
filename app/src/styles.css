@@ -112,8 +112,15 @@ body { overflow: hidden; user-select: none; }
 /* In flow at the bottom of the left column, not floating: a fixed overlay was
    sitting on top of the node log. */
 .actions { flex: none; display: flex; align-items: center; gap: 12px; }
-/* MWC hosts set their own display, so [hidden] needs an explicit override. */
-.actions [hidden] { display: none; }
+/* md-fab ships no disabled state, so the inert look is ours: MD3's disabled
+   palette over the primary variant, and no pointer events to act on. */
+#fab[aria-disabled="true"] {
+  pointer-events: none;
+  box-shadow: none;
+  --md-fab-primary-container-color: color-mix(in srgb, var(--md-sys-color-on-surface) 12%, transparent);
+  --md-fab-primary-icon-color: color-mix(in srgb, var(--md-sys-color-on-surface) 38%, transparent);
+  --md-fab-primary-label-text-color: color-mix(in srgb, var(--md-sys-color-on-surface) 38%, transparent);
+}
 
 .sect { padding: 14px 18px 4px; font-size: 11.5px; letter-spacing: .5px; color: var(--md-sys-color-primary); }
 .field { display: flex; align-items: center; justify-content: space-between; gap: 16px; padding: 12px 18px; border-bottom: 1px solid var(--md-sys-color-outline-variant); }
