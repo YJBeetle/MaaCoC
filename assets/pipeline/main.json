@@ -117,7 +117,7 @@
     "FindVehicle": {
         "focus": "FindVehicle!",
         "recognition": "TemplateMatch",
-        "template": "Vehicle",
+        "template": "Cards/Vehicle",
         "green_mask": true,
         "roi": [46,584,1191,135],
         "threshold": 0.95,
