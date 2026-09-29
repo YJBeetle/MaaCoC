@@ -315,10 +315,22 @@ class Renderer:
             clip_bottom = min(canvas.height, math.ceil((clip_box[3] - min_y) * scale_y))
         for page, points in meshes:
             texture = self.page(page)
+            projected = [((p[0] - min_x) * scale_x,
+                          (p[1] - min_y) * scale_y) for p in points]
+            mesh_left = max(0, math.floor(min(x for x, _ in projected)))
+            mesh_top = max(0, math.floor(min(y for _, y in projected)))
+            mesh_right = min(canvas.width, math.ceil(max(x for x, _ in projected)))
+            mesh_bottom = min(canvas.height, math.ceil(max(y for _, y in projected)))
+            if clip_box is not None:
+                mesh_left, mesh_top = max(mesh_left, clip_left), max(mesh_top, clip_top)
+                mesh_right, mesh_bottom = min(mesh_right, clip_right), min(mesh_bottom, clip_bottom)
+            if mesh_right <= mesh_left or mesh_bottom <= mesh_top:
+                continue
+            mesh_layer = Image.new("RGBA", (mesh_right - mesh_left,
+                                             mesh_bottom - mesh_top))
             for i in range(len(points) - 2):
                 triangle = points[i:i + 3]
-                dest = [((p[0] - min_x) * scale_x,
-                         (p[1] - min_y) * scale_y) for p in triangle]
+                dest = projected[i:i + 3]
                 source = [(p[2], p[3]) for p in triangle]
                 (x0, y0), (x1, y1), (x2, y2) = dest
                 dx1, dy1, dx2, dy2 = x1 - x0, y1 - y0, x2 - x0, y2 - y0
@@ -332,13 +344,10 @@ class Renderer:
                 vb = (dx1 * (v2 - v0) - dx2 * (v1 - v0)) / determinant
                 uc = u0 - ua * x0 - ub * y0
                 vc = v0 - va * x0 - vb * y0
-                left = max(0, math.floor(min(p[0] for p in dest)))
-                top = max(0, math.floor(min(p[1] for p in dest)))
-                right = min(canvas.width, math.ceil(max(p[0] for p in dest)))
-                bottom = min(canvas.height, math.ceil(max(p[1] for p in dest)))
-                if clip_box is not None:
-                    left, top = max(left, clip_left), max(top, clip_top)
-                    right, bottom = min(right, clip_right), min(bottom, clip_bottom)
+                left = max(mesh_left, math.floor(min(p[0] for p in dest)))
+                top = max(mesh_top, math.floor(min(p[1] for p in dest)))
+                right = min(mesh_right, math.ceil(max(p[0] for p in dest)))
+                bottom = min(mesh_bottom, math.ceil(max(p[1] for p in dest)))
                 if right <= left or bottom <= top:
                     continue
                 region_size = (right - left, bottom - top)
@@ -349,8 +358,10 @@ class Renderer:
                 mask = Image.new("L", region_size)
                 ImageDraw.Draw(mask).polygon(
                     [(x - left, y - top) for x, y in dest], fill=255)
-                tile.putalpha(ImageChops.multiply(tile.getchannel("A"), mask))
-                canvas.alpha_composite(tile, (left, top))
+                # 同一网格的相邻三角形共用边，边上的像素只能写一次。
+                # 逐三角形 alpha_composite 会把半透明像素叠加两遍，形成对角线。
+                mesh_layer.paste(tile, (left - mesh_left, top - mesh_top), mask)
+            canvas.alpha_composite(mesh_layer, (mesh_left, mesh_top))
 
     @staticmethod
     def bounds(meshes, obj_id):
