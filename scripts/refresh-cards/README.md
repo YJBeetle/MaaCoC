@@ -1,12 +1,15 @@
 # 更新卡面
 
-游戏更新后，从游戏自己的文件里重新导出战斗条卡牌的卡面图，不用手工截图、不用手工裁。
+游戏更新后，从 `.sc` 重新合成家乡战斗条的 Soldier、Hero、Spell 卡牌模板。
 
 ## 为什么需要工具
 
-卡面不是独立图片。CoC 的卡面是 `assets/sc/ui.sc` 里图集页上的一块矩形，而且**游戏不存这块矩形** ——
-它存的是矢量形状：符号名 → 对象 → 绘制命令 → 顶点，每个顶点带一对 16 位归一化 uv 坐标，
-卡面矩形是这些 uv 的包围盒乘上页尺寸算出来的。所以想要卡面，必须复现引擎这套推导。
+卡底和人物图分存在 `ui.sc` 的不同符号里。脚本按顶点与 UV 渲染卡面，再放进对应的卡底：
+普通兵与超级兵用 `capacity_slot` 的图层 0/1，英雄用 `capacity_slot_hero_locked` 的图层 0，法术用
+`capacity_slot_spell`。数量、等级及卡底 alpha 低于 50% 的边角填成纯绿，供 MAAFW 的
+`green_mask` 跳过。
+每类卡牌共用一套遮罩位置；咏王另遮住右下角的模式切换开关。
+兵种图标按 SC 顶点所在的方形画布定位；可见网格缺少一侧时保留透明留白，避免拉伸后偏移。
 
 `.sc` 的结构（v6 容器）：
 
@@ -23,7 +26,7 @@ FlatBuffers，3043 条符号元数据在其中；zstd 帧从偏移 `196488` 开�
 
 推导链：`FBExports` 给出「符号名 ↔ 对象 id」，id 解析到 `FBShape` 的绘制命令
 `{页号, 顶点数, 起始顶点下标}`，再回 `FBResources.shape_points` 取顶点
-`{float x, float y, u16 u, u16 v}`，uv 包围盒 ÷ 65536 × 页宽高就是像素矩形。
+`{float x, float y, u16 u, u16 v}`；顶点的 `(x, y)` 决定画布位置，UV 决定纹理采样。
 
 这套格式有公开参考实现（`sc-workshop/SupercellFlash`、`danila-schelkov/supercell-swf`），
 schema 直接可用，不需要逆向。
@@ -31,7 +34,7 @@ schema 直接可用，不需要逆向。
 ## 准备环境
 
 ```bash
-pip install pillow numpy zstandard texture2ddecoder
+pip install pillow zstandard texture2ddecoder
 ```
 
 ## 拉取文件
@@ -48,25 +51,37 @@ adb pull "$(adb shell pm path com.supercell.clashofclans | tr -d '\r' | sed 's/^
 unzip -o -j var/coc-unpack/apk/split_install_time_asset_pack.apk assets/sc/ui.sc -d var/coc-unpack/sc
 ```
 
-## 导出全部卡面
+## 合成卡牌模板
 
 ```bash
-scripts/refresh-cards/export_cards.py var/coc-unpack/sc/ui.sc
+scripts/refresh-cards/export_cards.py var/coc-unpack/sc/ui.sc --scale 1.2
+scripts/refresh-cards/export_cards.py var/coc-unpack/sc/ui.sc --out /tmp/cards --scale 2
 ```
 
-约 2 秒，输出 `assets/image/cards/<符号名>.png`，当前共 236 张。
-两个仅大小写不同的符号在大小写不敏感的文件系统上会冲突，脚本会给它们加稳定后缀。
-卡牌类型和卡牌背景由后续维护的「卡牌 ↔ SC 符号名」对应表决定，这里只按符号名导出图片。
+默认输出到 `assets/image/Cards/{Soldier,Hero,Spell}/<卡牌名>.png`，与旧模板目录分开；
+流水线中的 `FindSoldier`、`FindHero`、`FindSpell` 从这三个目录读取模板。
+当前内置 47 张 Soldier、5 张 Hero、2 张 Spell 的元数据；以后可在 `export_cards.py` 的
+三个数组中追加卡牌及其 SC 符号，不扫描旧模板目录，也不导出建筑大师卡牌。
+Soldier 文件名沿用原模板编号（如 `0_Barbarian.png`、`13_ElectroDragon.png`），
+超级兵仍用原来的无编号名称，方便在文件夹中浏览。
+`--scale` 将整张卡统一缩放，默认 1；缩放后宽高上限为 1000 像素。
+英雄卡底的 SC 原始画布较大，先乘 `7/8` 的尺寸校正，再应用 `--scale`。
+英雄肖像在卡底内向上移动 5 个 SC 画布像素；卡底位置和透明边角的裁切方式不变。
+当前生成的模板按 `--scale 1.2` 生成；此比例已用 1280×720 的实机战斗画面核对。
+卡牌用尽后会变灰，三个 `Find*` 节点均使用反向 `TM_SQDIFF_NORMED`
+（`method: 10001`），按像素差异区分彩色可用卡和灰卡。
+实机截图核对后的阈值为兵种 `0.8`、英雄 `0.85`、法术 `0.85`。
 
 常用参数：
 
 | 参数 | 作用 |
 |---|---|
-| `--prefix icon_unit_` | 只要某类前缀，可重复（默认 `icon_unit_` 和 `icon_spell_`） |
-| `--out /tmp/cards` | 换输出目录，不碰仓库里的 |
+| `--scale 2` | 将卡底、卡面和绿块一起放大 2 倍 |
+| `--out /tmp/cards` | 将三类模板写到独立输出根目录 |
 
-导出的 PNG **不入库**，随时可以重新生成。重复导出会覆盖同名文件，
-但不会自动删除输出目录里本次未生成的旧 PNG。
+重复导出会覆盖同名文件，但不会自动删除输出目录里本次未生成的旧 PNG。
+发布资源包前应检查这三个目录是否包含最新模板；`--out /tmp/cards` 只用于单独预览，
+不会更新流水线正在使用的模板。
 
 ## 查看通用 SC 的推导结果
 
@@ -106,33 +121,10 @@ scripts/refresh-cards/scframes.py var/coc-unpack/sc/ui.sc --textures-out var/coc
 
 ## 验收要看什么
 
-1. 输出里没有「裁不出 N 个」这一行。
-2. 缩略图扫一遍有没有倒置、镜像或裁错。图集里有 80 张图块原本带旋转或镜像，
-   导出时会自动校正朝向。
+1. 检查新模板中的卡面、卡底是否对齐，普通兵为蓝底、超级兵为红底。
+2. 检查数量、等级以及卡底 alpha 低于 50% 的边角是否为纯 `(0,255,0)`。
+3. 按 MAAFW 的 720 高度匹配实际画面，调整 `--scale` 并验证 TemplateMatch 分数。
 
-## 朝向为什么不能用简单规则
-
-图块在图集里可能是 8 种存法之一（二面体群 D4）。判法是：把**每条绘制命令**自己的顶点
-从局部 `(x,y)` 拟合到页内像素 `(u,v)`（**必须带常数项**，因为局部原点在形状中心而 uv 原点在页角），
-取线性部分 K，再选让 `O·K` 成为「正数倍单位阵」的那个 O。残差是精确几何量，正常都在 1e-4 量级。
-
-两个踩过的坑：
-
-- 只区分「转 90 度 / 没转」不够 —— 有 8 张的 K 是 `diag(1,-1)`，那是**镜像**不是旋转，
-  必须把 flip 也放进候选集。
-- 朝向必须按命令单独算。一个卡面 MovieClip 的孩子混着遮罩、脸和背景块，各有各的局部坐标系，
-  混在一起拟合会互相污染。
-
-## 已知没解决的
-
-- **中文名**。`assets/localization/{cn,cnt,de,...,texts}.csv` 23 个语言文件确实在 APK 里，
-  但和 `assets/logic/*.csv` 同一套加密（整体熵 7.999 bits/byte，头部 `5d 00 00 04 00` + u32 明文长度，
-  zstd/zlib/lzma/bz2 都解不开），拿不到明文，需要人工维护。`assets.scdb` 是明文 SQLite，
-  但 `tags` 列 6,890 行全空，指望不上。
-- **导出的卡面是干净的脸，不含卡框**。现有 `assets/image/Soldier/` 那 48 张模板是「脸 + 外框 +
-  数量角标 + 等级角标」合成后的屏幕截图裁片，所以拿导出图和它做像素比对**必然有差**，
-  这个差不能用来判对错 —— 真正的判据只有流水线的 TemplateMatch 分数。
-- **绿块还没打**。`green_mask` 用的纯 `(0,255,0)` 角标遮罩需要后处理时加，
-  从现有 26 张模板反推的相对比例中位数是 `(左 0.047, 上 0.656, 宽 0.295, 高 0.261)`，分量范围都很窄。
-- **`assets/image/Soldier/` 那 48 张模板还是老的手起名**，且没有绿块。要让流水线用这批官方
-  命名的图，得先定后处理规则（统一尺寸、装框方式、绿块位置），再把模板迁成符号名。
+卡面位置和动态区域目前按 `ui.sc` 这份样本及现有模板确定；游戏更新后如果卡底布局改变，
+需复查 `export_cards.py` 中的 `*_FACE_BOX` 与 `*_MASKS`。卡牌名与 SC 符号的对应关系
+由脚本内元数据人工维护。
