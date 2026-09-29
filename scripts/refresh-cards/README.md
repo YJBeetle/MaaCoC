@@ -63,10 +63,10 @@ scripts/refresh-cards/export_cards.py var/coc-unpack/sc/ui.sc --out /tmp/cards
 
 默认输出到 `assets/image/Cards/{Unit,Hero,Spell,Siege}/<卡牌名>.png`，与旧模板目录分开；
 流水线中的 `FindUnit`、`FindHero`、`FindSpell`、`FindSiege` 从这四个目录读取模板。
-当前内置 47 张 Unit、5 张 Hero、2 张 Spell、3 张 Siege 的元数据；以后可在 `export_cards.py` 的
+当前内置 63 张 Unit、5 张 Hero、18 张 Spell、9 张 Siege 的元数据；以后可在 `export_cards.py` 的
 对应数组中追加卡牌及其 SC 符号，不扫描旧模板目录，也不导出建筑大师卡牌。
 Unit 文件名沿用原模板编号（如 `0_Barbarian.png`、`13_ElectroDragon.png`），
-超级兵仍用原来的无编号名称，方便在文件夹中浏览。
+超级兵仍用无编号名称；战车使用游戏中的英文名称，方便在文件夹中浏览。
 输出倍率由 `export_cards.py` 顶部的 `CARD_SCALE` 控制。
 缩放后宽高上限为 1000 像素。
 卡面按各类 slot 的固定位置映射到卡底；英雄肖像使用统一的 SC 画布范围保留留白。
