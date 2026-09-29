@@ -3,7 +3,7 @@
 
     python3 scripts/refresh-cards/export_cards.py var/coc-unpack/sc/ui.sc
 
-产出 assets/image/Cards/{Unit,Hero,Spell}/<卡牌名>.png。
+产出 assets/image/Cards/{Unit,Hero,Spell,Siege}/<卡牌名>.png。
 """
 
 from __future__ import annotations
@@ -87,13 +87,12 @@ UNIT_CARDS = (
     CardSpec("SuperMiner", "icon_unit_elite_miner", background_layer=3),
     CardSpec("SuperWitch", "icon_unit_elite_witch", background_layer=3),
 )
-
 HERO_CARDS = (
     CardSpec("King", "icon_hero_barbarianKing"),
     CardSpec("Queen", "icon_hero_archerQueen"),
     # 咏王右下角的飞行/地面模式切换开关是其他英雄没有的动态区域。
     CardSpec("Warden", "icon_hero_grandwarden",
-             extra_masks=((0.39, 0.67, 1.0, 0.96),)),
+             extra_masks=((0.4, 0.67, 0.96, 0.93),)),
     CardSpec("Prince", "icon_hero_minionprince"),
     CardSpec("Mars", "icon_hero_warriorPrincess"),
 )
@@ -101,24 +100,36 @@ SPELL_CARDS = (
     CardSpec("SpellRage", "icon_spell_rage"),
     CardSpec("SpellSpeed", "icon_spell_speedup"),
 )
+SIEGE_CARDS = (
+    CardSpec("Balloon", "icon_unit_siege_machine_balloon", image_layer=1),
+    CardSpec("LogRoller", "icon_unit_siege_machine_LogLauncher", image_layer=0),
+    CardSpec("Trebuchet", "icon_unit_siege_machine_catapult", image_layer=0),
+)
 # 卡面在各自卡底的原始 SC 画布中的位置。普通卡面约为 83×83，英雄为 83×113。
 UNIT_FACE_BOX = (3.5, 24.4, 78.5, 99)
 HERO_FACE_BOX = (2.5, -4, 76.5, 98)
 SPELL_FACE_BOX = (2.5, 24.4, 77, 99)
+# 攻城机器肖像在卡底里比普通兵高 16 个 SC 单位。
+SIEGE_FACE_BOX = (3.5, 8.4, 78.5, 83)
 # 英雄肖像的可见网格略有差异，但共享同一个 166×225 的 SC 画布。
 HERO_ICON_BOUNDS = (-83, -144.5, 83, 80.5)
 # 数量、等级等动态内容由 MAAFW 的 green_mask 跳过。
 UNIT_MASKS = ((0.39, 0.03, 0.95, 0.2), (0.06, 0.68, 0.4, 0.91))
 HERO_MASKS = ((0.03, 0.06, 0.43, 0.36), (0.05, 0.68, 0.38, 0.93))
 SPELL_MASKS = ((0.39, 0.03, 0.95, 0.21), (0.05, 0.68, 0.38, 0.91))
+# 所有攻城机器共用感叹号、等级和底部状态按钮的遮罩。
+SIEGE_MASKS = ((0.39, 0.1, 0.61, 0.60),
+               (0.05, 0.68, 0.38, 0.93),
+               (0.4, 0.67, 0.96, 0.93))
 CARD_GROUPS = (
     ("Unit", UNIT_CARDS, "unit_slot", 1, UNIT_FACE_BOX, UNIT_MASKS),
     ("Hero", HERO_CARDS, "hero_slot", 2, HERO_FACE_BOX, HERO_MASKS),
     ("Spell", SPELL_CARDS, "spell_slot", 1, SPELL_FACE_BOX, SPELL_MASKS),
+    ("Siege", SIEGE_CARDS, "siege_slot", 1, SIEGE_FACE_BOX, SIEGE_MASKS),
 )
 GREEN = (0, 255, 0, 255)
 MAX_SIZE = 1000
-# 根据设备截图缩至 720 高后的实测卡牌尺寸区分卡底倍率。
+# 根据设备截图缩至 720 高后的实测卡牌尺寸确定卡底倍率。
 CARD_SCALE = 1.69 * 720 / 1080
 
 
@@ -222,7 +233,7 @@ def render_cards(sc, out):
                 if not face_meshes:
                     raise ValueError(f"{card.name} 的卡面图层不可绘制：{card.symbol}")
                 face_bounds = renderer.bounds(face_meshes, obj_id)
-                if group == "Unit":
+                if group in ("Unit", "Siege"):
                     face_bounds = unit_icon_bounds(face_bounds)
                 elif group == "Hero":
                     face_bounds = HERO_ICON_BOUNDS

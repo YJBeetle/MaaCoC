@@ -119,6 +119,7 @@
         "recognition": "TemplateMatch",
         "template": "Cards/Siege",
         "green_mask": true,
+        "method": 10001,
         "roi": [46,584,1191,135],
         "threshold": 0.95,
         "action": "Click",

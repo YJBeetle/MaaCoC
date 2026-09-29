@@ -1,17 +1,18 @@
 # 更新卡面
 
-游戏更新后，从 `.sc` 重新合成家乡战斗条的 Unit、Hero、Spell 卡牌模板。
+游戏更新后，从 `.sc` 重新合成家乡战斗条的 Unit、Hero、Spell、Siege 卡牌模板。
 
 ## 为什么需要工具
 
 卡底和人物图分存在 `ui.sc` 的不同符号里。脚本将两者的网格映射到同一画布，
 按顶点与 UV 直接绘制成卡牌：
 普通兵用 `unit_slot` 图层 1，编号 100 起的活动兵用图层 2；`icon_unit_elite_*` 超级兵
-用图层 3，并应用该图层在 SC 中记录的红色变换。英雄用 `hero_slot` 图层 2，法术用 `spell_slot` 图层 1。
+用图层 3，并应用该图层在 SC 中记录的红色变换。英雄用 `hero_slot` 图层 2，法术用 `spell_slot` 图层 1；攻城机器用 `siege_slot` 图层 1。
 数量、等级及卡底 alpha 低于 50% 的边角填成纯绿，供 MAAFW 的
 `green_mask` 跳过。
 每类卡牌共用一套遮罩位置；咏王另遮住右下角的模式切换开关。
 兵种图标按 SC 顶点所在的方形画布定位；可见网格缺少一侧时保留透明留白，避免拉伸后偏移。
+攻城机器卡面相对卡底上移，统一遮住感叹号、等级和状态按钮。
 
 `.sc` 的结构（v6 容器）：
 
@@ -60,28 +61,28 @@ scripts/refresh-cards/export_cards.py var/coc-unpack/sc/ui.sc
 scripts/refresh-cards/export_cards.py var/coc-unpack/sc/ui.sc --out /tmp/cards
 ```
 
-默认输出到 `assets/image/Cards/{Unit,Hero,Spell}/<卡牌名>.png`，与旧模板目录分开；
-流水线中的 `FindUnit`、`FindHero`、`FindSpell` 从这三个目录读取模板。
-当前内置 47 张 Unit、5 张 Hero、2 张 Spell 的元数据；以后可在 `export_cards.py` 的
-三个数组中追加卡牌及其 SC 符号，不扫描旧模板目录，也不导出建筑大师卡牌。
+默认输出到 `assets/image/Cards/{Unit,Hero,Spell,Siege}/<卡牌名>.png`，与旧模板目录分开；
+流水线中的 `FindUnit`、`FindHero`、`FindSpell`、`FindSiege` 从这四个目录读取模板。
+当前内置 47 张 Unit、5 张 Hero、2 张 Spell、3 张 Siege 的元数据；以后可在 `export_cards.py` 的
+对应数组中追加卡牌及其 SC 符号，不扫描旧模板目录，也不导出建筑大师卡牌。
 Unit 文件名沿用原模板编号（如 `0_Barbarian.png`、`13_ElectroDragon.png`），
 超级兵仍用原来的无编号名称，方便在文件夹中浏览。
 输出倍率由 `export_cards.py` 顶部的 `CARD_SCALE` 控制。
 缩放后宽高上限为 1000 像素。
 卡面按各类 slot 的固定位置映射到卡底；英雄肖像使用统一的 SC 画布范围保留留白。
 需要按 720 高的实机战斗画面对比倍率时，修改对应常量后重新导出。
-卡牌用尽后会变灰，三个 `Find*` 节点均使用反向 `TM_SQDIFF_NORMED`
+卡牌用尽后会变灰，四个 `Find*` 节点均使用反向 `TM_SQDIFF_NORMED`
 （`method: 10001`），按像素差异区分彩色可用卡和灰卡。
-实机截图核对后的阈值为兵种、英雄、法术均 `0.95`。
+实机截图核对后的阈值为兵种、英雄、法术、攻城机器均 `0.95`。
 
 常用参数：
 
 | 参数 | 作用 |
 |---|---|
-| `--out /tmp/cards` | 将三类模板写到独立输出根目录 |
+| `--out /tmp/cards` | 将四类模板写到独立输出根目录 |
 
 重复导出会覆盖同名文件，但不会自动删除输出目录里本次未生成的旧 PNG。
-发布资源包前应检查这三个目录是否包含最新模板；`--out /tmp/cards` 只用于单独预览，
+发布资源包前应检查这四个目录是否包含最新模板；`--out /tmp/cards` 只用于单独预览，
 不会更新流水线正在使用的模板。
 
 ## 查看通用 SC 的推导结果
