@@ -505,7 +505,7 @@ def main(argv=None):
                 from scrender import export as export_rendered_png
                 count, layers, skipped, failed = export_rendered_png(
                     sc, args.png_out, ktx_image, args.max_size, args.filter or ())
-                print("导出 {:,} 张组合 PNG、{:,} 张图层 PNG → {}"
+                print("导出 {:,} 个符号的 {:,} 张图层 PNG → {}"
                       "（浏览页 index.html；无网格 {:,} 个，失败 {:,} 个）".format(
                           count, layers, args.png_out, len(skipped), len(failed)))
                 render_failed = bool(failed)
@@ -516,8 +516,8 @@ def main(argv=None):
                 results, layers, skipped, failed = export_web(
                     sc, args.web_out, ktx_image, args.max_size, args.filter or ())
                 animated = sum(count > 1 for _, _, count, _ in results)
-                print(f"导出 {len(results):,} 张组合 WebP、{layers:,} 张图层 WebP → {args.web_out}"
-                      f"（组合图中动画 {animated:,} 个；浏览页 index.html；"
+                print(f"导出 {layers:,} 张图层 WebP → {args.web_out}"
+                      f"（预览 {len(results):,} 个符号，其中动画 {animated:,} 个；浏览页 index.html；"
                       f"无网格 {len(skipped):,} 个，失败 {len(failed):,} 个）")
                 for name, reason in failed[:5]:
                     print(f"  渲染失败：{name}：{reason}")

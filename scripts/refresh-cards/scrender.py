@@ -47,6 +47,9 @@ def preview_header(title):
             "overflow-wrap:anywhere}.grid{display:flex;flex-wrap:wrap;gap:16px}"
             "figure{margin:0;width:270px;max-width:100%}"
             ".image-with-text{position:relative;display:inline-block;line-height:0}"
+            ".composite{position:relative;display:block;line-height:0;background:#444}"
+            ".composite img{position:absolute;inset:0;width:100%;height:100%;"
+            "max-width:none;max-height:none;background:transparent}"
             ".overlay-text{position:absolute;left:50%;top:50%;"
             "transform:translate(-50%,-50%);font:18px system-ui;line-height:1;"
             "white-space:nowrap;color:#fff;text-shadow:0 1px 2px #000}"
@@ -203,14 +206,43 @@ class Renderer:
         self.duration_cache[obj_id] = duration
         return duration
 
-    def layer_frames(self, obj_id, layer_index, child_id):
-        """根图层的显隐/位移和其自身动画共同决定时长。"""
+    def solo_meshes(self, obj_id, layer_index, frame):
+        """独立图层使用自己的帧；父层结束后固定在最后一次可见的矩阵。"""
         clip = self.sc.clips_by_id[obj_id][0]
-        parent_count = animation_frames(clip)
-        appearance = self.clip_appearances(clip).get(layer_index)
-        if appearance is None or appearance[1] < parent_count - 1:
-            return max(1, parent_count)
-        return max(1, parent_count, appearance[0] + self.timeline_frames(child_id))
+        first, last = self.clip_appearances(clip)[layer_index]
+        parent_frame = min(first + frame, last)
+        for current in range(parent_frame, first - 1, -1):
+            elements = [item for item in self.clip_elements(clip, current)
+                        if item[0] == layer_index]
+            if elements:
+                break
+        child_at = clip.struct_pos(5, 2)[layer_index]
+        child_id = struct.unpack_from("<H", clip.b, child_at)[0]
+        bank = clip.scalar(10)
+        for _, matrix_index, _color in elements:
+            transform = self.matrix(bank, matrix_index)
+            yield from self.meshes(child_id, transform, frame=frame)
+
+    def layer_span(self, obj_id, layer_index, child_id):
+        """按独立图层的父层变化和自身动画求有效帧数与画布边界。"""
+        clip = self.sc.clips_by_id[obj_id][0]
+        first, last = self.clip_appearances(clip)[layer_index]
+        duration = max(last - first + 1, self.timeline_frames(child_id))
+        previous, last_change, bounds = None, None, None
+        for frame in range(duration):
+            meshes = list(self.solo_meshes(obj_id, layer_index, frame))
+            if meshes != previous:
+                last_change = frame
+            previous = meshes
+            if not meshes:
+                continue
+            current = self.bounds(meshes, obj_id)
+            bounds = current if bounds is None else (
+                min(bounds[0], current[0]), min(bounds[1], current[1]),
+                max(bounds[2], current[2]), max(bounds[3], current[3]))
+        if bounds is None:
+            return None
+        return last_change + 1, bounds
 
     def meshes(self, obj_id, transform=IDENTITY, stack=frozenset(), frame=0,
                layer=None):
@@ -245,9 +277,11 @@ class Renderer:
                 yield from self.meshes(children[child_index], child_transform,
                                        stack, child_frame)
 
-    def render(self, obj_id, max_size=1000, frame=0, bounds=None, layer=None):
+    def render(self, obj_id, max_size=1000, frame=0, bounds=None, layer=None,
+               solo=False):
         """按 xy 画布渲染一帧；bounds 可固定动画各帧画布。"""
-        meshes = list(self.meshes(obj_id, frame=frame, layer=layer))
+        meshes = list(self.solo_meshes(obj_id, layer, frame) if solo else
+                      self.meshes(obj_id, frame=frame, layer=layer))
         if not meshes:
             return None
         if bounds is None:
@@ -374,6 +408,23 @@ def add_figure(lines, name, filename, detail, overlay_text=False):
                  '</figcaption></figure>')
 
 
+def add_composite_figure(lines, name, filenames, size, overlay_text=False,
+                         animated=False):
+    """在浏览器中按图层顺序叠图；各动画独立循环。"""
+    scale = min(1, 256 / max(size))
+    width, height = (max(1, round(value * scale)) for value in size)
+    images = "".join(
+        f'<img loading="lazy" src="{html.escape(filename, quote=True)}" '
+        f'alt="{html.escape(name, quote=True)} 图层">'
+        for filename in filenames)
+    text = '<span class="overlay-text">######</span>' if overlay_text else ""
+    detail = " · 图层独立循环" if animated else ""
+    lines.append(f'<figure><div class="composite" '
+                 f'style="width:{width}px;height:{height}px">{images}{text}</div>'
+                 f'<figcaption>网页叠合预览 · {size[0]}×{size[1]}'
+                 f'{detail}</figcaption></figure>')
+
+
 def add_missing_layer(lines, index, child, reason):
     lines.append(f'<figure><div class="missing">{html.escape(reason)}</div>'
                  f'<figcaption>图层 [{index}]，对象 {child} · '
@@ -397,92 +448,10 @@ def text_field_ids(sc):
 
 
 def export(sc, out: Path, decode_ktx, max_size=1000, name_filters=()):
-    """导出每个符号的首帧 PNG 和浏览页。"""
-    renderer = Renderer(sc, decode_ktx)
-    out.mkdir(parents=True, exist_ok=True)
-    lines = preview_header("SC 符号首帧渲染")
-    exported, layer_exported, skipped, failed = 0, 0, [], []
-    texts = text_field_ids(sc)
-    filters = tuple(value.casefold() for value in name_filters)
-    symbols = sorted((name, obj_id) for name, obj_id in dict(sc.exports()).items()
-                     if not filters or any(value in name.casefold() for value in filters))
-    total = len(symbols)
-    for index, (name, obj_id) in enumerate(symbols, 1):
-        renderer.clip_frame_cache.clear()
-        if index > 1 and (index - 1) % 100 == 0:
-            done = index - 1
-            print(f"渲染进度：{done:,}/{total:,}（{done / total:.0%}）", flush=True)
-        try:
-            result = renderer.render(obj_id, max_size)
-        except ValueError as exc:
-            failed.append((name, str(exc)))
-            continue
-        if result is None:
-            skipped.append(name)
-            continue
-        image, natural, pages = result
-        filename = filename_for(name, natural, image.size)
-        image.save(out / filename)
-        clips = sc.clips_by_id.get(obj_id, ())
-        visible = ({child for child, _matrix, _color
-                    in renderer.clip_elements(clips[0])} if clips else set())
-        layers = root_layers(sc, obj_id, visible)
-        group_start = start_group(lines, name)
-        add_figure(lines, name, filename,
-                   f"组合图 · 顶点尺寸 {natural[0]}×{natural[1]} · "
-                   f"PNG {image.width}×{image.height} · 页 {pages}",
-                   overlay_text=any(child_id in texts for _, child_id in layers))
-        exported += 1
-        if layers:
-            bounds = renderer.bounds(list(renderer.meshes(obj_id)), obj_id)
-            layer_results = []
-            layer_errors = 0
-            for layer_index, child_id in layers:
-                if child_id in texts:
-                    layer_results.append((layer_index, child_id, None, "文字层暂不渲染"))
-                    continue
-                try:
-                    part = renderer.render(obj_id, max_size, bounds=bounds,
-                                           layer=layer_index)
-                except ValueError as exc:
-                    failed.append((f"{name}+layer-{layer_index:02d}", str(exc)))
-                    layer_errors += 1
-                    continue
-                if part is None:
-                    layer_results.append((layer_index, child_id, None, "首帧无可绘制网格"))
-                    continue
-                layer_results.append((layer_index, child_id, part[0], None))
-            drawable = [entry for entry in layer_results if entry[2] is not None]
-            single_layer = (layer_errors == 0 and len(clips) == 1 and
-                            len(layers) == 1 and not sc.shapes_by_id.get(obj_id)
-                            and len(drawable) == 1)
-            for layer_index, child_id, layer_image, reason in layer_results:
-                if reason is not None:
-                    if child_id in texts:
-                        add_text_layer(lines, layer_index, child_id, image.size)
-                    else:
-                        add_missing_layer(lines, layer_index, child_id, reason)
-                    continue
-                layer_name = filename_for(name, natural, image.size, layer_index)
-                if single_layer:
-                    (out / layer_name).unlink(missing_ok=True)
-                    continue
-                layer_image.save(out / layer_name)
-                add_figure(lines, name, layer_name,
-                           f"图层 [{layer_index}] · 对象 {child_id} · "
-                           f"PNG {layer_image.width}×{layer_image.height}")
-                layer_exported += 1
-        end_group(lines, group_start)
-    if total:
-        print(f"渲染进度：{total:,}/{total:,}（100%）", flush=True)
-    lines.append("</main>")
-    if failed:
-        lines.append("<h2>未能渲染</h2><ul>")
-        for name, reason in failed:
-            lines.append(f"<li>{html.escape(name)}：{html.escape(reason)}</li>")
-        lines.append("</ul>")
-    write_preview(out, lines)
-    return exported, layer_exported, skipped, failed
+    """导出各图层的首帧 PNG 和浏览页。"""
+    results, layers, skipped, failed = export_layers(
+        sc, out, decode_ktx, max_size, name_filters, animated=False)
+    return len(results), layers, skipped, failed
 
 
 def animation_frames(clip):
@@ -497,11 +466,12 @@ def canvas_size(bounds, max_size):
             min(max_size, max(1, math.ceil(span_y * scale))))
 
 
-def render_frames(renderer, obj_id, count, max_size, bounds, layer=None):
+def render_frames(renderer, obj_id, count, max_size, bounds, layer=None,
+                  solo=False):
     """逐帧渲染；空帧输出透明画布，不缓存整段动画。"""
     size = canvas_size(bounds, max_size)
     for frame in range(count):
-        result = renderer.render(obj_id, max_size, frame, bounds, layer)
+        result = renderer.render(obj_id, max_size, frame, bounds, layer, solo)
         yield result[0] if result is not None else Image.new("RGBA", size)
 
 
@@ -550,39 +520,46 @@ def save_web_frames(frames, path, count, fps):
         os.replace(temp / "result.webp", path)
 
 
-def export_web(sc, out: Path, decode_ktx, max_size=1000, name_filters=()):
-    """导出 WebP 组合图及各直属图层和网页预览。"""
-    if shutil.which("img2webp") is None:
+def export_layers(sc, out: Path, decode_ktx, max_size=1000, name_filters=(),
+                  animated=False):
+    """导出独立图层；PNG 取首帧，WebP 取各自的动画。"""
+    if animated and shutil.which("img2webp") is None:
         raise OSError("--web-out 需要 img2webp（libwebp 工具）")
     renderer = Renderer(sc, decode_ktx)
     filters = tuple(value.casefold() for value in name_filters)
-    exports = {name: obj_id for name, obj_id in sc.exports()
-               if not filters or any(value in name.casefold() for value in filters)}
+    symbols = sorted((name, obj_id) for name, obj_id in dict(sc.exports()).items()
+                     if not filters or any(value in name.casefold() for value in filters))
     out.mkdir(parents=True, exist_ok=True)
-    lines = preview_header("SC 符号网页预览")
+    lines = preview_header("SC 符号网页预览" if animated else "SC 符号首帧预览")
     results, layer_exported, skipped, failed = [], 0, [], []
     texts = text_field_ids(sc)
-    for index, (name, obj_id) in enumerate(sorted(exports.items()), 1):
-        # 帧元素按符号用完即释放；纹理页和矩阵仍可跨符号复用。
+    extension = "webp" if animated else "png"
+    for index, (name, obj_id) in enumerate(symbols, 1):
         renderer.clip_frame_cache.clear()
         if index > 1 and (index - 1) % 100 == 0:
-            print(f"渲染进度：{index - 1:,}/{len(exports):,}", flush=True)
+            print(f"渲染进度：{index - 1:,}/{len(symbols):,}", flush=True)
         group_start = None
         try:
             clips = sc.clips_by_id.get(obj_id, ())
-            visible = (set(renderer.clip_appearances(clips[0])) if clips else set())
+            if not clips:
+                skipped.append(name)
+                continue
+            visible = set(renderer.clip_appearances(clips[0]))
             layers = root_layers(sc, obj_id, visible)
-            layer_counts = [(layer_index, child_id,
-                             renderer.layer_frames(obj_id, layer_index, child_id))
-                            for layer_index, child_id in layers]
-            count = renderer.timeline_frames(obj_id)
-            fps = (clips[0].scalar(2, 1) or 30) if clips else 30
-            bounds = None
-            for frame in range(count):
-                meshes = list(renderer.meshes(obj_id, frame=frame))
-                if not meshes:
+            fps = clips[0].scalar(2, 1) or 30
+            spans, bounds = {}, None
+            for layer_index, child_id in layers:
+                if child_id in texts:
                     continue
-                current = renderer.bounds(meshes, obj_id)
+                if animated:
+                    span = renderer.layer_span(obj_id, layer_index, child_id)
+                else:
+                    meshes = list(renderer.solo_meshes(obj_id, layer_index, 0))
+                    span = ((1, renderer.bounds(meshes, obj_id)) if meshes else None)
+                spans[layer_index] = span
+                if span is None:
+                    continue
+                current = span[1]
                 bounds = current if bounds is None else (
                     min(bounds[0], current[0]), min(bounds[1], current[1]),
                     max(bounds[2], current[2]), max(bounds[3], current[3]))
@@ -593,55 +570,64 @@ def export_web(sc, out: Path, decode_ktx, max_size=1000, name_filters=()):
             natural = (max(1, math.ceil(span_x * PIXELS_PER_UNIT)),
                        max(1, math.ceil(span_y * PIXELS_PER_UNIT)))
             size = canvas_size(bounds, max_size)
-            filename = filename_for(name, natural, size, extension="webp")
-            path = out / filename
-            save_web_frames(render_frames(renderer, obj_id, count, max_size, bounds),
-                            path, count, fps)
-            results.append((name, path, count, fps))
-            label = f"{count} 帧 · {fps} FPS" if count > 1 else "静态"
-            group_start = start_group(lines, name)
-            add_figure(lines, name, filename,
-                       f"组合图 · {label} · {size[0]}×{size[1]}",
-                       overlay_text=any(child_id in texts for _, child_id in layers))
-            drawable = {
-                layer_index for layer_index, child_id, layer_count in layer_counts
-                if child_id not in texts and
-                any(any(renderer.meshes(obj_id, frame=frame, layer=layer_index))
-                    for frame in range(layer_count))
-            }
-            single_layer = (len(clips) == 1 and
-                            len(layers) == 1 and not sc.shapes_by_id.get(obj_id)
-                            and len(drawable) == 1)
-            for layer_index, child_id, layer_count in layer_counts:
+            layer_lines, layer_files, longest = [], [], 1
+            for layer_index, child_id in layers:
                 if child_id in texts:
-                    add_text_layer(lines, layer_index, child_id, size)
+                    add_text_layer(layer_lines, layer_index, child_id, size)
                     continue
-                if layer_index not in drawable:
-                    add_missing_layer(lines, layer_index, child_id, "无可绘制网格")
+                span = spans[layer_index]
+                if span is None:
+                    add_missing_layer(layer_lines, layer_index, child_id,
+                                      "无可绘制网格")
                     continue
-                layer_name = filename_for(name, natural, size, layer_index, "webp")
+                layer_count = span[0]
+                layer_name = filename_for(name, natural, size,
+                                          layer_index, extension)
                 layer_path = out / layer_name
-                if single_layer:
-                    layer_path.unlink(missing_ok=True)
-                    continue
-                child_clips = sc.clips_by_id.get(child_id, ())
-                layer_fps = (child_clips[0].scalar(2, 1) or fps) if child_clips else fps
-                save_web_frames(render_frames(renderer, obj_id, layer_count,
-                                              max_size, bounds, layer_index),
-                                layer_path, layer_count, layer_fps)
-                detail = (f"{layer_count} 帧 · {layer_fps} FPS"
-                          if layer_count > 1 else "静态")
-                add_figure(lines, name, layer_name,
+                if animated:
+                    child_clips = sc.clips_by_id.get(child_id, ())
+                    layer_fps = ((child_clips[0].scalar(2, 1) or fps)
+                                 if child_clips else fps)
+                    save_web_frames(render_frames(renderer, obj_id, layer_count,
+                                                  max_size, bounds, layer_index,
+                                                  solo=True),
+                                    layer_path, layer_count, layer_fps)
+                    detail = (f"{layer_count} 帧 · {layer_fps} FPS"
+                              if layer_count > 1 else "静态")
+                else:
+                    image = renderer.render(obj_id, max_size, bounds=bounds,
+                                            layer=layer_index, solo=True)
+                    image[0].save(layer_path)
+                    detail = "静态"
+                add_figure(layer_lines, name, layer_name,
                            f"图层 [{layer_index}] · 对象 {child_id} · {detail} · "
                            f"{size[0]}×{size[1]}")
+                layer_files.append(layer_name)
+                longest = max(longest, layer_count)
                 layer_exported += 1
+            if not layer_files:
+                skipped.append(name)
+                continue
+            (out / filename_for(name, natural, size,
+                                extension=extension)).unlink(missing_ok=True)
+            results.append((name, None, longest, fps))
+            group_start = start_group(lines, name)
+            if len(layers) == 1 and len(layer_files) == 1:
+                lines.extend(layer_lines)
+            else:
+                add_composite_figure(lines, name, layer_files, size,
+                                     overlay_text=any(child_id in texts
+                                                      for _, child_id in layers),
+                                     animated=animated)
+                lines.extend(layer_lines)
             end_group(lines, group_start)
             group_start = None
         except (OSError, ValueError) as exc:
             if group_start is not None:
                 end_group(lines, group_start)
             failed.append((name, str(exc)))
-    print(f"渲染进度：{len(exports):,}/{len(exports):,}", flush=True)
+    if symbols:
+        print(f"渲染进度：{len(symbols):,}/{len(symbols):,}", flush=True)
     lines.append("</main>")
     if failed:
         lines.append("<h2>未能渲染</h2><ul>")
@@ -650,3 +636,9 @@ def export_web(sc, out: Path, decode_ktx, max_size=1000, name_filters=()):
         lines.append("</ul>")
     write_preview(out, lines)
     return results, layer_exported, skipped, failed
+
+
+def export_web(sc, out: Path, decode_ktx, max_size=1000, name_filters=()):
+    """导出各图层的 WebP 动画和浏览页。"""
+    return export_layers(sc, out, decode_ktx, max_size, name_filters,
+                         animated=True)
