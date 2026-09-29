@@ -3,7 +3,7 @@
 
     python3 scripts/refresh-cards/export_cards.py var/coc-unpack/sc/ui.sc
 
-产出 assets/image/Cards/{Soldier,Hero,Spell}/<卡牌名>.png。
+产出 assets/image/Cards/{Unit,Hero,Spell}/<卡牌名>.png。
 """
 
 from __future__ import annotations
@@ -28,7 +28,7 @@ import sctx2png          # noqa: E402
 REPO = HERE.parents[1]
 
 # 卡牌名、SC 符号、可选的卡面图层，以及特殊卡底。
-# Soldier 沿用原模板的编号前缀，方便按兵种顺序浏览。
+# Unit 沿用原模板的编号前缀，方便按兵种顺序浏览。
 class CardSpec(NamedTuple):
     name: str
     symbol: str
@@ -38,7 +38,7 @@ class CardSpec(NamedTuple):
     extra_masks: tuple[tuple[float, float, float, float], ...] = ()
 
 
-SOLDIER_CARDS = (
+UNIT_CARDS = (
     CardSpec("0_Barbarian", "icon_unit_barbarian"),
     CardSpec("1_Archer", "icon_unit_archer"),
     CardSpec("3_Giant", "icon_unit_giant"),
@@ -102,17 +102,17 @@ SPELL_CARDS = (
     CardSpec("SpellSpeed", "icon_spell_speedup"),
 )
 # 卡面在各自卡底的原始 SC 画布中的位置。普通卡面约为 83×83，英雄为 83×113。
-SOLDIER_FACE_BOX = (3.5, 24.4, 78.5, 99)
+UNIT_FACE_BOX = (3.5, 24.4, 78.5, 99)
 HERO_FACE_BOX = (2.5, -4, 76.5, 98)
 SPELL_FACE_BOX = (2.5, 24.4, 77, 99)
 # 英雄肖像的可见网格略有差异，但共享同一个 166×225 的 SC 画布。
 HERO_ICON_BOUNDS = (-83, -144.5, 83, 80.5)
 # 数量、等级等动态内容由 MAAFW 的 green_mask 跳过。
-SOLDIER_MASKS = ((0.39, 0.03, 0.95, 0.2), (0.06, 0.68, 0.4, 0.91))
+UNIT_MASKS = ((0.39, 0.03, 0.95, 0.2), (0.06, 0.68, 0.4, 0.91))
 HERO_MASKS = ((0.03, 0.06, 0.43, 0.36), (0.05, 0.68, 0.38, 0.93))
 SPELL_MASKS = ((0.39, 0.03, 0.95, 0.21), (0.05, 0.68, 0.38, 0.91))
 CARD_GROUPS = (
-    ("Soldier", SOLDIER_CARDS, "unit_slot", 1, SOLDIER_FACE_BOX, SOLDIER_MASKS),
+    ("Unit", UNIT_CARDS, "unit_slot", 1, UNIT_FACE_BOX, UNIT_MASKS),
     ("Hero", HERO_CARDS, "hero_slot", 2, HERO_FACE_BOX, HERO_MASKS),
     ("Spell", SPELL_CARDS, "spell_slot", 1, SPELL_FACE_BOX, SPELL_MASKS),
 )
@@ -129,7 +129,7 @@ def scaled_box(box, size):
             math.ceil(right * width), math.ceil(bottom * height))
 
 
-def soldier_icon_bounds(mesh_bounds):
+def unit_icon_bounds(mesh_bounds):
     """保留居中卡面在 SC 坐标系中的透明留白，避免按可见网格裁紧后拉伸。"""
     left, top, right, bottom = mesh_bounds
     # 家乡兵种图标以原点为中心（普通兵半径 83，超级兵半径 150）；
@@ -222,8 +222,8 @@ def render_cards(sc, out):
                 if not face_meshes:
                     raise ValueError(f"{card.name} 的卡面图层不可绘制：{card.symbol}")
                 face_bounds = renderer.bounds(face_meshes, obj_id)
-                if group == "Soldier":
-                    face_bounds = soldier_icon_bounds(face_bounds)
+                if group == "Unit":
+                    face_bounds = unit_icon_bounds(face_bounds)
                 elif group == "Hero":
                     face_bounds = HERO_ICON_BOUNDS
                 layer_meshes, bounds = backgrounds[key]

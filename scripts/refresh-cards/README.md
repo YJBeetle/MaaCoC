@@ -1,6 +1,6 @@
 # 更新卡面
 
-游戏更新后，从 `.sc` 重新合成家乡战斗条的 Soldier、Hero、Spell 卡牌模板。
+游戏更新后，从 `.sc` 重新合成家乡战斗条的 Unit、Hero、Spell 卡牌模板。
 
 ## 为什么需要工具
 
@@ -60,11 +60,11 @@ scripts/refresh-cards/export_cards.py var/coc-unpack/sc/ui.sc
 scripts/refresh-cards/export_cards.py var/coc-unpack/sc/ui.sc --out /tmp/cards
 ```
 
-默认输出到 `assets/image/Cards/{Soldier,Hero,Spell}/<卡牌名>.png`，与旧模板目录分开；
-流水线中的 `FindSoldier`、`FindHero`、`FindSpell` 从这三个目录读取模板。
-当前内置 47 张 Soldier、5 张 Hero、2 张 Spell 的元数据；以后可在 `export_cards.py` 的
+默认输出到 `assets/image/Cards/{Unit,Hero,Spell}/<卡牌名>.png`，与旧模板目录分开；
+流水线中的 `FindUnit`、`FindHero`、`FindSpell` 从这三个目录读取模板。
+当前内置 47 张 Unit、5 张 Hero、2 张 Spell 的元数据；以后可在 `export_cards.py` 的
 三个数组中追加卡牌及其 SC 符号，不扫描旧模板目录，也不导出建筑大师卡牌。
-Soldier 文件名沿用原模板编号（如 `0_Barbarian.png`、`13_ElectroDragon.png`），
+Unit 文件名沿用原模板编号（如 `0_Barbarian.png`、`13_ElectroDragon.png`），
 超级兵仍用原来的无编号名称，方便在文件夹中浏览。
 输出倍率由 `export_cards.py` 顶部的 `CARD_SCALE` 控制。
 缩放后宽高上限为 1000 像素。

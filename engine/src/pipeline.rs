@@ -453,7 +453,7 @@ mod tests {
         let names = doc.node_names().unwrap();
         assert_eq!(names[..3], ["Main", "SetScreen", "Launch"]);
         assert!(names.contains(&"AttackLoop".to_string()));
-        assert_eq!(doc.node("FindSoldier").unwrap()["threshold"], serde_json::json!(0.95));
+        assert_eq!(doc.node("FindUnit").unwrap()["threshold"], serde_json::json!(0.95));
     }
 
     #[test]
@@ -474,7 +474,7 @@ mod tests {
     fn scalar_edit_changes_exactly_one_line() {
         let doc = PipelineDoc::from_text(std::fs::read_to_string(repo_pipeline()).unwrap());
         let patched = doc
-            .patched(&[Edit::new("FindSoldier", "threshold", serde_json::json!(0.8))])
+            .patched(&[Edit::new("FindUnit", "threshold", serde_json::json!(0.8))])
             .unwrap();
         let changed: Vec<_> = doc
             .text()
@@ -484,7 +484,7 @@ mod tests {
             .collect();
         assert_eq!(changed.len(), 1, "只该有一行不同，实际 {changed:?}");
         assert_eq!(
-            load(&patched).unwrap()["FindSoldier"]["threshold"],
+            load(&patched).unwrap()["FindUnit"]["threshold"],
             serde_json::json!(0.8)
         );
     }

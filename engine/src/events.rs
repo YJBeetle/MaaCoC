@@ -249,12 +249,12 @@ mod tests {
 
     // Shape taken from a real Node.Recognition.Succeeded payload on the device.
     const HIT: &str = r#"{
-        "task_id":200000001,"reco_id":400000001,"name":"FindSoldier","focus":"FindSoldier!",
+        "task_id":200000001,"reco_id":400000001,"name":"FindUnit","focus":"FindUnit!",
         "reco_details":{"algorithm":"TemplateMatch","box":[92,594,90,118],
             "detail":{"all":[{"box":[53,619,86,90],"score":0.34},{"box":[92,594,90,118],"score":0.996}],
                       "filtered":[{"box":[92,594,90,118],"score":0.996}],
                       "best":{"box":[92,594,90,118],"score":0.996}},
-            "name":"FindSoldier","reco_id":400000001}}"#;
+            "name":"FindUnit","reco_id":400000001}}"#;
 
     const MISS: &str = r#"{"task_id":2,"reco_id":3,"name":"FindNext","focus":null,
         "reco_details":{"algorithm":"TemplateMatch","box":null,
@@ -270,13 +270,13 @@ mod tests {
     fn extracts_scores_and_counts_from_a_hit() {
         let event = parse_event("Node.Recognition.Succeeded", HIT, 1.5, 100.0).unwrap();
         assert_eq!(event.kind, "recognition");
-        assert_eq!(event.node, "FindSoldier");
-        assert_eq!(event.focus, "FindSoldier!");
+        assert_eq!(event.node, "FindUnit");
+        assert_eq!(event.focus, "FindUnit!");
         assert!(event.hit);
         assert_eq!(event.box_rect, Some([92, 594, 90, 118]));
         assert!((event.score - 0.996).abs() < 1e-6);
         assert_eq!((event.candidates, event.filtered), (2, 1));
-        assert_eq!(event.label(), "FindSoldier!");
+        assert_eq!(event.label(), "FindUnit!");
     }
 
     #[test]
@@ -330,7 +330,7 @@ mod tests {
         sink("Node.Recognition.Starting", HIT);
         let first = bus.drain();
         assert_eq!(first.len(), 1);
-        assert_eq!(first[0].node, "FindSoldier");
+        assert_eq!(first[0].node, "FindUnit");
         assert!(bus.drain().is_empty(), "drain must not replay events");
         assert_eq!(bus.ignored(), 1);
         assert_eq!(bus.dropped(), 0, "nothing was lost, only not understood");

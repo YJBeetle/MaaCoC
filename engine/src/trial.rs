@@ -193,9 +193,9 @@ mod tests {
     #[test]
     fn flat_v1_params_are_collected() {
         let node: Value = serde_json::json!({
-            "recognition": "TemplateMatch", "template": ["Soldier"],
+            "recognition": "TemplateMatch", "template": ["Unit"],
             "threshold": 0.95, "roi": [46, 584, 1191, 135], "green_mask": true,
-            "action": "Click", "next": "DeploySoldier", "focus": "FindSoldier!"
+            "action": "Click", "next": "DeployUnit", "focus": "FindUnit!"
         });
         let (kind, params) = recognition_of(&node).unwrap();
         assert_eq!(kind, "TemplateMatch");

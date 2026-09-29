@@ -54,7 +54,7 @@ cargo run --bin maacoc-engine -- devices                     # 列设备
 cargo run --bin maacoc-engine -- snap frame.png              # 截一帧，报告匹配空间尺寸
 cargo run --bin maacoc-engine -- load                        # 加载资源并列出节点
 cargo run --bin maacoc-engine -- run --minutes 10            # 跑自动战斗并打印时间轴
-cargo run --bin maacoc-engine -- reco FindSoldier frame.png  # 在静态帧上试跑某个节点
+cargo run --bin maacoc-engine -- reco FindUnit frame.png     # 在静态帧上试跑某个节点
 cargo run --bin maacoc-engine -- regress                     # 对已录制的语料帧重跑识别
 cargo run --bin maacoc-engine -- patch AttackStart threshold 0.9   # 只打印 diff
 ```
