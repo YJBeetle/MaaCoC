@@ -15,10 +15,12 @@ import "@material/web/select/outlined-select.js";
 import "@material/web/select/select-option.js";
 
 import type { EngineApi, Frame, NodeEvent, Paths, Phase, Settings, Status } from "./api";
-import { DEFAULT_SETTINGS, eventLabel, eventValue, formatUptime } from "./api";
-import { applyTheme, type ThemeMode } from "./theme";
+import { DEFAULT_SETTINGS, formatUptime } from "./api";
+import { applyTheme } from "./theme";
 import { el } from "./dom";
-import { DevicePreview } from "./device-preview";
+import { RunPage } from "./pages/run-page";
+import { StatsPage } from "./pages/stats-page";
+import { SettingsPage } from "./pages/settings-page";
 
 const stateLabels: Record<Phase, string> = {
   idle: "未连接",
@@ -92,20 +94,13 @@ const ui = {
   title: el("h1", { text: "挂机", id: "page-title" }),
   chip: el("span", { id: "status-note" }),
   meta: el("span", { class: "meta", id: "run-meta", text: "" }),
-  timeline: el("div", { class: "timeline", id: "timeline" }),
-  fab: el("md-fab", { id: "fab" }),
-  secondary: el("div", { class: "secondary" }),
   link: el("md-outlined-button", { id: "btn-link" }),
-  sizeSet: el("md-text-button", {
-    id: "btn-size-set",
-    title: "把设备锁成 1080×1920，横屏画面才正好缩到 1280×720 匹配空间",
-  }),
-  sizeReset: el("md-text-button", { id: "btn-size-reset", title: "还回设备自己的分辨率" }),
-  actions: el("div", { class: "actions", id: "actions" }),
   pages: {} as Record<string, HTMLElement>,
 };
 
-const preview = new DevicePreview();
+const runPage = new RunPage({ toggleRun, changeScreenSize });
+const statsPage = new StatsPage();
+const settingsPage = new SettingsPage(persist);
 
 function buildShell() {
   const app = el("div", { class: "shell" });
@@ -134,22 +129,9 @@ function buildShell() {
   topbar.append(ui.title, el("span", { class: "grow" }), ui.meta, ui.chip, ui.link);
 
   const main = el("div", { class: "main" });
-  ui.fab.setAttribute("label", "开始战斗");
-  ui.fab.setAttribute("variant", "primary");
-  ui.fab.appendChild(el("md-icon", { slot: "icon", text: "play_arrow" }));
-  ui.fab.addEventListener("click", () => void toggleRun());
-  ui.sizeSet.appendChild(el("span", { text: "设为 1080×1920" }));
-  ui.sizeReset.appendChild(el("span", { text: "恢复默认" }));
-  ui.sizeSet.addEventListener("click", () => void changeScreenSize(false));
-  ui.sizeReset.addEventListener("click", () => void changeScreenSize(true));
-  // The FAB is the one primary action; the resolution pair is device setup and
-  // belongs on a quieter second row, not competing for the same line.
-  ui.secondary.append(ui.sizeSet, ui.sizeReset);
-  ui.actions.append(ui.fab, ui.secondary);
-
-  ui.pages.run = buildRunPage();
-  ui.pages.stats = buildStatsPage();
-  ui.pages.settings = buildSettingsPage();
+  ui.pages.run = runPage.element;
+  ui.pages.stats = statsPage.element;
+  ui.pages.settings = settingsPage.element;
 
   const body = el("div", { class: "page", id: "page-run" });
   body.appendChild(ui.pages.run);
@@ -157,158 +139,6 @@ function buildShell() {
   app.append(rail, main);
   document.body.appendChild(app);
   go(state.page);
-}
-
-function buildRunPage(): HTMLElement {
-  const grid = el("div", { class: "run-grid" });
-  const left = el("div", { class: "run-left" });
-  const card = el("div", { class: "card bordered grow" });
-  card.appendChild(preview.element);
-  left.append(card, ui.actions);
-
-  const tlCard = el("div", { class: "card bordered timeline-card" });
-  tlCard.append(el("div", { class: "card-title", text: "节点" }), ui.timeline);
-
-  grid.append(left, tlCard);
-  return grid;
-}
-
-function buildStatsPage(): HTMLElement {
-  const wrap = el("div", { class: "column" });
-  const stats = el("div", { class: "stats", id: "stats" });
-  for (const [key, label] of [["battles", "局数"], ["hits", "命中"], ["misses", "未命中"]] as const) {
-    const cell = el("div", { class: "stat" });
-    cell.append(el("div", { class: "n", id: `stat-${key}`, text: "0" }), el("div", { class: "l", text: label }));
-    stats.appendChild(cell);
-  }
-  const card = el("div", { class: "card bordered" });
-  card.append(el("div", { class: "card-title", text: "未命中最多的节点" }), el("div", { class: "card-body", id: "miss-rank" }));
-  wrap.append(stats, card);
-  return wrap;
-}
-
-function buildSettingsPage(): HTMLElement {
-  const wrap = el("div", { class: "column" });
-  const device = el("div", { class: "card bordered", id: "card-device" });
-  device.append(
-    el("div", { class: "sect", text: "设备" }),
-    el("div", { class: "field", id: "f-device" }),
-    el("div", { class: "field", id: "f-entry" }),
-    el("div", { class: "field", id: "f-interval" }),
-    el("div", { class: "field", id: "f-autostart" }),
-  );
-
-  const diag = el("div", { class: "card bordered" });
-  diag.append(
-    el("div", { class: "sect", text: "诊断" }),
-    el("div", { class: "field", id: "f-misses" }),
-    el("div", { class: "field", id: "f-overlay" }),
-    el("div", { class: "field", id: "f-record" }),
-  );
-
-  const look = el("div", { class: "card bordered" });
-  look.append(el("div", { class: "sect", text: "外观" }), el("div", { class: "field", id: "f-theme" }));
-
-  const about = el("div", { class: "card bordered" });
-  about.append(
-    el("div", { class: "sect", text: "关于" }),
-    el("div", { class: "field", id: "f-log" }),
-    el("div", { class: "field", id: "f-version" }),
-    el("div", { class: "field danger", id: "f-reset" }),
-  );
-
-  wrap.append(device, diag, look, about);
-  return wrap;
-}
-
-/** Controls are created the first time they are needed and only updated
-    afterwards. Rebuilding them on every 250 ms poll made the outlined selects
-    visibly flicker. */
-function fieldOf(id: string, title: string, hint?: string): HTMLElement | null {
-  const field = document.getElementById(id);
-  if (!field) return null;
-  if (!field.firstElementChild) {
-    const left = el("div");
-    left.append(el("div", { class: "k", text: title }), ...(hint ? [el("div", { class: "hint", text: hint })] : []));
-    field.appendChild(left);
-  } else if (hint !== undefined) {
-    // The hint can be live text (which device is connected), so it updates too.
-    const node = field.querySelector(".hint");
-    if (node && node.textContent !== hint) node.textContent = hint;
-  }
-  return field;
-}
-
-interface Option {
-  value: string;
-  label: string;
-}
-
-/** The MWC custom elements we touch, narrowed to the properties used here. */
-interface Select extends HTMLElement {
-  value: string;
-  disabled: boolean;
-}
-interface Switch extends HTMLElement {
-  selected: boolean;
-}
-
-const asOptions = (values: string[]): Option[] => values.map((value) => ({ value, label: value }));
-
-/** The field's own heading is the visible label, so the select only carries an
-    accessible one — a second copy inside the notch read as a duplicate.
-    MWC derives the displayed text when the field first renders and does not
-    refresh it for a later programmatic selection, so a select whose option list
-    changed is rebuilt off-DOM with the choice already applied. MWC has no
-    placeholder, so an unavailable choice shows as a disabled stand-in row. */
-function syncSelect(
-  id: string,
-  title: string,
-  hint: string | undefined,
-  options: Option[],
-  value: string,
-  onChange: (v: string) => void,
-  emptyLabel: string,
-) {
-  const field = fieldOf(id, title, hint);
-  if (!field) return null;
-  const items = options.length ? options : [{ value: "-", label: emptyLabel }];
-  const wanted = options.length ? value : "-";
-  const signature = items.map((o) => o.value).join("\n");
-  let select = field.querySelector<Select>("md-outlined-select");
-  if (select?.dataset.items !== signature) {
-    const fresh = el("md-outlined-select") as Select;
-    fresh.setAttribute("aria-label", title);
-    fresh.style.minWidth = "260px";
-    fresh.disabled = !options.length;
-    fresh.dataset.items = signature;
-    fresh.addEventListener("change", () => onChange(fresh.value));
-    for (const option of items) {
-      const item = el("md-select-option");
-      item.value = option.value;
-      item.appendChild(el("div", { slot: "headline", text: option.label }));
-      fresh.appendChild(item);
-    }
-    fresh.value = wanted;
-    if (select) select.replaceWith(fresh);
-    else field.appendChild(fresh);
-    select = fresh;
-  }
-  return select;
-}
-
-function syncSwitch(id: string, title: string, hint: string | undefined, value: boolean, onChange: (v: boolean) => void) {
-  const field = fieldOf(id, title, hint);
-  if (!field) return null;
-  let sw = field.querySelector<Switch>("md-switch");
-  if (!sw) {
-    sw = el("md-switch") as Switch;
-    sw.setAttribute("aria-label", title);
-    sw.addEventListener("change", () => onChange(sw!.selected));
-    field.appendChild(sw);
-  }
-  if (sw.selected !== value) sw.selected = value;
-  return sw;
 }
 
 async function persist(next: Partial<Settings>) {
@@ -334,7 +164,7 @@ async function connect() {
 async function disconnectNow() {
   state.error = "";
   state.frame = null;
-  preview.clear();
+  runPage.clearPreview();
   try {
     state.status = await api.disconnect();
   } catch (err) {
@@ -363,22 +193,9 @@ async function changeScreenSize(reset: boolean) {
   render();
 }
 
-/** The start/stop button is a fixture of the run page, not a reward for
-    connecting: it stays put and goes inert until a device is ready, so the
-    layout does not jump when the first connection lands. */
-function renderActions() {
+function renderConnection() {
   const phase = state.status.phase;
   const connected = phase === "ready" || phase === "running";
-  const running = phase === "running";
-
-  if (connected) ui.fab.removeAttribute("aria-disabled");
-  else ui.fab.setAttribute("aria-disabled", "true");
-  ui.fab.setAttribute("label", running ? "停止" : "开始战斗");
-  const icon = ui.fab.querySelector("md-icon");
-  if (icon) icon.textContent = running ? "stop" : "play_arrow";
-
-  for (const button of [ui.sizeSet, ui.sizeReset]) button.toggleAttribute("disabled", !connected || sizeBusy);
-
   // Swap text in place: rebuilding the button on every 4 Hz render flickered.
   setLabel(ui.link, "state", stateLabels[phase]);
   setLabel(ui.link, "action", connected ? "断开连接" : "连接设备");
@@ -407,130 +224,6 @@ function go(page: string) {
   render();
 }
 
-function renderTimeline() {
-  const visible = state.settings.showMisses ? state.events : state.events.filter((e) => e.hit || e.kind === "action");
-  if (!visible.length) {
-    ui.timeline.replaceChildren(el("div", { class: "tl-empty", text: "尚无事件" }));
-    return;
-  }
-  const stuck = ui.timeline.scrollHeight - ui.timeline.scrollTop - ui.timeline.clientHeight < 40;
-  const rows = visible.slice(-200).map((event) => {
-    const row = el("div", { class: "tl-row" });
-    const dot = el("span", { class: `dot ${event.kind === "action" ? "act" : event.hit ? "" : "miss"}` });
-    row.append(
-      el("span", { class: "t", text: event.at.toFixed(1) }),
-      dot,
-      el("span", { text: eventLabel(event) }),
-      el("span", { class: "v", text: eventValue(event) }),
-    );
-    return row;
-  });
-  ui.timeline.replaceChildren(...rows);
-  if (stuck) ui.timeline.scrollTop = ui.timeline.scrollHeight;
-}
-
-function renderStats() {
-  const hits = state.events.filter((e) => e.kind === "recognition" && e.hit).length;
-  const misses = state.events.filter((e) => e.kind === "recognition" && !e.hit).length;
-  const set = (id: string, value: string) => {
-    const node = document.getElementById(id);
-    if (node) node.textContent = value;
-  };
-  set("stat-battles", String(state.status.battles));
-  set("stat-hits", String(hits));
-  set("stat-misses", String(misses));
-  const rank = document.getElementById("miss-rank");
-  if (!rank) return;
-  const counts = new Map<string, number>();
-  for (const event of state.events) {
-    if (event.kind === "recognition" && !event.hit) counts.set(event.node, (counts.get(event.node) ?? 0) + 1);
-  }
-  const top = [...counts.entries()].sort((a, b) => b[1] - a[1]).slice(0, 8);
-  rank.replaceChildren(
-    ...(top.length
-      ? top.map(([node, count]) => {
-          const row = el("div", { class: "field" });
-          row.append(el("div", { class: "k", text: node }), el("code", { text: String(count) }));
-          return row;
-        })
-      : [el("div", { class: "hint", text: "暂无未命中记录" })]),
-  );
-}
-
-const REFRESH_RATES: Option[] = [
-  { value: "500", label: "0.5 秒" },
-  { value: "1000", label: "1 秒" },
-  { value: "2000", label: "2 秒" },
-  { value: "0", label: "关闭" },
-];
-
-const THEME_MODES: Option[] = [
-  { value: "system", label: "跟随系统" },
-  { value: "light", label: "浅色" },
-  { value: "dark", label: "深色" },
-];
-
-function renderSettings() {
-  syncSelect(
-    "f-device",
-    "设备",
-    "仅一个设备时自动选中",
-    state.devices.length ? asOptions(state.devices.map((d) => d.label)) : [],
-    state.settings.preferredDevice ?? state.devices[0]?.label ?? "",
-    (value) => void persist({ preferredDevice: value || null }),
-    "未检测到设备",
-  );
-  syncSelect(
-    "f-entry",
-    "任务入口",
-    undefined,
-    asOptions(state.nodes.length ? state.nodes : ["Main"]),
-    state.settings.entry,
-    (value) => void persist({ entry: value }),
-    "未加载资源",
-  );
-  syncSelect("f-interval", "画面刷新", undefined, REFRESH_RATES, String(state.settings.frameIntervalMs), (value) =>
-    void persist({ frameIntervalMs: Number(value) }),
-    "—",
-  );
-  syncSwitch("f-autostart", "连接后开始战斗", undefined, state.settings.autoStart, (v) => void persist({ autoStart: v }));
-  syncSwitch("f-misses", "显示未命中节点", undefined, state.settings.showMisses, (v) => void persist({ showMisses: v }));
-  syncSwitch("f-overlay", "画面叠加命中框", undefined, state.settings.overlayHits, (v) => void persist({ overlayHits: v }));
-  syncSwitch("f-record", "记录节点画面", "保存到应用数据目录下的 frames", state.settings.recordFrames, (v) => void persist({ recordFrames: v }));
-  syncSelect(
-    "f-theme",
-    "外观",
-    undefined,
-    THEME_MODES,
-    state.settings.themeMode,
-    (value) => {
-      applyTheme(value as ThemeMode);
-      void persist({ themeMode: value as ThemeMode });
-    },
-    "跟随系统",
-  );
-
-  const version = fieldOf("f-version", "版本");
-  if (version) {
-    let text = version.querySelector("code");
-    if (!text) {
-      text = el("code");
-      version.appendChild(text);
-    }
-    const textValue = `0.1.0 · ${api.mode}`;
-    if (text.textContent !== textValue) text.textContent = textValue;
-  }
-  const reset = fieldOf("f-reset", "恢复默认设置");
-  if (reset && !reset.querySelector("md-text-button")) {
-    const btn = el("md-text-button");
-    btn.appendChild(el("span", { text: "重置" }));
-    btn.addEventListener("click", () => {
-      void persist({ ...DEFAULT_SETTINGS }).then(() => applyTheme(state.settings.themeMode));
-    });
-    reset.appendChild(btn);
-  }
-}
-
 function render() {
   const phase = state.status.phase;
   const problem = state.error || (phase === "error" ? state.status.detail : "");
@@ -544,15 +237,15 @@ function render() {
       ? ""
       : state.status.detail;
 
-  renderActions();
+  renderConnection();
 
   if (probing) probeLayout();
   if (state.page === "run") {
-    preview.render(state);
-    renderTimeline();
+    runPage.render({ ...state, sizeBusy });
+  } else if (state.page === "stats") {
+    statsPage.render(state);
   } else {
-    renderStats();
-    renderSettings();
+    settingsPage.render({ ...state, mode: api.mode });
   }
 }
 
@@ -612,7 +305,7 @@ async function boot() {
     if (state.settings.themeMode === "system") applyTheme("system");
   });
   buildShell();
-  window.addEventListener("pagehide", () => preview.dispose(), { once: true });
+  window.addEventListener("pagehide", () => runPage.dispose(), { once: true });
   state.paths = await api.paths();
   state.devices = await api.devices();
   state.nodes = await api.nodes();
