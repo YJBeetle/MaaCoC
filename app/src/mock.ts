@@ -30,7 +30,17 @@ export function createMockApi(): EngineApi {
   let cursor = 0;
   let clock = 0;
 
-  const frame: Frame = { dataUrl: frameUrl, width: 1280, height: 720, landscape: true };
+  // The marked top/bottom edges make portrait clipping visible in WebKit too.
+  const portrait = new URLSearchParams(location.search).get("portrait") === "1";
+  const portraitSvg = '<svg xmlns="http://www.w3.org/2000/svg" width="720" height="1600">' +
+    '<rect width="720" height="1600" fill="#d8e9f4"/>' +
+    '<path d="M0 0h720v120H0zM0 1480h720v120H0z" fill="#145377"/>' +
+    '<g fill="white" font-family="sans-serif" font-size="56" text-anchor="middle">' +
+    '<text x="360" y="80">TOP</text><text x="360" y="1560">BOTTOM</text></g>' +
+    '<text x="360" y="800" text-anchor="middle" font-size="52">720 x 1600</text></svg>';
+  const frame: Frame = portrait
+    ? { dataUrl: `data:image/svg+xml;base64,${btoa(portraitSvg)}`, width: 720, height: 1600, landscape: false }
+    : { dataUrl: frameUrl, width: 1280, height: 720, landscape: true };
 
   return {
     mode: "mock",

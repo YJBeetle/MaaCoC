@@ -107,6 +107,7 @@ const ui = {
   panel: el("span", { class: "panel", id: "panel-size", text: "" }),
   overlay: el("canvas", { id: "overlay" }) as HTMLCanvasElement,
   void: el("div", { class: "void", text: "未连接设备" }),
+  portraitNote: el("div", { class: "portrait-note", text: "设备处于竖屏，游戏不在前台" }),
   timeline: el("div", { class: "timeline", id: "timeline" }),
   fab: el("md-fab", { id: "fab" }),
   secondary: el("div", { class: "secondary" }),
@@ -443,7 +444,7 @@ function renderStage() {
   ui.panel.textContent = state.status.panel;
   const children: HTMLElement[] = [ui.frameImg, ui.badge];
   if (state.status.panel) children.push(ui.panel);
-  if (!frame.landscape) children.push(el("div", { class: "void", text: "设备处于竖屏，游戏不在前台" }));
+  if (!frame.landscape) children.push(ui.portraitNote);
   // In portrait the events on screen came from a landscape frame, so their
   // boxes land anywhere but where the button actually is.
   const overlay = state.settings.overlayHits && frame.landscape;
@@ -693,6 +694,7 @@ async function boot() {
     if (state.settings.themeMode === "system") applyTheme("system");
   });
   buildShell();
+  new ResizeObserver(() => drawOverlay()).observe(ui.stage);
   state.paths = await api.paths();
   state.devices = await api.devices();
   state.nodes = await api.nodes();

@@ -74,8 +74,9 @@ body { overflow: hidden; user-select: none; }
 /* min-height:0 stops the frame's intrinsic 720px from setting a floor on the
    flex item, which would otherwise push the timeline below the fold. */
 .stage { position: relative; flex: 1; min-width: 0; min-height: 0; background: var(--md-sys-color-surface-container-lowest); display: grid; place-items: center; }
-.stage img { width: 100%; height: 100%; object-fit: contain; display: block; }
+.stage img { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: contain; display: block; }
 .stage .void { display: grid; place-items: center; gap: 8px; color: var(--md-sys-color-on-surface-variant); font-size: 13px; }
+.stage .portrait-note { position: absolute; top: 10px; left: 10px; max-width: calc(100% - 110px); padding: 4px 8px; border-radius: 6px; background: rgb(0 0 0 / 0.6); color: var(--md-sys-color-surface-bright); font-size: 12px; pointer-events: none; }
 .stage .res { position: absolute; top: 10px; right: 10px; max-width: calc(100% - 20px); padding: 3px 8px; border-radius: 6px; background: rgb(0 0 0 / 0.6); font: 11px ui-monospace, Menlo, monospace; color: var(--md-sys-color-surface-bright); }
 .stage .res.warn { background: var(--md-sys-color-error-container); color: var(--md-sys-color-on-error-container); font-family: inherit; }
 /* Physical vs current panel size, bottom-left, so the 1080×1920 lock is
