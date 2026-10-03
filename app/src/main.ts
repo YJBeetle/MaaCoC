@@ -17,6 +17,7 @@ import "@material/web/select/select-option.js";
 import type { EngineApi, Frame, NodeEvent, Paths, Phase, Settings, Status } from "./api";
 import { DEFAULT_SETTINGS, eventLabel, eventValue, formatUptime } from "./api";
 import { applyTheme, type ThemeMode } from "./theme";
+import { PreviewImage } from "./preview-image";
 
 const stateLabels: Record<Phase, string> = {
   idle: "未连接",
@@ -118,6 +119,8 @@ const ui = {
   actions: el("div", { class: "actions", id: "actions" }),
   pages: {} as Record<string, HTMLElement>,
 };
+
+const previewImage = new PreviewImage(ui.frameImg, () => drawOverlay());
 
 function buildShell() {
   const app = el("div", { class: "shell" });
@@ -346,7 +349,7 @@ async function connect() {
 async function disconnectNow() {
   state.error = "";
   state.frame = null;
-  releaseFrame();
+  previewImage.clear();
   try {
     state.status = await api.disconnect();
   } catch (err) {
@@ -427,43 +430,6 @@ function showStageChildren(children: HTMLElement[]) {
   ui.stage.replaceChildren(...children);
 }
 
-/** Feeding <img> a fresh base64 data URL every second is what grew the Web
-    Content process to 6 GB: WebKit keeps a cache entry per distinct URL, and a
-    new screenshot is always a new string. Blob URLs can be revoked, so each
-    swap releases the frame it replaces. */
-let activeFrameUrl = "";
-
-function toRevocableUrl(dataUrl: string): string | null {
-  if (!dataUrl.startsWith("data:")) return null; // the dev mock uses a plain asset URL
-  const binary = atob(dataUrl.slice(dataUrl.indexOf(",") + 1));
-  const bytes = Uint8Array.from(binary, (c) => c.charCodeAt(0));
-  return URL.createObjectURL(new Blob([bytes], { type: "image/png" }));
-}
-
-function swapFrameSrc(dataUrl: string) {
-  const url = toRevocableUrl(dataUrl);
-  if (url === null) {
-    ui.frameImg.src = dataUrl;
-    return;
-  }
-  const pre = new Image();
-  pre.onload = () => {
-    const previous = activeFrameUrl;
-    ui.frameImg.src = url;
-    activeFrameUrl = url;
-    pre.src = "";
-    if (previous) URL.revokeObjectURL(previous);
-  };
-  pre.onerror = () => URL.revokeObjectURL(url);
-  pre.src = url;
-}
-
-function releaseFrame() {
-  if (activeFrameUrl) URL.revokeObjectURL(activeFrameUrl);
-  activeFrameUrl = "";
-  ui.frameImg.removeAttribute("src");
-}
-
 function renderStage() {
   const frame = state.frame;
   if (!frame) {
@@ -471,7 +437,7 @@ function renderStage() {
     showStageChildren([ui.void]);
     return;
   }
-  swapFrameSrc(frame.dataUrl);
+  previewImage.update(frame.dataUrl);
   ui.badge.textContent = `${frame.width}×${frame.height}`;
   ui.badge.classList.toggle("warn", !frame.landscape);
   ui.panel.textContent = state.status.panel;
