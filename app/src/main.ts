@@ -17,7 +17,8 @@ import "@material/web/select/select-option.js";
 import type { EngineApi, Frame, NodeEvent, Paths, Phase, Settings, Status } from "./api";
 import { DEFAULT_SETTINGS, eventLabel, eventValue, formatUptime } from "./api";
 import { applyTheme, type ThemeMode } from "./theme";
-import { PreviewImage } from "./preview-image";
+import { el } from "./dom";
+import { DevicePreview } from "./device-preview";
 
 const stateLabels: Record<Phase, string> = {
   idle: "未连接",
@@ -77,16 +78,6 @@ async function loadApi(): Promise<EngineApi> {
 
 let api: EngineApi;
 
-function el<K extends keyof HTMLElementTagNameMap>(tag: K, attrs: Record<string, string> = {}): HTMLElementTagNameMap[K] {
-  const node = document.createElement(tag);
-  for (const [key, value] of Object.entries(attrs)) {
-    if (key === "class") node.className = value;
-    else if (key === "text") node.textContent = value;
-    else node.setAttribute(key, value);
-  }
-  return node;
-}
-
 /** Swap a label in place; rebuilding the button on every 4 Hz render flickered. */
 function setLabel(host: HTMLElement, className: string, text: string) {
   let node = host.querySelector(`.${className}`);
@@ -101,13 +92,6 @@ const ui = {
   title: el("h1", { text: "挂机", id: "page-title" }),
   chip: el("span", { id: "status-note" }),
   meta: el("span", { class: "meta", id: "run-meta", text: "" }),
-  stage: el("div", { class: "stage", id: "stage" }),
-  frameImg: el("img", { id: "frame-img", alt: "设备画面" }),
-  badge: el("span", { class: "res", text: "" }),
-  panel: el("span", { class: "panel", id: "panel-size", text: "" }),
-  overlay: el("canvas", { id: "overlay" }) as HTMLCanvasElement,
-  void: el("div", { class: "void", text: "未连接设备" }),
-  portraitNote: el("div", { class: "portrait-note", text: "设备处于竖屏，游戏不在前台" }),
   timeline: el("div", { class: "timeline", id: "timeline" }),
   fab: el("md-fab", { id: "fab" }),
   secondary: el("div", { class: "secondary" }),
@@ -121,7 +105,7 @@ const ui = {
   pages: {} as Record<string, HTMLElement>,
 };
 
-const previewImage = new PreviewImage(ui.frameImg, () => drawOverlay());
+const preview = new DevicePreview();
 
 function buildShell() {
   const app = el("div", { class: "shell" });
@@ -179,7 +163,7 @@ function buildRunPage(): HTMLElement {
   const grid = el("div", { class: "run-grid" });
   const left = el("div", { class: "run-left" });
   const card = el("div", { class: "card bordered grow" });
-  card.appendChild(ui.stage);
+  card.appendChild(preview.element);
   left.append(card, ui.actions);
 
   const tlCard = el("div", { class: "card bordered timeline-card" });
@@ -350,7 +334,7 @@ async function connect() {
 async function disconnectNow() {
   state.error = "";
   state.frame = null;
-  previewImage.clear();
+  preview.clear();
   try {
     state.status = await api.disconnect();
   } catch (err) {
@@ -421,72 +405,6 @@ function go(page: string) {
   // The action row lives inside the run page, so switching pages hides it.
   document.querySelector(".page")?.replaceChildren(ui.pages[page]);
   render();
-}
-
-/** The stage keeps one long-lived <img>: recreating it per render left the dark
-    background visible until the new frame decoded, so the picture blinked black. */
-function showStageChildren(children: HTMLElement[]) {
-  const current = Array.from(ui.stage.children);
-  if (current.length === children.length && current.every((node, i) => node === children[i])) return;
-  ui.stage.replaceChildren(...children);
-}
-
-function renderStage() {
-  const frame = state.frame;
-  if (!frame) {
-    ui.void.textContent = state.status.phase === "connecting" ? "连接中…" : "未连接设备";
-    showStageChildren([ui.void]);
-    return;
-  }
-  previewImage.update(frame.dataUrl);
-  ui.badge.textContent = `${frame.width}×${frame.height}`;
-  ui.badge.classList.toggle("warn", !frame.landscape);
-  ui.panel.textContent = state.status.panel;
-  const children: HTMLElement[] = [ui.frameImg, ui.badge];
-  if (state.status.panel) children.push(ui.panel);
-  if (!frame.landscape) children.push(ui.portraitNote);
-  // In portrait the events on screen came from a landscape frame, so their
-  // boxes land anywhere but where the button actually is.
-  const overlay = state.settings.overlayHits && frame.landscape;
-  if (overlay) children.push(ui.overlay);
-  showStageChildren(children);
-  if (overlay) drawOverlay();
-}
-
-function drawOverlay() {
-  const canvas = document.getElementById("overlay") as HTMLCanvasElement | null;
-  const frame = state.frame;
-  if (!canvas || !frame) return;
-
-  // The frame is letterboxed inside the stage, so the overlay has to cover the
-  // letterboxed rect rather than the stage — otherwise every box lands in the
-  // wrong place. Stroke widths are divided back out so lines stay 2-3 screen px.
-  const stage = ui.stage.getBoundingClientRect();
-  const scale = Math.min(stage.width / frame.width, stage.height / frame.height) || 1;
-  const shown = { width: frame.width * scale, height: frame.height * scale };
-  canvas.style.inset = "auto";
-  canvas.style.left = `${(stage.width - shown.width) / 2}px`;
-  canvas.style.top = `${(stage.height - shown.height) / 2}px`;
-  canvas.style.width = `${shown.width}px`;
-  canvas.style.height = `${shown.height}px`;
-  canvas.width = frame.width;
-  canvas.height = frame.height;
-
-  const ctx = canvas.getContext("2d");
-  if (!ctx) return;
-  const px = (size: number) => size / scale;
-  ctx.clearRect(0, 0, canvas.width, canvas.height);
-  const style = getComputedStyle(document.documentElement);
-  ctx.strokeStyle = style.getPropertyValue("--md-sys-color-primary").trim() || "#f5a623";
-  ctx.lineWidth = px(2);
-  ctx.font = `${px(12)}px monospace`;
-  ctx.fillStyle = ctx.strokeStyle;
-  for (const event of state.events.slice(-12)) {
-    if (!event.hit || !event.boxRect) continue;
-    const [x, y, w, h] = event.boxRect;
-    ctx.strokeRect(x, y, w, h);
-    ctx.fillText(`${event.node} ${event.score.toFixed(2)}`, x, Math.max(px(12), y - px(4)));
-  }
 }
 
 function renderTimeline() {
@@ -630,7 +548,7 @@ function render() {
 
   if (probing) probeLayout();
   if (state.page === "run") {
-    renderStage();
+    preview.render(state);
     renderTimeline();
   } else {
     renderStats();
@@ -694,7 +612,7 @@ async function boot() {
     if (state.settings.themeMode === "system") applyTheme("system");
   });
   buildShell();
-  new ResizeObserver(() => drawOverlay()).observe(ui.stage);
+  window.addEventListener("pagehide", () => preview.dispose(), { once: true });
   state.paths = await api.paths();
   state.devices = await api.devices();
   state.nodes = await api.nodes();
