@@ -8,7 +8,7 @@ use maacoc_engine::{
     frames::FrameStore,
     pipeline::{Edit, PipelineDoc},
     trial::trial_node,
-    DeviceTarget, Error, NodeEvent, Runner,
+    DeviceTarget, Error, NodeEvent, Runner, Strategy,
 };
 use std::{
     io::Write,
@@ -32,7 +32,8 @@ fn usage() {
   snap [输出.png]                 截一帧，报告设备与匹配空间尺寸
   shell <命令...>                 通过 MaaFramework 在设备上执行 adb shell 命令
   load [assets]                  加载资源并列出节点
-  run [--minutes N] [--entry E]  跑自动战斗循环并打印节点时间轴
+  run [--minutes N] [--entry E] [--strategy spells-first|units-first]
+                                 跑自动战斗循环并打印节点时间轴
   reco <节点> <帧.png> [阈值]     在一张静态帧上试跑该节点的识别
   regress [语料目录]              对已录制的帧重跑识别，检查资产退化
   patch <节点> <字段> <JSON> [--write]
@@ -146,13 +147,17 @@ fn battle(assets: &Path, args: &[String], preferred: Option<&str>) -> Result<(),
         .map(String::as_str)
         .unwrap_or("Main");
 
+    let strategy = match args.iter().position(|a| a == "--strategy") {
+        Some(i) => Strategy::parse(args.get(i + 1).ok_or("--strategy 缺少策略名称")?)?,
+        None => Strategy::default(),
+    };
     let runner = Runner::connect(assets, DeviceTarget::Adb, preferred)?;
     let recorder = record_dir.as_ref().map(FrameStore::open);
     if recorder.is_some() {
         runner.set_debug_mode(true)?;
     }
     println!("{} 资源就绪，投递任务 {entry}", runner.label);
-    runner.start(entry)?;
+    runner.start_with_strategy(entry, strategy)?;
 
     let deadline = Instant::now() + Duration::from_secs_f64(minutes * 60.0);
     let mut total = 0usize;

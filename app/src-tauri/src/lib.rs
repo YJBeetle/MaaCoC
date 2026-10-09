@@ -5,7 +5,7 @@
 //! browser against the same commands.
 
 use base64::Engine as _;
-use maacoc_engine::{frames::FrameStore, DeviceTarget, NodeEvent, Runner, DEVICE_MATCH_SIZE};
+use maacoc_engine::{frames::FrameStore, DeviceTarget, NodeEvent, Runner, Strategy, DEVICE_MATCH_SIZE};
 use serde::{Deserialize, Serialize};
 use std::{
     collections::VecDeque,
@@ -26,6 +26,7 @@ pub struct Settings {
     pub overlay_hits: bool,
     pub record_frames: bool,
     pub theme_mode: String,
+    pub strategy: Strategy,
 }
 
 impl Default for Settings {
@@ -39,6 +40,7 @@ impl Default for Settings {
             overlay_hits: false,
             record_frames: false,
             theme_mode: "system".into(),
+            strategy: Strategy::default(),
         }
     }
 }
@@ -280,7 +282,9 @@ async fn connect<R: Runtime>(app: AppHandle<R>, state: State<'_, AppState>) -> R
 fn begin(inner: &mut Inner) -> Result<(), String> {
     let entry = inner.settings.entry.clone();
     let runner = inner.runner.as_ref().ok_or("尚未连接设备")?;
-    runner.start(&entry).map_err(|e| e.to_string())?;
+    runner
+        .start_with_strategy(&entry, inner.settings.strategy)
+        .map_err(|e| e.to_string())?;
     inner.phase = Phase::Running;
     inner.started = Some(Instant::now());
     inner.events.clear();
@@ -494,6 +498,7 @@ mod tests {
     fn settings_defaults_are_conservative() {
         let settings = Settings::default();
         assert_eq!(settings.entry, "Main");
+        assert_eq!(settings.strategy, Strategy::SpellsFirst);
         assert_eq!(settings.theme_mode, "system", "外观默认跟随系统，不预设深浅");
         assert!(!settings.auto_start, "打开界面不应自动开始战斗");
         assert!(!settings.overlay_hits);
@@ -505,6 +510,7 @@ mod tests {
         let settings = Settings {
             auto_start: true,
             theme_mode: "dark".into(),
+            strategy: Strategy::UnitsFirst,
             ..Default::default()
         };
         let text = serde_json::to_string(&settings).unwrap();
@@ -512,6 +518,7 @@ mod tests {
         assert!(back.auto_start);
         assert_eq!(back.entry, "Main");
         assert_eq!(back.theme_mode, "dark");
+        assert_eq!(back.strategy, Strategy::UnitsFirst);
     }
 
     #[test]
@@ -519,6 +526,7 @@ mod tests {
         let back: Settings = serde_json::from_str(r#"{"entry":"Main"}"#).unwrap();
         assert_eq!(back.theme_mode, "system");
         assert!(!back.show_misses);
+        assert_eq!(back.strategy, Strategy::SpellsFirst);
     }
 
     /// The frontend's `Settings` interface must carry exactly these keys. A
@@ -539,6 +547,7 @@ mod tests {
                 "preferredDevice",
                 "recordFrames",
                 "showMisses",
+                "strategy",
                 "themeMode"
             ]
         );

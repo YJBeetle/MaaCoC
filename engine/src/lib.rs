@@ -4,10 +4,12 @@ pub mod events;
 pub mod frames;
 pub mod pipeline;
 pub mod runner;
+pub mod strategy;
 pub mod trial;
 
 pub use events::{EventBus, NodeEvent};
 pub use runner::{DeviceTarget, Runner};
+pub use strategy::Strategy;
 
 /// The one logical coordinate space: MaaFramework matches against a screenshot
 /// downscaled to short side 720, and every template/ROI in `assets/pipeline`

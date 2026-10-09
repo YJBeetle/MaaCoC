@@ -245,7 +245,7 @@ function render() {
   } else if (state.page === "stats") {
     statsPage.render(state);
   } else {
-    settingsPage.render({ ...state, mode: api.mode });
+    settingsPage.render({ ...state, mode: api.mode, running: phase === "running" });
   }
 }
 

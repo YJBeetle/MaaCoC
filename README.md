@@ -51,10 +51,13 @@ cargo run --bin maacoc-engine -- snap frame.png              # 截一帧，报�
 cargo run --bin maacoc-engine -- shell wm size               # 通过 MaaFramework 在设备上执行命令
 cargo run --bin maacoc-engine -- load                        # 加载资源并列出节点
 cargo run --bin maacoc-engine -- run --minutes 10            # 跑自动战斗并打印时间轴
+cargo run --bin maacoc-engine -- run --strategy units-first # 先投兵种、战车、英雄，再投法术
 cargo run --bin maacoc-engine -- reco FindUnit frame.png     # 在静态帧上试跑某个节点
 cargo run --bin maacoc-engine -- regress                     # 对已录制的语料帧重跑识别
 cargo run --bin maacoc-engine -- patch AttackStart threshold 0.9   # 只打印 diff
 ```
+
+应用设置中的“投放策略”可选择法术优先（默认）或兵种优先，停止后切换，下一次运行生效。两种策略只改变投放顺序，仍使用现有左侧投放位置与英雄技能流程。
 
 `regress` 是防资产退化的关键工具：`tests/fixtures/frames/` 里存着真机录下的帧和
 当时的识别结果，改模板或改阈值后跑一遍就知道有没有把别的地方弄坏。

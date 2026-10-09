@@ -30,7 +30,10 @@ export interface Status {
   panel: string;
 }
 
+export type Strategy = "spells-first" | "units-first";
+
 export interface Settings {
+  strategy: Strategy;
   entry: string;
   preferredDevice: string | null;
   autoStart: boolean;
@@ -78,6 +81,7 @@ export interface EngineApi {
 }
 
 export const DEFAULT_SETTINGS: Settings = {
+  strategy: "spells-first",
   entry: "Main",
   preferredDevice: null,
   autoStart: false,

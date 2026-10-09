@@ -168,12 +168,17 @@ impl Runner {
     }
 
     pub fn start(&self, entry: &str) -> Result<()> {
+        self.start_with_strategy(entry, crate::Strategy::default())
+    }
+
+    pub fn start_with_strategy(&self, entry: &str, strategy: crate::Strategy) -> Result<()> {
         if !self.inited() {
             return Err("Tasker 未初始化（资源或控制器未绑定）".into());
         }
         self.bus.restart();
         // Never wait on the returned job: the battle loop is a resident task.
-        self.tasker.post_task(entry, "{}")?;
+        self.tasker
+            .post_task(entry, &strategy.pipeline_override().to_string())?;
         Ok(())
     }
 

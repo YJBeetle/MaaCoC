@@ -1,4 +1,4 @@
-import type { DeviceItem, Settings } from "../api";
+import type { DeviceItem, Settings, Strategy } from "../api";
 import { DEFAULT_SETTINGS } from "../api";
 import { el } from "../dom";
 import { applyTheme, type ThemeMode } from "../theme";
@@ -8,6 +8,7 @@ interface SettingsPageState {
   devices: DeviceItem[];
   nodes: string[];
   mode: "tauri" | "mock";
+  running: boolean;
 }
 
 interface Option {
@@ -46,6 +47,7 @@ function buildSettingsPage(): HTMLElement {
     el("div", { class: "sect", text: "设备" }),
     el("div", { class: "field", id: "f-device" }),
     el("div", { class: "field", id: "f-entry" }),
+    el("div", { class: "field", id: "f-strategy" }),
     el("div", { class: "field", id: "f-interval" }),
     el("div", { class: "field", id: "f-autostart" }),
   );
@@ -117,7 +119,7 @@ export class SettingsPage {
     const wanted = options.length ? value : "-";
     const signature = items.map((o) => o.value).join("\n");
     let select = field.querySelector<Select>("md-outlined-select");
-    if (select?.dataset.items !== signature) {
+    if (select?.dataset.items !== signature || select.value !== wanted) {
       const fresh = el("md-outlined-select") as Select;
       fresh.setAttribute("aria-label", title);
       fresh.style.minWidth = "260px";
@@ -153,6 +155,13 @@ export class SettingsPage {
   }
 
   render(state: SettingsPageState) {
+    const strategy = this.syncSelect(
+      "f-strategy", "投放策略", "停止后可切换；下一次开始时生效。投放位置固定在左侧。",
+      [{ value: "spells-first", label: "法术优先（原有顺序）" }, { value: "units-first", label: "兵种优先" }],
+      state.settings.strategy, (value) => void this.persist({ strategy: value as Strategy }), "—",
+    );
+    if (strategy) strategy.disabled = state.running;
+
     this.syncSelect(
       "f-device",
       "设备",
@@ -211,5 +220,6 @@ export class SettingsPage {
       });
       reset.appendChild(btn);
     }
+    reset?.querySelector("md-text-button")?.toggleAttribute("disabled", state.running);
   }
 }
