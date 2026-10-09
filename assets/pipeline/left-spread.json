@@ -1,0 +1,148 @@
+{
+    "SpreadZoom": {
+        "focus": "SpreadZoom!",
+        "action": "MultiSwipe",
+        "swipes": [
+            {
+                "begin": [340, 300],
+                "end": [560, 300],
+                "duration": 600
+            },
+            {
+                "begin": [940, 300],
+                "end": [720, 300],
+                "duration": 600
+            }
+        ],
+        "post_delay": 400,
+        "next": "SpreadZoomAgain",
+        "on_error": "AttackLoop"
+    },
+    "SpreadZoomAgain": {
+        "focus": "SpreadZoomAgain!",
+        "action": "MultiSwipe",
+        "swipes": [
+            {
+                "begin": [340, 300],
+                "end": [560, 300],
+                "duration": 600
+            },
+            {
+                "begin": [940, 300],
+                "end": [720, 300],
+                "duration": 600
+            }
+        ],
+        "post_delay": 400,
+        "next": "SpreadPan",
+        "on_error": "AttackLoop"
+    },
+    "SpreadPan": {
+        "focus": "SpreadPan!",
+        "action": "Swipe",
+        "begin": [430, 300],
+        "end": [710, 300],
+        "duration": 500,
+        "post_delay": 600,
+        "next": "Deploy",
+        "on_error": "AttackLoop"
+    },
+    "SpreadUnit1": {
+        "focus": "SpreadUnit1!",
+        "action": "LongPress",
+        "target": [220, 230],
+        "duration": 2000,
+        "pre_delay": 0,
+        "post_delay": 100,
+        "next": "SpreadUnit2",
+        "on_error": "AttackLoop"
+    },
+    "SpreadUnit2": {
+        "focus": "SpreadUnit2!",
+        "action": "LongPress",
+        "target": [150, 310],
+        "duration": 2000,
+        "pre_delay": 0,
+        "post_delay": 100,
+        "next": "SpreadUnit3",
+        "on_error": "AttackLoop"
+    },
+    "SpreadUnit3": {
+        "focus": "SpreadUnit3!",
+        "action": "LongPress",
+        "target": [220, 390],
+        "duration": 2000,
+        "pre_delay": 0,
+        "post_delay": 100,
+        "next": "Deploy",
+        "on_error": "AttackLoop"
+    },
+    "SpreadSiege": {
+        "focus": "SpreadSiege!",
+        "action": "Click",
+        "target": [150, 310],
+        "pre_delay": 0,
+        "post_delay": 100,
+        "next": "Deploy",
+        "on_error": "AttackLoop"
+    },
+    "SpreadHero": {
+        "focus": "SpreadHero!",
+        "action": "Click",
+        "target": [150, 310],
+        "pre_delay": 0,
+        "post_delay": 100,
+        "next": "SkillHero",
+        "on_error": "AttackLoop"
+    },
+    "SpreadSpell1": {
+        "focus": "SpreadSpell1!",
+        "action": "Click",
+        "target": [300, 250],
+        "repeat": 3,
+        "pre_delay": 0,
+        "post_delay": 100,
+        "next": "SpreadSpell2",
+        "on_error": "AttackLoop"
+    },
+    "SpreadSpell2": {
+        "focus": "SpreadSpell2!",
+        "action": "Click",
+        "target": [340, 280],
+        "repeat": 3,
+        "pre_delay": 0,
+        "post_delay": 100,
+        "next": "SpreadSpell3",
+        "on_error": "AttackLoop"
+    },
+    "SpreadSpell3": {
+        "focus": "SpreadSpell3!",
+        "action": "Click",
+        "target": [380, 310],
+        "repeat": 3,
+        "pre_delay": 0,
+        "post_delay": 100,
+        "next": "SpreadSpell4",
+        "on_error": "AttackLoop"
+    },
+    "SpreadSpell4": {
+        "focus": "SpreadSpell4!",
+        "action": "Click",
+        "target": [340, 340],
+        "repeat": 3,
+        "pre_delay": 0,
+        "post_delay": 100,
+        "next": "SpreadSpell5",
+        "on_error": "AttackLoop"
+    },
+    "SpreadSpell5": {
+        "focus": "SpreadSpell5!",
+        "action": "Click",
+        "target": [300, 370],
+        "repeat": 3,
+        "pre_delay": 0,
+        "post_delay": 100,
+        "next": "Deploy",
+        "on_error": "AttackLoop"
+    }
+}

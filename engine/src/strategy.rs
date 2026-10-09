@@ -1,4 +1,4 @@
-//! Small battle presets: override deployment order without duplicating the pipeline.
+//! Battle presets: deployment order plus optional camera and placement actions.
 use serde::{Deserialize, Serialize};
 use serde_json::{json, Value};
 
@@ -8,6 +8,7 @@ pub enum Strategy {
     #[default]
     SpellsFirst,
     UnitsFirst,
+    LeftSpread,
 }
 
 impl Strategy {
@@ -15,16 +16,27 @@ impl Strategy {
         match name {
             "spells-first" => Ok(Self::SpellsFirst),
             "units-first" => Ok(Self::UnitsFirst),
-            _ => Err(format!("未知策略 {name}，可选 spells-first 或 units-first").into()),
+            "left-spread" => Ok(Self::LeftSpread),
+            _ => Err(format!("未知策略 {name}，可选 spells-first、units-first 或 left-spread").into()),
         }
     }
 
     pub fn pipeline_override(self) -> Value {
         let next = match self {
             Self::SpellsFirst => ["ReturnHome", "FindSpell", "FindUnit", "FindSiege", "FindHero"],
-            Self::UnitsFirst => ["ReturnHome", "FindUnit", "FindSiege", "FindHero", "FindSpell"],
+            Self::UnitsFirst | Self::LeftSpread => ["ReturnHome", "FindUnit", "FindSiege", "FindHero", "FindSpell"],
         };
-        json!({"Deploy": {"next": next}})
+        let mut pipeline = json!({"Deploy": {"next": next}});
+        if self == Self::LeftSpread {
+            pipeline["FindNext"] = json!({"next": "SpreadZoom"});
+            // Resuming an existing battle also prepares the camera before placement.
+            pipeline["BattleReady"] = json!({"next": "SpreadZoom"});
+            pipeline["FindUnit"] = json!({"next": "SpreadUnit1"});
+            pipeline["FindSiege"] = json!({"next": "SpreadSiege"});
+            pipeline["FindHero"] = json!({"next": "SpreadHero"});
+            pipeline["FindSpell"] = json!({"next": "SpreadSpell1"});
+        }
+        pipeline
     }
 }
 
@@ -34,7 +46,7 @@ mod tests {
 
     #[test]
     fn presets_keep_end_detection_first_and_deploy_each_category() {
-        for strategy in [Strategy::SpellsFirst, Strategy::UnitsFirst] {
+        for strategy in [Strategy::SpellsFirst, Strategy::UnitsFirst, Strategy::LeftSpread] {
             let data = strategy.pipeline_override();
             let next = data["Deploy"]["next"].as_array().unwrap();
             assert_eq!(next[0], "ReturnHome");
@@ -48,5 +60,32 @@ mod tests {
         );
         assert_eq!(Strategy::default(), Strategy::SpellsFirst);
         assert!(Strategy::parse("unknown").is_err());
+    }
+
+    #[test]
+    fn spread_prepares_camera_once_before_the_deployment_loop() {
+        let data = Strategy::LeftSpread.pipeline_override();
+        assert_eq!(data["FindNext"]["next"], "SpreadZoom");
+        assert_eq!(data["BattleReady"]["next"], "SpreadZoom");
+        assert_eq!(data["FindUnit"]["next"], "SpreadUnit1");
+        assert_eq!(data["FindSpell"]["next"], "SpreadSpell1");
+        assert!(Strategy::UnitsFirst.pipeline_override().get("FindNext").is_none());
+        let nodes: serde_json::Value =
+            serde_json::from_str(include_str!("../../assets/pipeline/left-spread.json")).unwrap();
+        assert_eq!(nodes["SpreadUnit3"]["next"], "Deploy");
+        assert_eq!(nodes["SpreadPan"]["next"], "Deploy");
+        assert_eq!(nodes["SpreadSpell5"]["next"], "Deploy");
+        assert_eq!(nodes["SpreadSpell1"]["repeat"], 3);
+        assert_eq!(nodes["SpreadHero"]["next"], "SkillHero");
+        for name in [
+            "SpreadZoom",
+            "SpreadZoomAgain",
+            "SpreadPan",
+            "SpreadUnit1",
+            "SpreadUnit2",
+            "SpreadUnit3",
+        ] {
+            assert_eq!(nodes[name]["on_error"], "AttackLoop");
+        }
     }
 }
