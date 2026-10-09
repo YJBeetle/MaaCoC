@@ -173,10 +173,6 @@ CARD_SCALE = 1.69 * 720 / 1080
 # 最终尺寸仍由 CARD_SCALE 决定；动态区域的纯绿遮罩在缩小后绘制。
 CARD_RENDER_SCALE = 1.5
 CARD_DOWNSAMPLE = Image.Resampling.BILINEAR
-# 兵种和法术被选中后卡牌放大并出现白色边框，供对应节点继续识别剩余数量。
-SELECTED_CARD_SCALE = 1.06
-SELECTED_CARD_MASKS = ((0, 0, 1, 0.05), (0, 0.95, 1, 1),
-                       (0, 0, 0.05, 1), (0.95, 0, 1, 1))
 
 
 def scaled_box(box, size):
@@ -292,22 +288,13 @@ def render_cards(sc, out):
                                      face_bounds, CARD_SCALE,
                                      face_box, masks + card.extra_masks)
                 image.save(group_stage / f"{card.name}.png")
-                if group in ("Unit", "Spell"):
-                    selected = compose_card(renderer, layer_meshes, bounds, face_meshes,
-                                            face_bounds, CARD_SCALE * SELECTED_CARD_SCALE,
-                                            face_box, masks + card.extra_masks + SELECTED_CARD_MASKS)
-                    selected.save(group_stage / f"{card.name}_Selected.png")
         for group, cards, *_ in CARD_GROUPS:
             target = out / group
             target.mkdir(parents=True, exist_ok=True)
             for card in cards:
                 os.replace(stage / group / f"{card.name}.png",
                            target / f"{card.name}.png")
-                if group in ("Unit", "Spell"):
-                    os.replace(stage / group / f"{card.name}_Selected.png",
-                               target / f"{card.name}_Selected.png")
-            states = "（含选中态）" if group in ("Unit", "Spell") else ""
-            print(f"导出 {len(cards)} 张 {group} 模板{states} → {target}")
+            print(f"导出 {len(cards)} 张 {group} 模板 → {target}")
 
 
 def main(argv=None):

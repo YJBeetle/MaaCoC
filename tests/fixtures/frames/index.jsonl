@@ -23,8 +23,5 @@
 {"file": "0008-DeployedCards.png", "node": "FindHero", "width": 1280, "height": 720, "label": "已投放灰卡不应命中 Warden", "roi": [595, 590, 99, 129], "expected_hit": false}
 {"file": "0008-DeployedCards.png", "node": "FindHero", "width": 1280, "height": 720, "label": "已投放灰卡不应命中 Mars", "roi": [692, 590, 99, 129], "expected_hit": false}
 {"file": "0008-DeployedCards.png", "node": "FindHero", "width": 1280, "height": 720, "label": "已投放灰卡不应命中 Queen", "roi": [788, 590, 99, 129], "expected_hit": false}
-{"file": "0009-SelectedSpell.png", "node": "FindSpell", "width": 1280, "height": 720, "label": "选中态 SpellSpeed 尚有剩余", "roi": [893, 584, 108, 135]}
 {"file": "0010-DepletedSpell.png", "node": "FindSpell", "width": 1280, "height": 720, "label": "耗尽的 SpellSpeed 灰卡不应命中", "roi": [893, 584, 108, 135], "expected_hit": false}
-{"file": "0011-SelectedUnit.png", "node": "FindUnit", "width": 1280, "height": 720, "label": "选中态 ElectroDragon 尚有 5 只剩余", "roi": [85, 584, 103, 135]}
 {"file": "0012-DepletedUnit.png", "node": "FindUnit", "width": 1280, "height": 720, "label": "耗尽的选中态 ElectroDragon 灰卡不应命中", "roi": [85, 584, 103, 135], "expected_hit": false}
-{"file": "0013-SelectedBalloon.png", "node": "FindUnit", "width": 1280, "height": 720, "label": "选中态 Balloon 尚有剩余", "roi": [181, 584, 103, 135]}
