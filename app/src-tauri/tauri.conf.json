@@ -27,6 +27,7 @@
     ],
     "resources": {
       "../../assets": "assets",
+      "../../vendor/share/MaaAgentBinary": "MaaAgentBinary",
       "./native/*": "."
     }
   }

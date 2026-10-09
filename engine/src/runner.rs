@@ -2,7 +2,13 @@
 
 use crate::events::{EventBus, NodeEvent};
 use crate::Result;
-use maa_framework::{common::MaaStatus, controller::Controller, resource::Resource, tasker::Tasker, toolkit::Toolkit};
+use maa_framework::{
+    common::MaaStatus,
+    controller::{AdbControllerBuilder, Controller},
+    resource::Resource,
+    tasker::Tasker,
+    toolkit::Toolkit,
+};
 use std::{
     path::Path,
     thread,
@@ -31,6 +37,24 @@ fn check(status: MaaStatus, what: &str) -> Result<()> {
     } else {
         Err(format!("{what} 失败: {status:?}").into())
     }
+}
+
+/// Resolve both installed resources and a source checkout independently of cwd.
+fn agent_dir(assets: &Path) -> Result<std::path::PathBuf> {
+    let assets = assets.canonicalize()?;
+    let root = assets.parent().ok_or("资源目录没有父目录")?;
+    let mut candidates = vec![root.join("MaaAgentBinary"), root.join("vendor/share/MaaAgentBinary")];
+    if let Ok(exe) = std::env::current_exe() {
+        if let Some(parent) = exe.parent() {
+            candidates.push(parent.join("MaaAgentBinary"));
+        }
+    }
+    candidates
+        .into_iter()
+        .find(|dir| dir.join("maatouch/universal/maatouch").is_file())
+        .ok_or_else(|| {
+            "找不到 MaaAgentBinary/maatouch/universal/maatouch，请重新运行 scripts/fetch-sdk.sh 或检查安装包".into()
+        })
 }
 
 impl Drop for Runner {
@@ -79,12 +103,15 @@ impl Runner {
                 let name = crate::device_model(&device).unwrap_or_else(|| device.name.clone());
                 let label = format!("{name} · {}", device.address);
                 let config = serde_json::to_string(&device.config)?;
-                let controller = Controller::new_adb(
-                    device.adb_path.to_str().ok_or("adb 路径无效")?,
-                    &device.address,
-                    &config,
-                    "",
-                )?;
+                let agent = agent_dir(assets)?;
+                let controller =
+                    AdbControllerBuilder::new(device.adb_path.to_str().ok_or("adb 路径无效")?, &device.address)
+                        // LongPress silently degrades to Click with AdbShell. Require
+                        // MaaTouch so a successful action really holds the contact.
+                        .input_methods(maa_framework::sys::MaaAdbInputMethod_Maatouch as _)
+                        .config(&config)
+                        .agent_path(agent.to_str().ok_or("MaaTouch 路径无效")?)
+                        .build()?;
                 (controller, label)
             }
         };
@@ -242,5 +269,31 @@ impl Runner {
         let controller = self.controller.as_ref().ok_or("当前无设备，无法执行命令")?;
         check(controller.wait(controller.post_shell(cmd, 10_000)?), "执行命令")?;
         Ok(controller.shell_output()?)
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::agent_dir;
+
+    #[test]
+    fn resolves_checkout_and_installed_helpers_from_assets() {
+        let id = std::time::SystemTime::now()
+            .duration_since(std::time::UNIX_EPOCH)
+            .unwrap()
+            .as_nanos();
+        let root = std::env::temp_dir().join(format!("maacoc-agents-{}-{id}", std::process::id()));
+        let assets = root.join("assets");
+        let checkout = root.join("vendor/share/MaaAgentBinary");
+        let installed = root.join("MaaAgentBinary");
+        std::fs::create_dir_all(&assets).unwrap();
+        for dir in [&checkout, &installed] {
+            std::fs::create_dir_all(dir.join("maatouch/universal")).unwrap();
+            std::fs::write(dir.join("maatouch/universal/maatouch"), b"test helper").unwrap();
+        }
+        assert_eq!(agent_dir(&assets).unwrap(), installed.canonicalize().unwrap());
+        std::fs::remove_dir_all(&installed).unwrap();
+        assert_eq!(agent_dir(&assets).unwrap(), checkout.canonicalize().unwrap());
+        std::fs::remove_dir_all(root).unwrap();
     }
 }

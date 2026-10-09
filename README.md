@@ -13,6 +13,7 @@
   左下角会显示 `物理 · 当前` 两个尺寸供核对。之所以要这个尺寸：MaaFramework 把
   截图缩到短边 720 再识别，所有模板和 ROI 都写在 **1280x720 坐标空间**里。
 - 已开启 USB 调试、用数据线连好的设备或模拟器。
+- 输入使用 **MaaTouch**，所需 `MaaAgentBinary` 随 SDK 提供并随应用打包。缺失时连接失败，避免 AdbShell 把长按静默降级为单击。
 - Rust stable（`rust-toolchain.toml` 会带上 clippy 和 rustfmt）、Node 22。
 
 ## 准备依赖

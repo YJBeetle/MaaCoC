@@ -19,6 +19,7 @@ case "$(uname -s)" in
     [ -x "$BIN" ] || fail "可执行文件缺失: $BIN"
     [ -f "$APP/Contents/Resources/assets/pipeline/main.json" ] || fail "包里缺 assets/pipeline/main.json"
     [ -f "$APP/Contents/Resources/libMaaFramework.dylib" ] || fail "包里缺 libMaaFramework.dylib"
+    [ -f "$APP/Contents/Resources/MaaAgentBinary/maatouch/universal/maatouch" ] || fail "包里缺 MaaTouch"
     otool -L "$BIN" | grep -q MaaFramework || fail "可执行文件没有链接 MaaFramework"
     otool -l "$BIN" | grep -q "path @executable_path/../Resources " || fail "缺少指向 Resources 的 rpath"
     echo "macOS 包检查通过: $APP ($(du -sh "$APP" | cut -f1))"
@@ -37,6 +38,10 @@ case "$(uname -s)" in
     case "$listing" in
       *libMaaFramework.so*) ;;
       *) fail ".deb 里缺 libMaaFramework.so" ;;
+    esac
+    case "$listing" in
+      *MaaAgentBinary/maatouch/universal/maatouch*) ;;
+      *) fail ".deb 里缺 MaaTouch" ;;
     esac
     echo "Linux 包检查通过: $deb"
     ;;

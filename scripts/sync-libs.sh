@@ -24,3 +24,10 @@ if [ "$copied" = 0 ]; then
     exit 1
 fi
 echo "已同步 $copied 个动态库到 $DEST"
+
+# Controller helper programs are resources too; long presses need MaaTouch.
+[ -f vendor/share/MaaAgentBinary/maatouch/universal/maatouch ] || {
+    echo "缺少 MaaTouch，先跑 scripts/fetch-sdk.sh" >&2
+    exit 1
+}
+cp -R vendor/share/MaaAgentBinary "$DEST/"
