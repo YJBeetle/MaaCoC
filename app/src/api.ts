@@ -103,7 +103,7 @@ export function formatUptime(ms: number): string {
 
 /** Value shown in a timeline row: score plus how many candidates survived. */
 export function eventValue(event: NodeEvent): string {
-  if (event.kind === "action") return "";
+  if (event.kind === "action") return event.error ? "动作失败" : "";
   if (!event.candidates) return "";
   return `${event.score.toFixed(3)} · ${event.filtered}/${event.candidates}`;
 }

@@ -38,7 +38,7 @@ impl NodeEvent {
 
     pub fn summary(&self) -> String {
         if self.kind == "action" {
-            return format!("action {}", self.label());
+            return format!("action {}{}", self.label(), if self.error { " 失败" } else { "" });
         }
         let state = if self.error {
             "失败"
@@ -303,6 +303,7 @@ mod tests {
         let details = r#"{"task_id":1,"action_id":2,"name":"SetScreen","focus":null}"#;
         let event = parse_event("Node.Action.Failed", details, 0.0, 0.0).unwrap();
         assert!(event.error);
+        assert_eq!(event.summary(), "action SetScreen 失败");
     }
 
     #[test]

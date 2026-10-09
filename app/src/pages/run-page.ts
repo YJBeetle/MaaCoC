@@ -99,8 +99,8 @@ export class RunPage {
     }
     const stuck = this.timeline.scrollHeight - this.timeline.scrollTop - this.timeline.clientHeight < 40;
     const rows = visible.slice(-200).map((event) => {
-      const row = el("div", { class: "tl-row" });
-      const dot = el("span", { class: `dot ${event.kind === "action" ? "act" : event.hit ? "" : "miss"}` });
+      const row = el("div", { class: `tl-row${event.error ? " failed" : ""}` });
+      const dot = el("span", { class: `dot ${event.error ? "failed" : event.kind === "action" ? "act" : event.hit ? "" : "miss"}` });
       row.append(
         el("span", { class: "t", text: event.at.toFixed(1) }),
         dot,

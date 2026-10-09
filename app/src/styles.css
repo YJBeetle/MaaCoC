@@ -115,6 +115,8 @@ body { overflow: hidden; user-select: none; }
 .tl-row .dot { width: 7px; height: 7px; border-radius: 50%; background: var(--md-sys-color-tertiary); }
 .tl-row .dot.miss { background: var(--md-sys-color-error); }
 .tl-row .dot.act { background: var(--md-sys-color-on-surface-variant); }
+.tl-row.failed .v { color: var(--md-sys-color-error); }
+.tl-row .dot.failed { background: var(--md-sys-color-error); }
 .tl-row .v { font: 11px ui-monospace, Menlo, monospace; color: var(--md-sys-color-on-surface-variant); white-space: nowrap; }
 .tl-empty { padding: 16px 18px; color: var(--md-sys-color-on-surface-variant); font-size: 12px; }
 
