@@ -156,8 +156,8 @@ export class SettingsPage {
 
   render(state: SettingsPageState) {
     const strategy = this.syncSelect(
-      "f-strategy", "投放策略", "停止后可切换；下一次开始时生效。投放位置固定在左侧。",
-      [{ value: "spells-first", label: "法术优先（原有顺序）" }, { value: "units-first", label: "兵种优先" }],
+      "f-strategy", "投放策略", "停止后切换，下一次开始生效。分散预设会缩小、拖动画面后在左侧多点投放。",
+      [{ value: "spells-first", label: "法术优先（原有顺序）" }, { value: "units-first", label: "兵种优先" }, { value: "left-spread", label: "左侧分散投放" }],
       state.settings.strategy, (value) => void this.persist({ strategy: value as Strategy }), "—",
     );
     if (strategy) strategy.disabled = state.running;
