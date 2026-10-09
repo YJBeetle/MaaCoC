@@ -5,3 +5,5 @@
 {"file": "0005-ReturnHome.png", "node": "ReturnHome", "ts": 1789935099.843159, "digest": "affac935a0d2", "width": 1280, "height": 720, "label": "战果回营按钮", "meta": {}}
 {"file": "0006-FindUnit-SuperDragon.png", "node": "FindUnit", "width": 1280, "height": 720, "label": "战斗中超级飞龙卡", "roi": [286, 590, 99, 129]}
 {"file": "0003-FindUnit.png", "node": "FindSiege", "width": 1280, "height": 720, "label": "战斗中投石攻城机器卡", "roi": [396, 590, 100, 129]}
+{"file": "0007-FindNext.png", "node": "FindNext", "width": 1280, "height": 720, "label": "当前版本开战准备界面的下一个按钮"}
+{"file": "0003-FindUnit.png", "node": "BattleReady", "width": 1280, "height": 720, "label": "已开战画面允许恢复投放"}

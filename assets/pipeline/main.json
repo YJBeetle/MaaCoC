@@ -3,9 +3,8 @@
         "next": "SetScreen",
     },
     "SetScreen": {
-        "action": "Command",
-        "exec": "adb",
-        "args": ["shell", "wm", "size", "1080x1920"],
+        "action": "Shell",
+        "cmd": "wm size 1080x1920",
         "next": "Launch",
     },
     "Launch": {
@@ -20,7 +19,7 @@
             "AttackStart",
             "FindMatch",
             "FindNext",
-            "Deploy",
+            "BattleReady",
             "Surrender",
             "ReturnHome",
             "OpenBox",
@@ -57,8 +56,8 @@
         "template": "AttackStartAgain",
         "roi": [961,572,292,119],
         "action": "Click",
-        "next": "FindNext",
-        "timeout": 1000,
+        "next": ["FindNext","BattleReady"],
+        "timeout": 10000,
         "on_error": "AttackLoop",
     },
     "FindNext": {
@@ -74,6 +73,17 @@
         "end": [1200,250,50,1],
         "duration": 100,
         "next": "Deploy",
+    },
+
+    // 恢复已开始的战斗时，必须先确认放弃按钮，避免在加载或村庄画面里盲目放兵。
+    "BattleReady": {
+        "recognition": "TemplateMatch",
+        "template": "Surrender",
+        "roi": [20,483,218,107],
+        "threshold": 0.95,
+        "next": "Deploy",
+        "pre_delay": 0,
+        "post_delay": 0,
     },
 
     "Deploy": {
