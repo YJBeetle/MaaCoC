@@ -76,7 +76,11 @@ mod tests {
         assert_eq!(nodes["SpreadPan"]["next"], "Deploy");
         assert_eq!(nodes["SpreadSpell5"]["next"], "Deploy");
         assert_eq!(nodes["SpreadSpell1"]["repeat"], 3);
-        assert_eq!(nodes["SpreadHero"]["next"], "SkillHero");
+        assert_eq!(nodes["SpreadHero"]["next"], "SpreadHeroWait");
+        assert_eq!(nodes["SpreadHeroWait"]["next"], "SpreadHeroSkillReady");
+        assert_eq!(nodes["SpreadHeroSkillReady"]["next"], "SkillHero");
+        assert_eq!(nodes["SpreadHeroSkillReady"]["on_error"], "AttackLoop");
+        assert_eq!(nodes["SpreadHeroSkillReady"]["recognition"], "TemplateMatch");
         for name in [
             "SpreadZoom",
             "SpreadZoomAgain",
