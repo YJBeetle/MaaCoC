@@ -9,6 +9,7 @@ pub enum Strategy {
     SpellsFirst,
     UnitsFirst,
     LeftSpread,
+    AirProbe,
 }
 
 impl Strategy {
@@ -17,17 +18,20 @@ impl Strategy {
             "spells-first" => Ok(Self::SpellsFirst),
             "units-first" => Ok(Self::UnitsFirst),
             "left-spread" => Ok(Self::LeftSpread),
-            _ => Err(format!("未知策略 {name}，可选 spells-first、units-first 或 left-spread").into()),
+            "air-probe" => Ok(Self::AirProbe),
+            _ => Err(format!("未知策略 {name}，可选 spells-first、units-first 、left-spread 或 air-probe").into()),
         }
     }
 
     pub fn pipeline_override(self) -> Value {
         let next = match self {
             Self::SpellsFirst => ["ReturnHome", "FindSpell", "FindUnit", "FindSiege", "FindHero"],
-            Self::UnitsFirst | Self::LeftSpread => ["ReturnHome", "FindUnit", "FindSiege", "FindHero", "FindSpell"],
+            Self::UnitsFirst | Self::LeftSpread | Self::AirProbe => {
+                ["ReturnHome", "FindUnit", "FindSiege", "FindHero", "FindSpell"]
+            }
         };
         let mut pipeline = json!({"Deploy": {"next": next}});
-        if self == Self::LeftSpread {
+        if matches!(self, Self::LeftSpread | Self::AirProbe) {
             pipeline["FindNext"] = json!({"next": "SpreadZoom"});
             // Resuming an existing battle also prepares the camera before placement.
             pipeline["BattleReady"] = json!({"next": "SpreadZoom"});
@@ -35,6 +39,9 @@ impl Strategy {
             pipeline["FindSiege"] = json!({"next": "SpreadSiege"});
             pipeline["FindHero"] = json!({"next": "SpreadHero"});
             pipeline["FindSpell"] = json!({"next": "SpreadSpell1"});
+        }
+        if self == Self::AirProbe {
+            pipeline["SpreadPan"] = json!({"next": "AirOpening"});
         }
         pipeline
     }
@@ -46,7 +53,12 @@ mod tests {
 
     #[test]
     fn presets_keep_end_detection_first_and_deploy_each_category() {
-        for strategy in [Strategy::SpellsFirst, Strategy::UnitsFirst, Strategy::LeftSpread] {
+        for strategy in [
+            Strategy::SpellsFirst,
+            Strategy::UnitsFirst,
+            Strategy::LeftSpread,
+            Strategy::AirProbe,
+        ] {
             let data = strategy.pipeline_override();
             let next = data["Deploy"]["next"].as_array().unwrap();
             assert_eq!(next[0], "ReturnHome");
@@ -60,6 +72,24 @@ mod tests {
         );
         assert_eq!(Strategy::default(), Strategy::SpellsFirst);
         assert!(Strategy::parse("unknown").is_err());
+    }
+
+    #[test]
+    fn air_probe_is_an_optional_opening_not_a_deployment_loop() {
+        let data = Strategy::AirProbe.pipeline_override();
+        assert_eq!(data["SpreadPan"]["next"], "AirOpening");
+        assert!(!data["Deploy"]["next"]
+            .as_array()
+            .unwrap()
+            .contains(&serde_json::json!("AirOpening")));
+        let nodes: serde_json::Value =
+            serde_json::from_str(include_str!("../../assets/pipeline/air-probe.json")).unwrap();
+        assert_eq!(
+            nodes["AirOpening"]["next"],
+            serde_json::json!(["ReturnHome", "AirProbeBalloon", "Deploy"])
+        );
+        assert_eq!(nodes["AirProbe3"]["next"], "Deploy");
+        assert_eq!(Strategy::parse("air-probe").unwrap(), Strategy::AirProbe);
     }
 
     #[test]

@@ -1,0 +1,65 @@
+{
+    "AirOpening": {
+        "focus": "AirOpening!",
+        "next": [
+            "ReturnHome",
+            "AirProbeBalloon",
+            "Deploy"
+        ],
+        "pre_delay": 0,
+        "post_delay": 0,
+        "timeout": 1000,
+        "on_error": "AttackLoop"
+    },
+    "AirProbeBalloon": {
+        "focus": "AirProbeBalloon!",
+        "recognition": "TemplateMatch",
+        "template": [
+            "Cards/Unit/6_Balloon.png",
+            "Cards/Unit/RocketBalloon.png"
+        ],
+        "green_mask": true,
+        "method": 10001,
+        "roi": [
+            46,
+            584,
+            1191,
+            135
+        ],
+        "threshold": 0.95,
+        "action": "Click",
+        "next": "AirProbe1",
+        "pre_delay": 0,
+        "post_delay": 0
+    },
+    "AirProbe1": {
+        "focus": "AirProbe1!",
+        "action": "LongPress",
+        "target": [220, 230],
+        "duration": 400,
+        "pre_delay": 0,
+        "post_delay": 100,
+        "next": "AirProbe2",
+        "on_error": "AttackLoop"
+    },
+    "AirProbe2": {
+        "focus": "AirProbe2!",
+        "action": "LongPress",
+        "target": [150, 310],
+        "duration": 400,
+        "pre_delay": 0,
+        "post_delay": 100,
+        "next": "AirProbe3",
+        "on_error": "AttackLoop"
+    },
+    "AirProbe3": {
+        "focus": "AirProbe3!",
+        "action": "LongPress",
+        "target": [220, 390],
+        "duration": 400,
+        "pre_delay": 0,
+        "post_delay": 100,
+        "next": "Deploy",
+        "on_error": "AttackLoop"
+    }
+}

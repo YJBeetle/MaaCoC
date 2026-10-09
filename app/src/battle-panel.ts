@@ -4,6 +4,7 @@ import { el } from "./dom";
 const stages: Record<string, string> = {
   Main: "启动", Launch: "启动", AttackStart: "寻找对手", FindMatch: "寻找对手",
   AttackStartAgain: "寻找对手", FindNext: "寻找对手", BattleReady: "准备投放",
+  AirOpening: "准备气球探路", AirProbeBalloon: "选择探路气球", AirProbe: "分点投放探路气球",
   SpreadZoom: "缩小镜头", SpreadZoomAgain: "缩小镜头", SpreadPan: "移动镜头",
   SpreadHeroWait: "等待英雄技能时机", SpreadHeroSkillReady: "确认战斗仍在进行",
   SpreadUnit: "分散投放兵种", SpreadSiege: "投放战车", SpreadHero: "投放英雄", SpreadSpell: "分散投放法术",
@@ -20,7 +21,8 @@ function nodeName(event: NodeEvent): string {
   return event.node.replace(/!$/, "")
     .replace(/^DeploySpell\d+$/, "DeploySpell")
     .replace(/^SpreadUnit\d+$/, "SpreadUnit")
-    .replace(/^SpreadSpell\d+$/, "SpreadSpell");
+    .replace(/^SpreadSpell\d+$/, "SpreadSpell")
+    .replace(/^AirProbe\d+$/, "AirProbe");
 }
 
 /** Events identify the phase; the card bar itself stays a live image, including
@@ -42,9 +44,9 @@ export class BattlePanel {
     const event = [...state.events].reverse().find((event) =>
       !event.error && (event.hit || event.kind === "action") && stages[nodeName(event)]);
     const node = event ? nodeName(event) : "";
-    const strategy = { "units-first": "兵种优先", "spells-first": "法术优先", "left-spread": "左侧分散投放" }[state.settings.strategy];
+    const strategy = { "units-first": "兵种优先", "spells-first": "法术优先", "left-spread": "左侧分散投放", "air-probe": "气球探路" }[state.settings.strategy];
     this.progress.textContent = `${strategy} · ${state.status.phase === "running" ? stages[node] ?? "运行中" : "已停止"}`;
-    const inBattle = ["SpreadHeroWait", "SpreadHeroSkillReady", "SpreadZoom", "SpreadZoomAgain", "SpreadPan", "SpreadUnit", "SpreadSiege", "SpreadHero", "SpreadSpell", "BattleReady", "SlideLeft", "Deploy", "FindUnit", "DeployUnit", "FindSiege",
+    const inBattle = ["AirOpening", "AirProbeBalloon", "AirProbe", "SpreadHeroWait", "SpreadHeroSkillReady", "SpreadZoom", "SpreadZoomAgain", "SpreadPan", "SpreadUnit", "SpreadSiege", "SpreadHero", "SpreadSpell", "BattleReady", "SlideLeft", "Deploy", "FindUnit", "DeployUnit", "FindSiege",
       "DeploySiege", "FindHero", "DeployHero", "SkillHero", "FindSpell", "DeploySpell", "WaitingEndLoop"].includes(node);
     const connected = state.status.phase === "ready" || state.status.phase === "running";
     const visible = connected && !!state.frame?.landscape && inBattle && draw();

@@ -63,6 +63,8 @@ cargo run --bin maacoc-engine -- patch AttackStart threshold 0.9   # 只打印 d
 
 镜头手势、投放坐标、时长和间隔集中在 `assets/pipeline/left-spread.json`，坐标以 MAA 720 高画面为准，目前在 POCO F3 的 1280×720 画面校准。缩放达到游戏下限后继续收拢不会再改变视野；拖移也受地图边界限制。镜头准备只在进入/恢复战斗时执行，不在每个兵种投放前重复。类别顺序由 `engine/src/strategy.rs` 的流水线覆盖配置决定。此预设采用固定位置，没有阵型识别或部队跟随。
 
+“气球探路 + 分散投放”（`--strategy air-probe`）复用相同镜头和主力投放流程，开局先寻找普通气球或火箭气球，在三个点各长按 400 毫秒，再投放主力；没有气球直接跳过。探路只执行一次，时长控制不是精确计数。相关参数在 `assets/pipeline/air-probe.json`。
+
 挂机页展示实时卡牌栏和当前阶段，数量与可用状态直接来自设备画面。竖屏、寻找对手和返回村庄时隐藏卡牌栏，避免显示上一场战斗的数据。
 
 `regress` 是防资产退化的关键工具：`tests/fixtures/frames/` 里存着真机录下的帧和

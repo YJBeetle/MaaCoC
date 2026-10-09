@@ -30,7 +30,7 @@ export interface Status {
   panel: string;
 }
 
-export type Strategy = "spells-first" | "units-first" | "left-spread";
+export type Strategy = "spells-first" | "units-first" | "left-spread" | "air-probe";
 
 export interface Settings {
   strategy: Strategy;

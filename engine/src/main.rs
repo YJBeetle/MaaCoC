@@ -32,7 +32,7 @@ fn usage() {
   snap [输出.png]                 截一帧，报告设备与匹配空间尺寸
   shell <命令...>                 通过 MaaFramework 在设备上执行 adb shell 命令
   load [assets]                  加载资源并列出节点
-  run [--minutes N] [--entry E] [--strategy spells-first|units-first|left-spread]
+  run [--minutes N] [--entry E] [--strategy spells-first|units-first|left-spread|air-probe]
                                  跑自动战斗循环并打印节点时间轴
   reco <节点> <帧.png> [阈值]     在一张静态帧上试跑该节点的识别
   regress [语料目录]              对已录制的帧重跑识别，检查资产退化
