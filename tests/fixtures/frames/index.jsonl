@@ -8,3 +8,10 @@
 {"file": "0007-FindNext.png", "node": "FindNext", "width": 1280, "height": 720, "label": "当前版本开战准备界面的下一个按钮"}
 {"file": "0003-FindUnit.png", "node": "BattleReady", "width": 1280, "height": 720, "label": "已开战画面允许恢复投放"}
 {"file": "0007-FindNext.png", "node": "FindSiege", "width": 1280, "height": 720, "label": "开战准备界面 StoneSlammer 卡", "roi": [396, 590, 100, 129]}
+{"file": "0007-FindNext.png", "node": "FindHero", "width": 1280, "height": 720, "label": "卡牌采样回归 Prince", "roi": [498, 590, 99, 129]}
+{"file": "0007-FindNext.png", "node": "FindHero", "width": 1280, "height": 720, "label": "卡牌采样回归 Warden", "roi": [595, 590, 99, 129]}
+{"file": "0007-FindNext.png", "node": "FindHero", "width": 1280, "height": 720, "label": "卡牌采样回归 Mars", "roi": [692, 590, 99, 129]}
+{"file": "0007-FindNext.png", "node": "FindHero", "width": 1280, "height": 720, "label": "卡牌采样回归 Queen", "roi": [788, 590, 99, 129]}
+{"file": "0007-FindNext.png", "node": "FindSpell", "width": 1280, "height": 720, "label": "卡牌采样回归 SpellSpeed", "roi": [897, 590, 99, 129]}
+{"file": "0007-FindNext.png", "node": "FindUnit", "width": 1280, "height": 720, "label": "卡牌采样回归 Balloon", "roi": [184, 590, 99, 129]}
+{"file": "0007-FindNext.png", "node": "FindUnit", "width": 1280, "height": 720, "label": "卡牌采样回归 DragonRider", "roi": [281, 590, 99, 129]}

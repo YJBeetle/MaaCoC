@@ -169,6 +169,10 @@ GREEN = (0, 255, 0, 255)
 MAX_SIZE = 1000
 # 根据设备截图缩至 720 高后的实测卡牌尺寸确定卡底倍率。
 CARD_SCALE = 1.69 * 720 / 1080
+# 全部卡牌先按设备 1080 高的采样密度绘制，再缩至 MAA 的 720 高。
+# 最终尺寸仍由 CARD_SCALE 决定；动态区域的纯绿遮罩在缩小后绘制。
+CARD_RENDER_SCALE = 1.5
+CARD_DOWNSAMPLE = Image.Resampling.BILINEAR
 
 
 def scaled_box(box, size):
@@ -220,13 +224,17 @@ def compose_card(renderer, background_meshes, background_bounds, face_meshes,
     canvas_bounds = (background_bounds[0], background_bounds[1],
                      background_bounds[0] + natural[0],
                      background_bounds[1] + natural[1])
-    card = Image.new("RGBA", size)
+    render_size = tuple(max(1, round(value * CARD_RENDER_SCALE)) for value in size)
+    card = Image.new("RGBA", render_size)
     renderer.draw_meshes(card, background_meshes, canvas_bounds)
     # 卡底图层的不透明度低于 50% 时，才把对应位置覆盖成纯绿。
     alpha = card.getchannel("A")
     fitted, clip_box = fit_face_meshes(face_meshes, face_bounds, canvas_bounds,
                                        face_box)
     renderer.draw_meshes(card, fitted, canvas_bounds, clip_box=clip_box)
+    # 预乘状态下缩小，避免半透明边缘的 RGB 渗入相邻像素。
+    card = card.convert("RGBa").resize(size, CARD_DOWNSAMPLE).convert("RGBA")
+    alpha = alpha.resize(size, CARD_DOWNSAMPLE)
     card.paste(GREEN, mask=alpha.point(lambda value: 255 if value < 128 else 0)) # 绿色蒙版 Alpha 阈值
     draw = ImageDraw.Draw(card)
     for box in masks:
