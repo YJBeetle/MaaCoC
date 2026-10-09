@@ -1,7 +1,7 @@
 //! Reading the committed frame corpus.
 //!
-//! Each entry records which node was expected to match when the frame was
-//! captured, so asset changes fail here instead of mid-battle.
+//! Each entry records whether a node should match, so asset changes fail here
+//! instead of mid-battle. Legacy entries default to an expected match.
 
 use crate::Result;
 use serde::{Deserialize, Serialize};
@@ -19,6 +19,12 @@ pub struct FrameRecord {
     pub height: u32,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub roi: Option<[i32; 4]>,
+    #[serde(default = "default_expected_hit")]
+    pub expected_hit: bool,
+}
+
+fn default_expected_hit() -> bool {
+    true
 }
 
 /// PNG header carries width/height at fixed offsets; avoids an image decode.
@@ -89,6 +95,7 @@ impl FrameStore {
             width,
             height,
             roi: None,
+            expected_hit: true,
         };
         let line = serde_json::to_string(&record)?;
         use std::io::Write;
@@ -99,5 +106,28 @@ impl FrameStore {
         handle.write_all(line.as_bytes())?;
         handle.write_all(b"\n")?;
         Ok(path)
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::FrameRecord;
+
+    #[test]
+    fn legacy_frames_expect_a_match() {
+        let record: FrameRecord =
+            serde_json::from_str(r#"{"file":"frame.png","node":"FindUnit","width":1280,"height":720}"#).unwrap();
+        assert!(record.expected_hit);
+    }
+
+    #[test]
+    fn negative_frames_preserve_their_expectation() {
+        let record: FrameRecord = serde_json::from_str(
+            r#"{"file":"frame.png","node":"FindUnit","width":1280,"height":720,"expected_hit":false}"#,
+        )
+        .unwrap();
+        let saved = serde_json::to_string(&record).unwrap();
+        let loaded: FrameRecord = serde_json::from_str(&saved).unwrap();
+        assert!(!loaded.expected_hit);
     }
 }

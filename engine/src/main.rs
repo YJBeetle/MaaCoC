@@ -254,14 +254,15 @@ fn regress(assets: &Path, dir: Option<String>) -> Result<(), Error> {
             None,
             record.roi,
         )?;
-        let ok = trial.hit && trial.error.is_none();
+        let ok = trial.hit == record.expected_hit && trial.error.is_none();
         if !ok {
             failed += 1;
         }
         println!(
-            "{} {} {}",
+            "{} {} 预期{} {}",
             if ok { "OK  " } else { "失败" },
             record.file,
+            if record.expected_hit { "命中" } else { "未中" },
             trial.summary()
         );
     }

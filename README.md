@@ -63,6 +63,7 @@ cargo run --bin maacoc-engine -- patch AttackStart threshold 0.9   # 只打印 d
 
 `regress` 是防资产退化的关键工具：`tests/fixtures/frames/` 里存着真机录下的帧和
 当时的识别结果，改模板或改阈值后跑一遍就知道有没有把别的地方弄坏。
+索引支持 `expected_hit: false`，可验证灰掉的卡牌不应命中；省略时沿用原有的“应命中”规则。
 
 `patch` 按字节定点改写 `assets/pipeline/main.json`，保留注释和原有排版，
 所以一行改动就只有一行 diff。不加 `--write` 时只打印，不落盘。

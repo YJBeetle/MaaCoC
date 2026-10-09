@@ -15,3 +15,11 @@
 {"file": "0007-FindNext.png", "node": "FindSpell", "width": 1280, "height": 720, "label": "卡牌采样回归 SpellSpeed", "roi": [897, 590, 99, 129]}
 {"file": "0007-FindNext.png", "node": "FindUnit", "width": 1280, "height": 720, "label": "卡牌采样回归 Balloon", "roi": [184, 590, 99, 129]}
 {"file": "0007-FindNext.png", "node": "FindUnit", "width": 1280, "height": 720, "label": "卡牌采样回归 DragonRider", "roi": [281, 590, 99, 129]}
+{"file": "0008-DeployedCards.png", "node": "FindUnit", "width": 1280, "height": 720, "label": "已投放灰卡不应命中 ElectroDragon", "roi": [88, 590, 99, 129], "expected_hit": false}
+{"file": "0008-DeployedCards.png", "node": "FindUnit", "width": 1280, "height": 720, "label": "已投放灰卡不应命中 Balloon", "roi": [184, 590, 99, 129], "expected_hit": false}
+{"file": "0008-DeployedCards.png", "node": "FindUnit", "width": 1280, "height": 720, "label": "已投放灰卡不应命中 DragonRider", "roi": [281, 590, 99, 129], "expected_hit": false}
+{"file": "0008-DeployedCards.png", "node": "FindSiege", "width": 1280, "height": 720, "label": "已投放灰卡不应命中 StoneSlammer", "roi": [397, 590, 99, 129], "expected_hit": false}
+{"file": "0008-DeployedCards.png", "node": "FindHero", "width": 1280, "height": 720, "label": "已投放灰卡不应命中 Prince", "roi": [498, 590, 99, 129], "expected_hit": false}
+{"file": "0008-DeployedCards.png", "node": "FindHero", "width": 1280, "height": 720, "label": "已投放灰卡不应命中 Warden", "roi": [595, 590, 99, 129], "expected_hit": false}
+{"file": "0008-DeployedCards.png", "node": "FindHero", "width": 1280, "height": 720, "label": "已投放灰卡不应命中 Mars", "roi": [692, 590, 99, 129], "expected_hit": false}
+{"file": "0008-DeployedCards.png", "node": "FindHero", "width": 1280, "height": 720, "label": "已投放灰卡不应命中 Queen", "roi": [788, 590, 99, 129], "expected_hit": false}
