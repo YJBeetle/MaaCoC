@@ -175,7 +175,8 @@ pub fn trial_node(
     job.wait();
     let _ = job;
     let events = bus.drain();
-    match events.into_iter().find(|event| event.kind == "recognition") {
+    // Custom recognitions can invoke OCR internally; the outer result arrives last.
+    match events.into_iter().rev().find(|event| event.kind == "recognition") {
         Some(event) => Ok(from_event(node, &event, used_threshold, used_roi)),
         None => Ok(Trial {
             node: node.to_string(),
