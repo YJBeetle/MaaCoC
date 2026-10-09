@@ -91,7 +91,7 @@ function setLabel(host: HTMLElement, className: string, text: string) {
 }
 
 const ui = {
-  title: el("h1", { text: "挂机", id: "page-title" }),
+  title: el("h1", { text: "挂机刷资源", id: "page-title" }),
   chip: el("span", { id: "status-note" }),
   meta: el("span", { class: "meta", id: "run-meta", text: "" }),
   link: el("md-outlined-button", { id: "btn-link" }),
@@ -217,7 +217,7 @@ function go(page: string) {
   for (const item of document.querySelectorAll<HTMLElement>(".rail-item")) {
     item.setAttribute("aria-current", String(item.dataset.page === page));
   }
-  const titles: Record<string, string> = { run: "挂机", stats: "战果", settings: "设置" };
+  const titles: Record<string, string> = { run: "挂机刷资源", stats: "战果", settings: "设置" };
   ui.title.textContent = titles[page];
   // The action row lives inside the run page, so switching pages hides it.
   document.querySelector(".page")?.replaceChildren(ui.pages[page]);

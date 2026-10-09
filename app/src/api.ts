@@ -34,6 +34,7 @@ export type Strategy = "spells-first" | "units-first" | "left-spread" | "air-pro
 
 export interface Settings {
   strategy: Strategy;
+  stopWhenFull: boolean;
   entry: string;
   preferredDevice: string | null;
   autoStart: boolean;
@@ -82,6 +83,7 @@ export interface EngineApi {
 
 export const DEFAULT_SETTINGS: Settings = {
   strategy: "spells-first",
+  stopWhenFull: true,
   entry: "Main",
   preferredDevice: null,
   autoStart: false,

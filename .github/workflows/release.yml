@@ -50,6 +50,9 @@ jobs:
       - name: 拉取 MaaFramework
         run: ./scripts/fetch-sdk.sh
 
+      - name: 拉取固定版本的 OCR 模型
+        run: python3 scripts/fetch-ocr.py
+
       - name: 安装前端依赖
         run: npm ci
         working-directory: app

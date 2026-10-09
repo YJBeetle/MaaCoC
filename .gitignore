@@ -17,3 +17,6 @@ app/dist/
 
 __pycache__/
 *.pyc
+
+/assets/model/ocr/*.onnx
+/assets/model/ocr/keys.txt

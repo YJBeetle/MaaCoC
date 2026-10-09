@@ -1,0 +1,211 @@
+{
+    "StorageOpenGold": {
+        "focus": "StorageOpenGold!",
+        "action": "Click",
+        "target": [
+            1120,
+            35
+        ],
+        "post_delay": 400,
+        "next": "StorageGateGold",
+        "on_error": "StorageReadFailed"
+    },
+    "StorageGateGold": {
+        "next": [
+            "StorageFullGold",
+            "StorageUnknownGold",
+            "StorageCloseGold"
+        ],
+        "pre_delay": 0,
+        "post_delay": 0
+    },
+    "StorageFullGold": {
+        "focus": "StorageFullGold!",
+        "recognition": "Custom",
+        "custom_recognition": "ResourceCapacity",
+        "custom_recognition_param": {
+            "resource": 0,
+            "state": "full"
+        },
+        "next": "StorageFullCloseGold",
+        "pre_delay": 0,
+        "post_delay": 0
+    },
+    "StorageUnknownGold": {
+        "focus": "StorageUnknownGold!",
+        "recognition": "Custom",
+        "custom_recognition": "ResourceCapacity",
+        "custom_recognition_param": {
+            "resource": 0,
+            "state": "unknown"
+        },
+        "next": "StorageReadFailed",
+        "pre_delay": 0,
+        "post_delay": 0
+    },
+    "StorageCloseGold": {
+        "action": "Click",
+        "target": [
+            1120,
+            35
+        ],
+        "next": "StorageContinue",
+        "pre_delay": 0,
+        "post_delay": 0,
+        "on_error": "StorageReadFailed"
+    },
+    "StorageOpenElixir": {
+        "focus": "StorageOpenElixir!",
+        "action": "Click",
+        "target": [
+            1120,
+            110
+        ],
+        "post_delay": 400,
+        "next": "StorageGateElixir",
+        "on_error": "StorageReadFailed"
+    },
+    "StorageGateElixir": {
+        "next": [
+            "StorageFullElixir",
+            "StorageUnknownElixir",
+            "StorageCloseElixir"
+        ],
+        "pre_delay": 0,
+        "post_delay": 0
+    },
+    "StorageFullElixir": {
+        "focus": "StorageFullElixir!",
+        "recognition": "Custom",
+        "custom_recognition": "ResourceCapacity",
+        "custom_recognition_param": {
+            "resource": 1,
+            "state": "full"
+        },
+        "next": "StorageFullCloseElixir",
+        "pre_delay": 0,
+        "post_delay": 0
+    },
+    "StorageUnknownElixir": {
+        "focus": "StorageUnknownElixir!",
+        "recognition": "Custom",
+        "custom_recognition": "ResourceCapacity",
+        "custom_recognition_param": {
+            "resource": 1,
+            "state": "unknown"
+        },
+        "next": "StorageReadFailed",
+        "pre_delay": 0,
+        "post_delay": 0
+    },
+    "StorageCloseElixir": {
+        "action": "Click",
+        "target": [
+            1120,
+            110
+        ],
+        "next": "StorageContinue",
+        "pre_delay": 0,
+        "post_delay": 0,
+        "on_error": "StorageReadFailed"
+    },
+    "StorageOpenDark": {
+        "focus": "StorageOpenDark!",
+        "action": "Click",
+        "target": [
+            1120,
+            175
+        ],
+        "post_delay": 400,
+        "next": "StorageGateDark",
+        "on_error": "StorageReadFailed"
+    },
+    "StorageGateDark": {
+        "next": [
+            "StorageFullDark",
+            "StorageUnknownDark",
+            "StorageCloseDark"
+        ],
+        "pre_delay": 0,
+        "post_delay": 0
+    },
+    "StorageFullDark": {
+        "focus": "StorageFullDark!",
+        "recognition": "Custom",
+        "custom_recognition": "ResourceCapacity",
+        "custom_recognition_param": {
+            "resource": 2,
+            "state": "full"
+        },
+        "next": "StorageFullClose",
+        "pre_delay": 0,
+        "post_delay": 0
+    },
+    "StorageUnknownDark": {
+        "focus": "StorageUnknownDark!",
+        "recognition": "Custom",
+        "custom_recognition": "ResourceCapacity",
+        "custom_recognition_param": {
+            "resource": 2,
+            "state": "unknown"
+        },
+        "next": "StorageReadFailed",
+        "pre_delay": 0,
+        "post_delay": 0
+    },
+    "StorageCloseDark": {
+        "action": "Click",
+        "target": [
+            1120,
+            175
+        ],
+        "next": "StorageContinue",
+        "pre_delay": 0,
+        "post_delay": 0,
+        "on_error": "StorageReadFailed"
+    },
+    "StorageFullClose": {
+        "action": "Click",
+        "target": [
+            1120,
+            175
+        ],
+        "next": "StorageFullStop"
+    },
+    "StorageContinue": {
+        "action": "Click",
+        "target": "AttackStart",
+        "next": "FindMatch",
+        "pre_delay": 0,
+        "post_delay": 0,
+        "on_error": "AttackLoop"
+    },
+    "StorageFullStop": {
+        "focus": "金币、圣水和黑油全部满仓，挂机刷资源已停止",
+        "action": "StopTask"
+    },
+    "StorageReadFailed": {
+        "focus": "无法可靠读取仓库容量，挂机刷资源已停止",
+        "action": "StopTask"
+    },
+    "StorageFullCloseGold": {
+        "action": "Click",
+        "target": [
+            1120,
+            35
+        ],
+        "post_delay": 300,
+        "next": "StorageOpenElixir",
+        "on_error": "StorageReadFailed"
+    },
+    "StorageFullCloseElixir": {
+        "action": "Click",
+        "target": [
+            1120,
+            110
+        ],
+        "post_delay": 300,
+        "next": "StorageOpenDark",
+        "on_error": "StorageReadFailed"
+    }
+}

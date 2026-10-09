@@ -29,3 +29,10 @@
 {"file": "0006-FindUnit-SuperDragon.png", "node": "AirProbeBalloon", "width": 1280, "height": 720, "label": "未携带气球时跳过探路", "expected_hit": false}
 {"file": "0008-DeployedCards.png", "node": "AirProbeBalloon", "width": 1280, "height": 720, "label": "耗尽灰气球不再执行探路", "expected_hit": false}
 {"file": "0005-ReturnHome.png", "node": "SpreadHeroSkillReady", "width": 1280, "height": 720, "label": "战斗结束后不得继续点击英雄技能", "expected_hit": false}
+{"file": "0010-StorageGold.png", "node": "StorageFullGold", "expected_hit": false, "width": 1280, "height": 720, "label": "实机未满仓容量弹窗"}
+{"file": "0010-StorageGold.png", "node": "StorageUnknownGold", "expected_hit": false, "width": 1280, "height": 720, "label": "实机未满仓容量弹窗"}
+{"file": "0010-StorageElixir.png", "node": "StorageFullElixir", "expected_hit": false, "width": 1280, "height": 720, "label": "实机未满仓容量弹窗"}
+{"file": "0010-StorageElixir.png", "node": "StorageUnknownElixir", "expected_hit": false, "width": 1280, "height": 720, "label": "实机未满仓容量弹窗"}
+{"file": "0010-StorageDark.png", "node": "StorageFullDark", "expected_hit": false, "width": 1280, "height": 720, "label": "实机未满仓容量弹窗"}
+{"file": "0010-StorageDark.png", "node": "StorageUnknownDark", "expected_hit": false, "width": 1280, "height": 720, "label": "实机未满仓容量弹窗"}
+{"file": "0003-FindUnit.png", "node": "StorageUnknownGold", "width": 1280, "height": 720, "expected_hit": true, "label": "战斗界面缺少仓库容量，不应继续检查"}

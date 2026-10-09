@@ -4,6 +4,7 @@ pub mod events;
 pub mod frames;
 pub mod pipeline;
 pub mod runner;
+pub mod storage;
 pub mod strategy;
 pub mod trial;
 

@@ -28,7 +28,7 @@ export class RunPage {
   readonly element: HTMLElement;
 
   constructor(actions: { toggleRun: () => Promise<void>; changeScreenSize: (reset: boolean) => Promise<void> }) {
-    this.fab.setAttribute("label", "开始战斗");
+    this.fab.setAttribute("label", "开始刷资源");
     this.fab.setAttribute("variant", "primary");
     this.fab.appendChild(el("md-icon", { slot: "icon", text: "play_arrow" }));
     this.fab.addEventListener("click", () => void actions.toggleRun());
@@ -62,7 +62,7 @@ export class RunPage {
 
     if (connected) this.fab.removeAttribute("aria-disabled");
     else this.fab.setAttribute("aria-disabled", "true");
-    this.fab.setAttribute("label", running ? "停止" : "开始战斗");
+    this.fab.setAttribute("label", running ? "停止" : "开始刷资源");
     const icon = this.fab.querySelector("md-icon");
     if (icon) icon.textContent = running ? "stop" : "play_arrow";
 

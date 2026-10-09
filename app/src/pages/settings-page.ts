@@ -48,6 +48,7 @@ function buildSettingsPage(): HTMLElement {
     el("div", { class: "field", id: "f-device" }),
     el("div", { class: "field", id: "f-entry" }),
     el("div", { class: "field", id: "f-strategy" }),
+    el("div", { class: "field", id: "f-full-stop" }),
     el("div", { class: "field", id: "f-interval" }),
     el("div", { class: "field", id: "f-autostart" }),
   );
@@ -161,6 +162,8 @@ export class SettingsPage {
       state.settings.strategy, (value) => void this.persist({ strategy: value as Strategy }), "—",
     );
     if (strategy) strategy.disabled = state.running;
+    const fullStop = this.syncSwitch("f-full-stop", "满仓后停止刷资源", "金币、圣水和黑油全部达到容量时停止；无法读取时停止并提示。", state.settings.stopWhenFull, (v) => void this.persist({ stopWhenFull: v }));
+    if (fullStop) fullStop.toggleAttribute("disabled", state.running);
 
     this.syncSelect(
       "f-device",
@@ -184,7 +187,7 @@ export class SettingsPage {
       void this.persist({ frameIntervalMs: Number(value) }),
       "—",
     );
-    this.syncSwitch("f-autostart", "连接后开始战斗", undefined, state.settings.autoStart, (v) => void this.persist({ autoStart: v }));
+    this.syncSwitch("f-autostart", "连接后开始刷资源", undefined, state.settings.autoStart, (v) => void this.persist({ autoStart: v }));
     this.syncSwitch("f-misses", "显示未命中节点", undefined, state.settings.showMisses, (v) => void this.persist({ showMisses: v }));
     this.syncSwitch("f-overlay", "画面叠加命中框", undefined, state.settings.overlayHits, (v) => void this.persist({ overlayHits: v }));
     this.syncSwitch("f-record", "记录节点画面", "保存到应用数据目录下的 frames", state.settings.recordFrames, (v) => void this.persist({ recordFrames: v }));

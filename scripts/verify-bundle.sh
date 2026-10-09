@@ -11,6 +11,10 @@ fail() { echo "打包检查失败: $*" >&2; exit 1; }
 staged=$(find app/src-tauri/native -type f ! -name .gitkeep | wc -l | tr -d ' ')
 [ "${staged:-0}" -gt 0 ] || fail "app/src-tauri/native 里没有运行库，scripts/stage-native.sh 没跑或没拷到东西"
 
+for model in det.onnx rec.onnx keys.txt; do
+    [ -s "assets/model/ocr/$model" ] || fail "缺少 OCR 模型 $model，请运行 scripts/fetch-ocr.py"
+done
+
 case "$(uname -s)" in
   Darwin)
     APP="$BUNDLE/macos/MaaCoC.app"
@@ -20,6 +24,9 @@ case "$(uname -s)" in
     [ -f "$APP/Contents/Resources/assets/pipeline/main.json" ] || fail "包里缺 assets/pipeline/main.json"
     [ -f "$APP/Contents/Resources/libMaaFramework.dylib" ] || fail "包里缺 libMaaFramework.dylib"
     [ -f "$APP/Contents/Resources/MaaAgentBinary/maatouch/universal/maatouch" ] || fail "包里缺 MaaTouch"
+    for model in det.onnx rec.onnx keys.txt; do
+        [ -s "$APP/Contents/Resources/assets/model/ocr/$model" ] || fail "包里缺 OCR 模型 $model"
+    done
     otool -L "$BIN" | grep -q MaaFramework || fail "可执行文件没有链接 MaaFramework"
     otool -l "$BIN" | grep -q "path @executable_path/../Resources " || fail "缺少指向 Resources 的 rpath"
     echo "macOS 包检查通过: $APP ($(du -sh "$APP" | cut -f1))"
@@ -35,6 +42,12 @@ case "$(uname -s)" in
       *assets/pipeline/main.json*) ;;
       *) fail ".deb 里缺 assets/pipeline" ;;
     esac
+    for model in det.onnx rec.onnx keys.txt; do
+      case "$listing" in
+        *"assets/model/ocr/$model"*) ;;
+        *) fail ".deb 里缺 OCR 模型 $model" ;;
+      esac
+    done
     case "$listing" in
       *libMaaFramework.so*) ;;
       *) fail ".deb 里缺 libMaaFramework.so" ;;

@@ -24,6 +24,7 @@ MaaFramework 的 SDK 不进仓库，按平台现拉：
 
 ```bash
 ./scripts/fetch-sdk.sh          # 下载 v5.14.0-beta.1 到 vendor/
+python3 scripts/fetch-ocr.py    # 下载并校验满仓检查使用的 OCR 模型
 (cd app && npm ci)              # 前端依赖
 ./scripts/sync-libs.sh          # 把动态库放到 target/debug 旁边
 ```
@@ -128,3 +129,9 @@ MWC 组件读同一批 CSS 变量，所以不会出现"这里深蓝那里浅蓝"
 ## 许可
 
 见 `LICENSE`。本项目与 Supercell 无关联。自动化操作存在账号风险，请自行判断。
+
+### 仓库满后停止
+
+挂机刷资源默认在每次出击前检查仓库。只有金币、圣水、黑油全部达到游戏弹窗里的最大储量才停止，不写死容量。读取失败会停止并提示，避免继续刷。设置页可以关闭此检查；命令行使用 `--keep-farming` 关闭。
+
+目前已验证中文界面、1280×720 匹配截图的容量弹窗识别。OCR 模型由 `scripts/fetch-ocr.py` 从 MaaCommonAssets 下载并校验 SHA-256，打包流程会自动拉取。

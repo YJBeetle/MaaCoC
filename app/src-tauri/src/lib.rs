@@ -27,6 +27,7 @@ pub struct Settings {
     pub record_frames: bool,
     pub theme_mode: String,
     pub strategy: Strategy,
+    pub stop_when_full: bool,
 }
 
 impl Default for Settings {
@@ -41,6 +42,7 @@ impl Default for Settings {
             record_frames: false,
             theme_mode: "system".into(),
             strategy: Strategy::default(),
+            stop_when_full: true,
         }
     }
 }
@@ -283,7 +285,7 @@ fn begin(inner: &mut Inner) -> Result<(), String> {
     let entry = inner.settings.entry.clone();
     let runner = inner.runner.as_ref().ok_or("尚未连接设备")?;
     runner
-        .start_with_strategy(&entry, inner.settings.strategy)
+        .start_farming(&entry, inner.settings.strategy, inner.settings.stop_when_full)
         .map_err(|e| e.to_string())?;
     inner.phase = Phase::Running;
     inner.started = Some(Instant::now());
@@ -385,7 +387,11 @@ async fn events(state: State<'_, AppState>) -> Result<Vec<NodeEvent>, String> {
         None => Vec::new(),
     };
     for event in &fresh {
-        if event.kind == "action" && event.node == "AttackStart" {
+        if event.kind == "action"
+            && event.hit
+            && !event.error
+            && (event.node == "StorageContinue" || (event.node == "AttackStart" && !inner.settings.stop_when_full))
+        {
             inner.battles += 1;
         }
         if event.kind == "recognition" && event.reco_id > 0 {
@@ -406,6 +412,21 @@ async fn events(state: State<'_, AppState>) -> Result<Vec<NodeEvent>, String> {
                 let _ = store.save(&png, &event.node, &event.focus);
             }
         }
+    }
+    if inner.phase == Phase::Running
+        && !inner.events.is_empty()
+        && inner.runner.as_ref().is_some_and(|runner| !runner.running())
+    {
+        inner.phase = Phase::Ready;
+        inner.started = None;
+        inner.detail = match inner.events.iter().rev().find(|e| e.hit && e.kind == "action") {
+            Some(e) if e.node == "StorageFullStop" => "金币、圣水和黑油全部满仓，挂机刷资源已停止".into(),
+            Some(e) if e.node == "StorageReadFailed" => {
+                inner.phase = Phase::Error;
+                "无法可靠读取仓库容量，挂机刷资源已停止".into()
+            }
+            _ => "任务已结束".into(),
+        };
     }
     Ok(fresh)
 }
@@ -547,6 +568,7 @@ mod tests {
                 "preferredDevice",
                 "recordFrames",
                 "showMisses",
+                "stopWhenFull",
                 "strategy",
                 "themeMode"
             ]
