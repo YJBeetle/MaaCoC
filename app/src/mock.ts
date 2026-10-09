@@ -1,6 +1,6 @@
 import type { EngineApi, Frame, NodeEvent, Settings, Status } from "./api";
 import { DEFAULT_SETTINGS } from "./api";
-import frameUrl from "./dev/frame.png?url";
+import frameUrl from "../../tests/fixtures/frames/0003-FindUnit.png?url";
 
 /** Browser-only stand-in so the UI can be driven and asserted without a phone
     or a native window. Loaded only from a dev build. */

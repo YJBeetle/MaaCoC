@@ -2,6 +2,7 @@ import type { Frame, NodeEvent, Settings, Status } from "../api";
 import { eventLabel, eventValue } from "../api";
 import { el } from "../dom";
 import { DevicePreview } from "../device-preview";
+import { BattlePanel } from "../battle-panel";
 
 interface RunPageState {
   frame: Frame | null;
@@ -12,7 +13,9 @@ interface RunPageState {
 }
 
 export class RunPage {
-  private readonly preview = new DevicePreview();
+  private readonly battle = new BattlePanel();
+  private state: RunPageState | null = null;
+  private readonly preview = new DevicePreview(() => this.renderBattle());
   private readonly timeline = el("div", { class: "timeline", id: "timeline" });
   private readonly fab = el("md-fab", { id: "fab" });
   private readonly secondary = el("div", { class: "secondary" });
@@ -43,6 +46,7 @@ export class RunPage {
 
   clearPreview() {
     this.preview.clear();
+    this.battle.canvas.hidden = true;
   }
 
   dispose() {
@@ -51,6 +55,7 @@ export class RunPage {
 
   /** Keep action controls in place as connection and run status change. */
   render(state: RunPageState) {
+    this.state = state;
     const phase = state.status.phase;
     const connected = phase === "ready" || phase === "running";
     const running = phase === "running";
@@ -64,6 +69,7 @@ export class RunPage {
     for (const button of [this.sizeSet, this.sizeReset]) button.toggleAttribute("disabled", !connected || state.sizeBusy);
 
     this.preview.render(state);
+    this.renderBattle();
     this.renderTimeline(state);
   }
 
@@ -72,13 +78,17 @@ export class RunPage {
     const left = el("div", { class: "run-left" });
     const card = el("div", { class: "card bordered grow" });
     card.appendChild(this.preview.element);
-    left.append(card, this.actions);
+    left.append(card, this.battle.element, this.actions);
 
     const tlCard = el("div", { class: "card bordered timeline-card" });
     tlCard.append(el("div", { class: "card-title", text: "节点" }), this.timeline);
 
     grid.append(left, tlCard);
     return grid;
+  }
+
+  private renderBattle() {
+    if (this.state) this.battle.render(this.state, () => this.preview.drawCardBar(this.battle.canvas));
   }
 
   private renderTimeline(state: RunPageState) {

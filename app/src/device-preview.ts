@@ -24,8 +24,23 @@ export class DevicePreview {
   private image = new PreviewImage(this.ui.frameImg, () => this.drawOverlay());
   private observer = new ResizeObserver(() => this.drawOverlay());
 
-  constructor() {
+  constructor(onFrameLoaded: () => void = () => {}) {
     this.observer.observe(this.element);
+    this.ui.frameImg.addEventListener("load", onFrameLoaded);
+  }
+
+  /** Crop in the same 1280×720 coordinate space as pipeline recognition. */
+  drawCardBar(canvas: HTMLCanvasElement): boolean {
+    const image = this.ui.frameImg;
+    if (!this.state.frame?.landscape || !image.complete || image.naturalWidth <= image.naturalHeight) return false;
+    canvas.width = 1191;
+    canvas.height = 135;
+    const context = canvas.getContext("2d");
+    if (!context) return false;
+    const sx = image.naturalWidth / 1280;
+    const sy = image.naturalHeight / 720;
+    context.drawImage(image, 46 * sx, 584 * sy, 1191 * sx, 135 * sy, 0, 0, 1191, 135);
+    return true;
   }
 
   clear() {
