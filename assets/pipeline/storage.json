@@ -8,7 +8,8 @@
         ],
         "post_delay": 800,
         "next": "StorageGateGold",
-        "on_error": "StorageReadFailed"
+        "on_error": "StorageReadFailed",
+        "pre_delay": 1000
     },
     "StorageGateGold": {
         "next": [
@@ -39,7 +40,7 @@
             "resource": 0,
             "state": "unknown"
         },
-        "next": "StorageReadFailed",
+        "next": "StorageRetryGold",
         "pre_delay": 0,
         "post_delay": 0
     },
@@ -187,7 +188,10 @@
     "StorageReadFailed": {
         "focus": "仓库容量读取失败，本轮继续刷资源",
         "action": "Click",
-        "target": [600, 150],
+        "target": [
+            600,
+            150
+        ],
         "next": "StorageContinue"
     },
     "StorageFullCloseGold": {
@@ -209,5 +213,49 @@
         "post_delay": 300,
         "next": "StorageOpenDark",
         "on_error": "StorageReadFailed"
+    },
+    "StorageRetryGold": {
+        "focus": "仓库提示未读到，重新打开一次",
+        "action": "Click",
+        "target": [
+            600,
+            150
+        ],
+        "pre_delay": 0,
+        "post_delay": 400,
+        "next": "StorageReopenGoldRetry",
+        "on_error": "StorageReadFailed"
+    },
+    "StorageReopenGoldRetry": {
+        "action": "Click",
+        "target": [
+            1120,
+            49
+        ],
+        "pre_delay": 500,
+        "post_delay": 800,
+        "next": "StorageRetryGateGold",
+        "on_error": "StorageReadFailed"
+    },
+    "StorageRetryGateGold": {
+        "next": [
+            "StorageFullGold",
+            "StorageRetryUnknownGold",
+            "StorageCloseGold"
+        ],
+        "pre_delay": 0,
+        "post_delay": 0
+    },
+    "StorageRetryUnknownGold": {
+        "focus": "StorageRetryUnknownGold!",
+        "recognition": "Custom",
+        "custom_recognition": "ResourceCapacity",
+        "custom_recognition_param": {
+            "resource": 0,
+            "state": "unknown"
+        },
+        "next": "StorageReadFailed",
+        "pre_delay": 0,
+        "post_delay": 0
     }
 }

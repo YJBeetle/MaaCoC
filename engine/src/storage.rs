@@ -124,9 +124,14 @@ mod tests {
     #[test]
     fn unknown_capacity_dismisses_tooltip_and_continues_farming() {
         let pipeline: Value = serde_json::from_str(include_str!("../../assets/pipeline/storage.json")).unwrap();
-        for resource in ["Gold", "Elixir", "Dark"] {
+        for resource in ["Elixir", "Dark"] {
             assert_eq!(pipeline[format!("StorageUnknown{resource}")]["next"], "StorageReadFailed");
         }
+        assert_eq!(pipeline["StorageUnknownGold"]["next"], "StorageRetryGold");
+        assert_eq!(pipeline["StorageRetryGold"]["next"], "StorageReopenGoldRetry");
+        assert_eq!(pipeline["StorageReopenGoldRetry"]["next"], "StorageRetryGateGold");
+        assert_eq!(pipeline["StorageRetryGateGold"]["next"], json!(["StorageFullGold", "StorageRetryUnknownGold", "StorageCloseGold"]));
+        assert_eq!(pipeline["StorageRetryUnknownGold"]["next"], "StorageReadFailed");
         assert_eq!(pipeline["StorageReadFailed"]["action"], "Click");
         assert_eq!(pipeline["StorageReadFailed"]["next"], "StorageContinue");
     }
