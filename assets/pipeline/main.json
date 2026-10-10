@@ -23,6 +23,7 @@
             "Surrender",
             "ReturnHome",
             "OpenBox",
+            "OpenBoxContinue",
             "OpenBoxTap",
             "CloseDialog",
         ],
@@ -311,10 +312,10 @@
     "OpenBoxContinue": {
         "recognition": "TemplateMatch",
         "template": "OpenBoxContinue",
-        "roi": [515,535,255,102],
+        "roi": [500,530,300,170],
         "threshold": 0.8,
         "action": "Click",
-        "next": "AttackStart",
+        "next": "AttackLoop",
         "on_error": "AttackLoop",
     },
 
