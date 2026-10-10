@@ -6,7 +6,7 @@ fn number(text: &str) -> Option<u64> {
     let grouped: String = text.chars().filter(|c| !c.is_whitespace()).collect();
     if grouped.contains('.') {
         let groups: Vec<_> = grouped.split('.').collect();
-        if groups[0].is_empty() || groups[0].len() > 3 || groups.iter().skip(1).any(|g| g.len() != 3) {
+        if groups[0].is_empty() || groups.iter().skip(1).any(|g| g.len() != 3) {
             return None;
         }
     }
@@ -59,7 +59,11 @@ pub fn register(resource: &Resource) -> crate::Result<()> {
                 let result = context
                     .run_recognition_direct("OCR", &params.to_string(), args.image)
                     .ok()??;
-                ocr_number(&result.detail, is_capacity)
+                let value = ocr_number(&result.detail, is_capacity);
+                if value.is_none() {
+                    eprintln!("仓库 OCR 读取失败 roi={roi:?}: {}", result.detail["filtered"]);
+                }
+                value
             };
             let current = read([width - 251, counter_y, 154, 31], false);
             let max = read([width - 290, capacity_y, 232, 23], true);
@@ -94,6 +98,8 @@ mod tests {
         assert_eq!(number("31 000 000"), Some(31_000_000));
         assert_eq!(number("31,000,000"), Some(31_000_000));
         assert_eq!(number("31.000.000"), Some(31_000_000));
+        assert_eq!(number("31 000.000"), Some(31_000_000));
+        assert_eq!(number("31000.000"), Some(31_000_000));
         assert_eq!(number("31.5"), None);
         assert_eq!(capacity("最大储量：500 000"), Some(500_000));
         assert!(number("32 000 000").unwrap() >= capacity("最大储量:31 000 000").unwrap());
