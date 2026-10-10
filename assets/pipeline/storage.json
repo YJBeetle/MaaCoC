@@ -9,7 +9,7 @@
         "post_delay": 800,
         "next": "StorageGateGold",
         "on_error": "StorageReadFailed",
-        "pre_delay": 1000
+        "pre_delay": 0
     },
     "StorageGateGold": {
         "next": [
@@ -255,6 +255,22 @@
             "state": "unknown"
         },
         "next": "StorageReadFailed",
+        "pre_delay": 0,
+        "post_delay": 0
+    },
+    "StorageQuickGate": {
+        "pre_delay": 1000,
+        "post_delay": 0,
+        "next": [
+            "StorageNotFull",
+            "StorageOpenGold"
+        ]
+    },
+    "StorageNotFull": {
+        "focus": "StorageNotFull!",
+        "recognition": "Custom",
+        "custom_recognition": "ResourceBelowCapacity",
+        "next": "StorageContinue",
         "pre_delay": 0,
         "post_delay": 0
     }

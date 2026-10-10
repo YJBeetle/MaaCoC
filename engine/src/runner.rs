@@ -32,6 +32,7 @@ pub struct Runner {
     bus: EventBus,
     pub label: String,
     army_read: crate::army::ReadResult,
+    storage_capacity: crate::storage::CapacityCache,
     adb_target: Option<(std::path::PathBuf, String)>,
 }
 
@@ -126,7 +127,7 @@ impl Runner {
     pub fn connect(assets: &Path, target: DeviceTarget, preferred: Option<&str>) -> Result<Self> {
         if matches!(target, DeviceTarget::Headless) {
             let resource = Resource::new()?;
-            crate::storage::register(&resource)?;
+            let storage_capacity = crate::storage::register(&resource)?;
             crate::loot::register(&resource)?;
             crate::army::register(&resource)?;
             check(
@@ -136,7 +137,7 @@ impl Runner {
             if !resource.loaded() {
                 return Err("资源未就绪".into());
             }
-            return Ok(Self::assemble(None, resource, "无设备（仅试跑）".into()));
+            return Ok(Self::assemble(None, resource, "无设备（仅试跑）".into(), storage_capacity));
         }
         let (controller, label, adb_target) = match target {
             DeviceTarget::Headless => return Err("无设备模式不需要建立连接".into()),
@@ -174,7 +175,7 @@ impl Runner {
         }
         let controller = Some(controller);
         let resource = Resource::new()?;
-        crate::storage::register(&resource)?;
+        let storage_capacity = crate::storage::register(&resource)?;
         crate::loot::register(&resource)?;
         crate::army::register(&resource)?;
         check(
@@ -184,12 +185,12 @@ impl Runner {
         if !resource.loaded() {
             return Err("资源未就绪".into());
         }
-        let mut runner = Self::assemble(controller, resource, label);
+        let mut runner = Self::assemble(controller, resource, label, storage_capacity);
         runner.adb_target = Some(adb_target);
         Ok(runner)
     }
 
-    fn assemble(controller: Option<Controller>, resource: Resource, label: String) -> Self {
+    fn assemble(controller: Option<Controller>, resource: Resource, label: String, storage_capacity: crate::storage::CapacityCache) -> Self {
         let army_read = crate::army::register_reader(&resource).expect("注册军队读取识别");
         let tasker = Tasker::new().expect("创建 Tasker 失败");
         let _ = tasker.bind_resource(&resource);
@@ -207,6 +208,7 @@ impl Runner {
             bus,
             label,
             army_read,
+            storage_capacity,
             adb_target: None,
         }
     }
@@ -297,6 +299,7 @@ impl Runner {
         }
         loot.validate()?;
         tactics.validate()?;
+        self.storage_capacity.reset();
         self.bus.restart();
         let mut pipeline = strategy.pipeline_override();
         pipeline.as_object_mut().unwrap().extend(

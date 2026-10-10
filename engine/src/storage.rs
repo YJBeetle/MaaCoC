@@ -1,6 +1,20 @@
 //! Compare village resource counters with the capacity tooltip, never a bar estimate.
 use maa_framework::{custom::FnRecognition, resource::Resource};
 use serde_json::{json, Value};
+use std::sync::{Arc, Mutex};
+
+#[derive(Clone, Default)]
+pub(crate) struct CapacityCache(Arc<Mutex<[Option<u64>; 3]>>);
+
+impl CapacityCache {
+    pub fn reset(&self) {
+        *self.0.lock().unwrap() = [None; 3];
+    }
+}
+
+fn below_capacity(current: Option<u64>, capacity: Option<u64>) -> bool {
+    current.zip(capacity).is_some_and(|(current, max)| current < max)
+}
 
 fn number(text: &str) -> Option<u64> {
     let grouped: String = text.chars().filter(|c| !c.is_whitespace()).collect();
@@ -43,10 +57,12 @@ pub(crate) fn ocr_number(detail: &Value, capacity_line: bool) -> Option<u64> {
     }
 }
 
-pub fn register(resource: &Resource) -> crate::Result<()> {
+pub(crate) fn register(resource: &Resource) -> crate::Result<CapacityCache> {
+    let cache = CapacityCache::default();
+    let observed = cache.clone();
     resource.register_custom_recognition(
         "ResourceCapacity",
-        Box::new(FnRecognition::new(|context, args| {
+        Box::new(FnRecognition::new(move |context, args| {
             let param: Value = serde_json::from_str(args.param).ok()?;
             let index = param["resource"].as_u64()? as usize;
             let (counter_y, capacity_y) = *[(27, 83), (95, 152), (160, 220)].get(index)?;
@@ -75,6 +91,7 @@ pub fn register(resource: &Resource) -> crate::Result<()> {
             let max = read([width - 290, capacity_y, 232, 23], true);
             let known = current.zip(max);
             if let Some((current, max)) = known {
+                observed.0.lock().unwrap()[index] = Some(max);
                 eprintln!("仓库检查 {}: {current}/{max}", ["金币", "圣水", "黑油"][index]);
             }
             let hit = match param["state"].as_str()? {
@@ -85,12 +102,40 @@ pub fn register(resource: &Resource) -> crate::Result<()> {
             hit.then(|| (*args.roi, json!({"current":current,"capacity":max}).to_string()))
         })),
     )?;
-    Ok(())
+    let cached = cache.clone();
+    resource.register_custom_recognition(
+        "ResourceBelowCapacity",
+        Box::new(FnRecognition::new(move |context, args| {
+            if args.image.width() != 1280 || args.image.height() != 720 {
+                return None;
+            }
+            let limits = *cached.0.lock().unwrap();
+            // Check dark elixir first: gold and elixir often fill up earlier.
+            for index in (0..3).rev() {
+                let Some(max) = limits[index] else { continue; };
+                let roi = [1029, [27, 95, 160][index], 154, 31];
+                for only_rec in [true, false] {
+                    let params = json!({"roi":roi,"only_rec":only_rec,"threshold":0.9});
+                    let Some(result) = context.run_recognition_direct(
+                        "OCR", &params.to_string(), args.image).ok().flatten() else { continue; };
+                    let current = ocr_number(&result.detail, false);
+                    if below_capacity(current, Some(max)) {
+                        eprintln!("仓库快速检查 {}: {}/{max}，未满", ["金币", "圣水", "黑油"][index], current.unwrap());
+                        return Some((*args.roi, json!({"resource":index,"current":current,"cached_capacity":max}).to_string()));
+                    }
+                    if current.is_some() { break; }
+                }
+            }
+            // Cached data never confirms full storage. Open fresh tooltips instead.
+            None
+        })),
+    )?;
+    Ok(cache)
 }
 
 pub fn pipeline_override(enabled: bool) -> Value {
     if enabled {
-        json!({"AttackStart":{"action":"DoNothing","next":"StorageOpenGold"}})
+        json!({"AttackStart":{"action":"DoNothing","next":"StorageQuickGate"}})
     } else {
         json!({})
     }
@@ -99,6 +144,18 @@ pub fn pipeline_override(enabled: bool) -> Value {
 #[cfg(test)]
 mod tests {
     use super::*;
+    #[test]
+    fn cached_capacity_can_only_prove_not_full() {
+        assert!(below_capacity(Some(409_224), Some(500_000)));
+        assert!(!below_capacity(Some(500_000), Some(500_000)));
+        assert!(!below_capacity(Some(501_000), Some(500_000)));
+        assert!(!below_capacity(None, Some(500_000)));
+        assert!(!below_capacity(Some(409_224), None));
+        let cache = CapacityCache::default();
+        cache.0.lock().unwrap()[2] = Some(500_000);
+        cache.reset();
+        assert_eq!(*cache.0.lock().unwrap(), [None; 3]);
+    }
     #[test]
     fn grouped_counts_and_overflow_rewards_are_supported() {
         assert_eq!(number("31 000 000"), Some(31_000_000));
