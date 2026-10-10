@@ -23,9 +23,11 @@ pub enum DeviceTarget {
 }
 
 pub struct Runner {
-    controller: Option<Controller>,
-    resource: Resource,
+    // Fields drop in declaration order. The tasker holds borrowed handles to
+    // both resource and controller, so destroy its worker before those handles.
     tasker: Tasker,
+    resource: Resource,
+    controller: Option<Controller>,
     sink_id: i64,
     bus: EventBus,
     pub label: String,

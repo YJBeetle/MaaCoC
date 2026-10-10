@@ -104,6 +104,7 @@ struct Inner {
     detail: String,
     panel: String,
     last_connection_check: Option<Instant>,
+    retiring: Vec<std::thread::JoinHandle<()>>,
 }
 
 #[derive(Debug, Clone, Serialize)]
@@ -132,6 +133,7 @@ impl AppState {
                 detail: String::new(),
                 panel: String::new(),
                 last_connection_check: None,
+                retiring: Vec::new(),
             }),
         }
     }
@@ -478,19 +480,36 @@ async fn status(state: State<'_, AppState>) -> Result<Status, String> {
             let runner = inner.runner.take();
             mark_device_disconnected(&mut inner);
             let status = status_of(&inner);
-            // Stop/drop outside the state lock so polling can show disconnection
-            // even if the framework takes time to drain an in-flight action.
-            drop(inner);
+            // Keep cleanup handles so process exit waits until MAA has stopped
+            // using its libraries; detached cleanup can race static destructors.
+            inner.retiring.retain(|worker| !worker.is_finished());
             if let Some(runner) = runner {
-                std::thread::spawn(move || {
+                inner.retiring.push(std::thread::spawn(move || {
                     runner.stop(Duration::from_secs(5));
                     drop(runner);
-                });
+                }));
             }
             return Ok(status);
         }
     }
     Ok(status_of(&inner))
+}
+
+fn shutdown(state: &AppState) {
+    let (runner, retiring) = {
+        let mut inner = state.inner.lock().unwrap();
+        let runner = inner.runner.take();
+        let retiring = std::mem::take(&mut inner.retiring);
+        mark_device_disconnected(&mut inner);
+        (runner, retiring)
+    };
+    if let Some(runner) = runner {
+        runner.stop(Duration::from_secs(5));
+        drop(runner);
+    }
+    for worker in retiring {
+        let _ = worker.join();
+    }
 }
 
 fn mark_device_disconnected(inner: &mut Inner) {
@@ -634,12 +653,11 @@ pub fn run() {
         .build(tauri::generate_context!())
         .expect("启动 MaaCoC 失败")
         .run(|app, event| {
-            if matches!(event, tauri::RunEvent::ExitRequested { .. }) {
+            // Native macOS Quit (Cmd+Q) can deliver Exit directly, without
+            // ExitRequested. Release MAA before AppKit calls C++ destructors.
+            if matches!(event, tauri::RunEvent::ExitRequested { .. } | tauri::RunEvent::Exit) {
                 if let Some(state) = app.try_state::<AppState>() {
-                    let inner = state.inner.lock().unwrap();
-                    if let Some(runner) = inner.runner.as_ref() {
-                        runner.stop(Duration::from_secs(5));
-                    }
+                    shutdown(&state);
                 }
             }
         });
@@ -648,6 +666,33 @@ pub fn run() {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn shutdown_releases_loaded_framework_without_a_phone() {
+        let state = AppState::new(Settings::default(), String::new());
+        let assets = PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("../../assets");
+        let runner = Runner::connect(&assets, DeviceTarget::Headless, None).unwrap();
+        state.inner.lock().unwrap().runner = Some(runner);
+        shutdown(&state);
+        assert!(state.inner.lock().unwrap().runner.is_none());
+    }
+
+    #[test]
+    fn shutdown_joins_retiring_connections_and_is_idempotent() {
+        use std::sync::{Arc, atomic::{AtomicBool, Ordering}};
+        let state = AppState::new(Settings::default(), String::new());
+        let finished = Arc::new(AtomicBool::new(false));
+        let flag = finished.clone();
+        state.inner.lock().unwrap().retiring.push(std::thread::spawn(move || {
+            std::thread::sleep(Duration::from_millis(30));
+            flag.store(true, Ordering::SeqCst);
+        }));
+        shutdown(&state);
+        assert!(finished.load(Ordering::SeqCst));
+        assert!(state.inner.lock().unwrap().retiring.is_empty());
+        shutdown(&state);
+        assert_eq!(state.inner.lock().unwrap().phase, Phase::Idle);
+    }
 
     #[test]
     fn unplugging_clears_device_state_and_stops_uptime() {
