@@ -1,6 +1,7 @@
 import type { ArmyCard, Settings, Status } from "../api";
 import { encodeArmy, decodeArmy } from "../army-share";
 import { el } from "../dom";
+import { TacticsEditor } from "./tactics-editor";
 
 /** Keep the editable list stable while the engine polls status. */
 export class ArmyPage {
@@ -18,8 +19,10 @@ export class ArmyPage {
   private key = "";
   private settings!: Settings;
   private cards: ArmyCard[] = [];
+  private tactics: TacticsEditor;
 
   constructor(private persist: (next: Partial<Settings>) => Promise<void>, apply: () => Promise<void>, stop: () => Promise<void>, read: () => Promise<void>) {
+    this.tactics = new TacticsEditor(persist);
     const tabs = el("div", { class: "army-toolbar" });
     for (const [group, label] of [["Unit", "兵种"], ["Spell", "法术"], ["Siege", "战车"]]) {
       const tab = el("md-outlined-button", { text: label });
@@ -35,13 +38,14 @@ export class ArmyPage {
     this.stop.addEventListener("click", () => void stop());
     const actions = el("div", { class: "army-toolbar" });
     actions.append(this.read, this.apply, this.stop, clear);
-    const share = el("textarea", { rows: "3", placeholder: "粘贴 MC1: 分享码", "aria-label": "卡组分享码" });
+    const share = el("textarea", { rows: "3", placeholder: "粘贴 MC2: 分享码", "aria-label": "卡组分享码" });
     const message = el("p", { role: "status" });
     const exportButton = el("md-outlined-button", { text: "生成分享码" });
     exportButton.addEventListener("click", () => {
       if (!this.settings.army.entries.length) { message.textContent = "请先配置卡组"; return; }
-      share.value = encodeArmy(this.settings); share.select();
-      message.textContent = "分享码已生成，包含卡组和当前策略；可复制给其他玩家。";
+      try { share.value = encodeArmy(this.settings); share.select(); }
+      catch (err) { message.textContent = String(err); return; }
+      message.textContent = "分享码已生成，包含卡组、当前策略和自定义战术；可复制给其他玩家。";
     });
     const importButton = el("md-outlined-button", { text: "导入分享码" });
     importButton.addEventListener("click", async () => {
@@ -54,7 +58,7 @@ export class ArmyPage {
     shareActions.append(exportButton, importButton);
     sharing.append(el("h2", { text: "卡组与策略分享" }), share, shareActions, message);
     this.element.append(el("p", { text: "先检查卡牌是否可用及容量，再替换部队、法术和战车。英雄、宠物和装备保留。" }),
-      el("p", { text: "最多配置 6 种兵、6 种法术和 3 种战车；数量 0 表示不携带。活动卡以游戏当前开放情况为准。" }), tabs, this.summary, this.error, actions, sharing, this.grid);
+      el("p", { text: "最多配置 6 种兵、6 种法术和 3 种战车；数量 0 表示不携带。活动卡以游戏当前开放情况为准。" }), tabs, this.summary, this.error, actions, this.tactics.element, sharing, this.grid);
   }
 
   render(state: { settings: Settings; cards: ArmyCard[]; status: Status }) {
@@ -62,6 +66,7 @@ export class ArmyPage {
     this.cards = state.cards;
     const running = state.status.phase === "running";
     this.busy = running;
+    this.tactics.render(this.settings,this.cards,running);
     this.clear.toggleAttribute("disabled", running);
     this.apply.toggleAttribute("disabled", state.status.phase !== "ready" || !this.settings.army.entries.length);
     this.read.toggleAttribute("disabled", state.status.phase !== "ready");

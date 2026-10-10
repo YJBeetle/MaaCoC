@@ -230,10 +230,22 @@ impl Runner {
         stop_when_full: bool,
         loot: &crate::loot::LootFilter,
     ) -> Result<()> {
+        self.start_farming_with_tactics(entry, strategy, stop_when_full, loot, &crate::tactics::Tactics::default())
+    }
+
+    pub fn start_farming_with_tactics(
+        &self,
+        entry: &str,
+        strategy: crate::Strategy,
+        stop_when_full: bool,
+        loot: &crate::loot::LootFilter,
+        tactics: &crate::tactics::Tactics,
+    ) -> Result<()> {
         if !self.inited() {
             return Err("Tasker 未初始化（资源或控制器未绑定）".into());
         }
         loot.validate()?;
+        tactics.validate()?;
         self.bus.restart();
         let mut pipeline = strategy.pipeline_override();
         pipeline.as_object_mut().unwrap().extend(
@@ -242,6 +254,7 @@ impl Runner {
                 .unwrap()
                 .clone(),
         );
+        tactics.apply_override(&mut pipeline)?;
         crate::loot::apply_override(&mut pipeline, loot);
         // Never wait on the returned job: the battle loop is a resident task.
         self.tasker.post_task(entry, &pipeline.to_string())?;

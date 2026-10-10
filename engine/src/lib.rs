@@ -8,6 +8,7 @@ pub mod pipeline;
 pub mod runner;
 pub mod storage;
 pub mod strategy;
+pub mod tactics;
 pub mod trial;
 
 pub use events::{EventBus, NodeEvent};

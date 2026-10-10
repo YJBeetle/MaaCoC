@@ -27,6 +27,7 @@ pub struct Settings {
     pub record_frames: bool,
     pub theme_mode: String,
     pub strategy: Strategy,
+    pub tactics: maacoc_engine::tactics::Tactics,
     pub stop_when_full: bool,
     pub loot_filter: maacoc_engine::loot::LootFilter,
     pub army: maacoc_engine::army::ArmyPlan,
@@ -44,6 +45,7 @@ impl Default for Settings {
             record_frames: false,
             theme_mode: "system".into(),
             strategy: Strategy::default(),
+            tactics: Default::default(),
             stop_when_full: true,
             loot_filter: Default::default(),
             army: Default::default(),
@@ -220,6 +222,7 @@ async fn save_settings<R: Runtime>(
     next: Settings,
 ) -> Result<Settings, String> {
     next.loot_filter.validate().map_err(|e| e.to_string())?;
+    next.tactics.validate().map_err(|e| e.to_string())?;
     if !next.army.entries.is_empty() {
         next.army.validate(&read_army_cards(&app)?).map_err(|e| e.to_string())?;
     }
@@ -366,11 +369,12 @@ fn begin(inner: &mut Inner) -> Result<(), String> {
     let entry = inner.settings.entry.clone();
     let runner = inner.runner.as_ref().ok_or("尚未连接设备")?;
     runner
-        .start_farming_with_loot(
+        .start_farming_with_tactics(
             &entry,
             inner.settings.strategy,
             inner.settings.stop_when_full,
             &inner.settings.loot_filter,
+            &inner.settings.tactics,
         )
         .map_err(|e| e.to_string())?;
     inner.phase = Phase::Running;
@@ -684,6 +688,7 @@ mod tests {
                 "showMisses",
                 "stopWhenFull",
                 "strategy",
+                "tactics",
                 "themeMode"
             ]
         );

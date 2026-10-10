@@ -34,7 +34,7 @@ fn usage() {
   snap [输出.png]                 截一帧，报告设备与匹配空间尺寸
   shell <命令...>                 通过 MaaFramework 在设备上执行 adb shell 命令
   load [assets]                  加载资源并列出节点
-  run [--minutes N] [--entry E] [--strategy spells-first|units-first|left-spread|air-probe] [--keep-farming]
+  run [--minutes N] [--entry E] [--strategy spells-first|units-first|left-spread|air-probe] [--keep-farming] [--tactics 配置.json]
                                  跑自动战斗循环并打印节点时间轴
   reco <节点> <帧.png> [阈值]     在一张静态帧上试跑该节点的识别
   regress [语料目录]              对已录制的帧重跑识别，检查资产退化
@@ -214,13 +214,18 @@ fn battle(assets: &Path, args: &[String], preferred: Option<&str>) -> Result<(),
         Some(i) => Strategy::parse(args.get(i + 1).ok_or("--strategy 缺少策略名称")?)?,
         None => Strategy::default(),
     };
+    let tactics: maacoc_engine::tactics::Tactics = match args.iter().position(|a| a == "--tactics") {
+        Some(i) => serde_json::from_str(&std::fs::read_to_string(args.get(i+1).ok_or("--tactics 缺少配置文件")?)?)?,
+        None => Default::default(),
+    };
+    tactics.validate()?;
     let runner = Runner::connect(assets, DeviceTarget::Adb, preferred)?;
     let recorder = record_dir.as_ref().map(FrameStore::open);
     if recorder.is_some() {
         runner.set_debug_mode(true)?;
     }
     println!("{} 资源就绪，投递任务 {entry}", runner.label);
-    runner.start_farming(entry, strategy, !args.iter().any(|a| a == "--keep-farming"))?;
+    runner.start_farming_with_tactics(entry, strategy, !args.iter().any(|a| a == "--keep-farming"), &Default::default(), &tactics)?;
 
     let deadline = Instant::now() + Duration::from_secs_f64(minutes * 60.0);
     let mut total = 0usize;

@@ -45,9 +45,13 @@ export interface Status {
 
 export type Strategy = "spells-first" | "units-first" | "left-spread" | "air-probe";
 
+export interface TacticStep { card: string; count: number; x: number; y: number; delayMs: number; intervalMs: number; }
+export interface Tactics { enabled: boolean; prepareCamera: boolean; steps: TacticStep[]; }
+
 export interface Settings {
   army: ArmyPlan;
   strategy: Strategy;
+  tactics: Tactics;
   stopWhenFull: boolean;
   lootFilter: LootFilter;
   entry: string;
@@ -103,6 +107,7 @@ export interface EngineApi {
 export const DEFAULT_SETTINGS: Settings = {
   army: { entries: [] },
   strategy: "spells-first",
+  tactics: { enabled: false, prepareCamera: false, steps: [] },
   stopWhenFull: true,
   lootFilter: { enabled: false, minGold: 0, minElixir: 0, minDark: 0, minGoldElixir: 1000000, matchAny: true, maxSkips: 30 },
   entry: "Main",

@@ -1,6 +1,8 @@
-import type { ArmyCard, ArmyPlan, Settings, Strategy } from "./api";
+import type { ArmyCard, ArmyPlan, Settings, Strategy, Tactics } from "./api";
 
-const PREFIX = "MC1:";
+import { validateTactics } from "./tactics.ts";
+
+const PREFIX = "MC2:";
 const STRATEGIES: Strategy[] = ["spells-first", "units-first", "left-spread", "air-probe"];
 // These indices are part of the share format: append new names, never reorder.
 const NAMES: Record<string, string[]> = {
@@ -29,18 +31,22 @@ function checksum(text: string): string {
 }
 
 /** Compact, versioned data. Importing never operates the phone. */
-export function encodeArmy(settings: Pick<Settings, "army" | "strategy">): string {
+export function encodeArmy(settings: Pick<Settings, "army" | "strategy" | "tactics">): string {
   const strategy = STRATEGIES.indexOf(settings.strategy);
   if (strategy < 0 || !settings.army.entries.length) throw new Error("请先配置卡组和策略");
-  const body = strategy + ":" + settings.army.entries.map(e => `${cardCode(e.id)}.${e.count.toString(36)}`).join(",");
+  const t = settings.tactics;
+  validateTactics(t, t.steps.map(s => ({id:s.card,group:"",name:"",preview:""})));
+  const flags = Number(t.enabled) | (Number(t.prepareCamera) << 1);
+  const steps = t.steps.map(s => [cardCode(s.card), ...[s.count,s.x,s.y,s.delayMs,s.intervalMs].map(n => n.toString(36))].join(".")).join(",");
+  const body = strategy + ":" + settings.army.entries.map(e => `${cardCode(e.id)}.${e.count.toString(36)}`).join(",") + ":" + flags + ";" + steps;
   return PREFIX + body + ":" + checksum(body);
 }
 
-export function decodeArmy(code: string, cards: ArmyCard[]): { army: ArmyPlan; strategy: Strategy } {
+export function decodeArmy(code: string, cards: ArmyCard[]): { army: ArmyPlan; strategy: Strategy; tactics: Tactics } {
   const text = code.trim();
-  if (!text.startsWith(PREFIX) || text.length > 1000) throw new Error("分享码格式或版本不支持");
+  if (!text.startsWith(PREFIX) || text.length > 8000) throw new Error("分享码格式或版本不支持");
   const parts = text.slice(PREFIX.length).split(":");
-  if (parts.length !== 3 || !/^[0-3]$/.test(parts[0]) || checksum(parts[0] + ":" + parts[1]) !== parts[2]) throw new Error("分享码已损坏");
+  if (parts.length !== 4 || !/^[0-3]$/.test(parts[0]) || checksum(parts.slice(0,3).join(":")) !== parts[3]) throw new Error("分享码已损坏");
   const seen = new Set<string>();
   const groups: Record<string, number> = {};
   const entries = parts[1].split(",").map(token => {
@@ -54,5 +60,17 @@ export function decodeArmy(code: string, cards: ArmyCard[]): { army: ArmyPlan; s
     if (groups[card.group] > (card.group === "Siege" ? 3 : 6)) throw new Error("卡牌种类超过当前支持数量");
     return { id: card.id, count };
   });
-  return { army: { entries }, strategy: STRATEGIES[Number(parts[0])] };
+  const [flags, rawSteps, extra] = parts[2].split(";");
+  if (!/^[0-3]$/.test(flags) || rawSteps === undefined || extra !== undefined) throw new Error("战术格式无效");
+  const steps = rawSteps ? rawSteps.split(",").map(token => {
+    if (!/^[uesv][0-9a-z]+(?:\.[0-9a-z]+){5}$/.test(token)) throw new Error("战术步骤格式无效");
+    const [key,...values] = token.split(".");
+    const card = cards.find(c => cardCode(c.id) === key);
+    if (!card) throw new Error("战术包含未知卡牌");
+    const [count,x,y,delayMs,intervalMs] = values.map(n => parseInt(n,36));
+    return {card:card.id,count,x,y,delayMs,intervalMs};
+  }) : [];
+  const tactics = {enabled:!!(Number(flags)&1),prepareCamera:!!(Number(flags)&2),steps};
+  validateTactics(tactics,cards);
+  return { army: { entries }, strategy: STRATEGIES[Number(parts[0])], tactics };
 }
