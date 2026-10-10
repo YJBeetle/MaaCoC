@@ -355,7 +355,7 @@ async fn connect<R: Runtime>(app: AppHandle<R>, state: State<'_, AppState>) -> R
             apply_recording(&mut inner, &app)?;
             if inner.settings.auto_start {
                 // 连接成功就开跑；起不来仍然算连上了，把原因显示出来供手动重试。
-                if let Err(err) = begin(&mut inner) {
+                if let Err(err) = begin(&mut inner, &app) {
                     let label = std::mem::take(&mut inner.detail);
                     inner.detail = format!("{label}（自动开始失败: {err}）");
                 }
@@ -370,7 +370,11 @@ async fn connect<R: Runtime>(app: AppHandle<R>, state: State<'_, AppState>) -> R
     }
 }
 
-fn begin(inner: &mut Inner) -> Result<(), String> {
+fn begin<R: Runtime>(inner: &mut Inner, app: &AppHandle<R>) -> Result<(), String> {
+    let panel = panel_sizes(inner.runner.as_ref().ok_or("尚未连接设备")?)?;
+    if !panel.ends_with("当前 1080×1920") {
+        resize_controller(inner, app, false)?;
+    }
     let entry = inner.settings.entry.clone();
     let runner = inner.runner.as_ref().ok_or("尚未连接设备")?;
     runner
@@ -389,9 +393,9 @@ fn begin(inner: &mut Inner) -> Result<(), String> {
 }
 
 #[tauri::command]
-async fn start(state: State<'_, AppState>) -> Result<Status, String> {
+async fn start<R: Runtime>(app: AppHandle<R>, state: State<'_, AppState>) -> Result<Status, String> {
     let mut inner = state.inner.lock().unwrap();
-    begin(&mut inner)?;
+    begin(&mut inner, &app)?;
     Ok(status_of(&inner))
 }
 
@@ -440,21 +444,41 @@ fn panel_sizes(runner: &Runner) -> Result<String, String> {
 /// logical size the assets were cropped for, or hand the phone its stock
 /// geometry back. Re-reads the panel so the stage badge shows the new size.
 #[tauri::command]
-async fn screen_size(state: State<'_, AppState>, reset: bool) -> Result<(), String> {
+async fn screen_size<R: Runtime>(app: AppHandle<R>, state: State<'_, AppState>, reset: bool) -> Result<(), String> {
     let mut inner = state.inner.lock().unwrap();
+    resize_controller(&mut inner, &app, reset)
+}
+
+fn resize_controller<R: Runtime>(inner: &mut Inner, app: &AppHandle<R>, reset: bool) -> Result<(), String> {
     let runner = inner.runner.as_ref().ok_or("尚未连接设备")?;
     if runner.running() {
-        // The panel re-layouts mid-battle, so every tap in flight is wrong.
         return Err("战斗进行中，请先停止再改分辨率".into());
     }
-    let cmd = if reset {
-        "wm size reset".to_owned()
-    } else {
-        format!("wm size {DEVICE_MATCH_SIZE}")
-    };
+    let address = runner.device_address().ok_or("当前设备不是 ADB 设备")?.to_owned();
+    let cmd = if reset { "wm size reset".to_owned() } else { format!("wm size {DEVICE_MATCH_SIZE}") };
     runner.shell(&cmd).map_err(|e| e.to_string())?;
-    inner.panel = panel_sizes(runner)?;
-    Ok(())
+    // MaaTouch caches the display geometry on connection. Recreate the
+    // controller after wm size so clicks use the new coordinate mapping.
+    drop(inner.runner.take());
+    inner.last_reco = 0;
+    inner.last_connection_check = None;
+    let outcome = assets_dir(app).and_then(|assets| {
+        Runner::connect(&assets, DeviceTarget::Adb, Some(&address)).map_err(|e| e.to_string())
+    });
+    match outcome {
+        Ok(runner) => {
+            inner.panel = panel_sizes(&runner)?;
+            inner.detail = runner.label.clone();
+            inner.runner = Some(runner);
+            inner.phase = Phase::Ready;
+            apply_recording(inner, app)
+        }
+        Err(err) => {
+            mark_device_disconnected(inner);
+            inner.detail = err.clone();
+            Err(err)
+        }
+    }
 }
 
 fn status_of(inner: &Inner) -> Status {

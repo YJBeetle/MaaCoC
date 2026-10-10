@@ -359,6 +359,10 @@ impl Runner {
         })
     }
 
+    pub fn device_address(&self) -> Option<&str> {
+        self.adb_target.as_ref().map(|(_, address)| address.as_str())
+    }
+
     pub fn poll(&self) -> Vec<NodeEvent> {
         self.bus.drain()
     }
@@ -383,7 +387,21 @@ impl Runner {
 
     pub fn screencap_png(&self) -> Result<Vec<u8>> {
         let controller = self.controller.as_ref().ok_or("当前无设备，无法截图")?;
-        check(controller.wait(controller.post_screencap()?), "截图")?;
+        let id = controller.post_screencap()?;
+        let deadline = Instant::now() + Duration::from_secs(5);
+        loop {
+            let status = controller.status(id);
+            if status == MaaStatus::SUCCEEDED {
+                break;
+            }
+            if status == MaaStatus::FAILED {
+                return Err("截图失败".into());
+            }
+            if Instant::now() >= deadline {
+                return Err("截图超时，请检查设备连接".into());
+            }
+            thread::sleep(Duration::from_millis(20));
+        }
         let image = controller.cached_image()?;
         image.to_vec().ok_or_else(|| "截图缓冲区为空".into())
     }
