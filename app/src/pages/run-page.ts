@@ -98,8 +98,18 @@ export class RunPage {
     const rows = ["金币", "圣水", "黑油"].map((name, index) => {
       const reading = state.status.resources?.[index];
       const row = el("div", { class: "resource-row" });
-      row.append(el("span", { text: name }), el("strong", { text: reading ? format.format(reading.current) : "未读取" }));
-      row.append(el("span", { class: "resource-meta", text: reading ? `${reading.capacity === null ? "容量未读取" : `容量 ${format.format(reading.capacity)}`} · ${new Date(reading.readAt * 1000).toLocaleTimeString("zh-CN", {hour12:false})}` : "等待仓库检查" }));
+      const hasValue = reading?.current != null;
+      row.append(el("span", { text: name }), el("strong", { text: hasValue ? format.format(reading!.current!) : "未读取" }));
+      const meta: string[] = [];
+      if (reading) {
+        if (reading.currentFailed) meta.push(hasValue ? "本次数量读取失败 · 保留旧读数" : "本次数量读取失败");
+        if (reading.capacityFailed) meta.push(reading.capacity === null ? "本次容量读取失败" : "本次容量读取失败 · 保留已知容量");
+        meta.push(reading.capacity === null ? "容量未读取" : `容量 ${format.format(reading.capacity)}`);
+        if (reading.readAt !== null) meta.push(`最近成功读取 ${new Date(reading.readAt * 1000).toLocaleTimeString("zh-CN", {hour12:false})}`);
+        else meta.push("尚无成功数量读数");
+      } else meta.push("等待仓库检查");
+      row.append(el("span", { class: "resource-meta", text: meta.join(" · ") }));
+      row.classList.toggle("read-failed", !!(reading?.currentFailed || reading?.capacityFailed));
       return row;
     });
     this.resources.replaceChildren(...rows);

@@ -7,9 +7,11 @@ use serde::Serialize;
 #[derive(Debug, Clone, Copy, Serialize)]
 #[serde(rename_all = "camelCase")]
 pub struct ResourceReading {
-    pub current: u64,
+    pub current: Option<u64>,
     pub capacity: Option<u64>,
-    pub read_at: f64,
+    pub read_at: Option<f64>,
+    pub current_failed: bool,
+    pub capacity_failed: bool,
 }
 
 fn read_time() -> f64 {
@@ -23,6 +25,25 @@ impl CapacityCache {
     pub fn readings(&self) -> [Option<ResourceReading>; 3] {
         *self.1.lock().unwrap()
     }
+    fn observe(&self, index: usize, current: Option<u64>, capacity: Option<u64>, check_capacity: bool) {
+        if let Some(max) = capacity {
+            self.0.lock().unwrap()[index] = Some(max);
+        }
+        let max = self.0.lock().unwrap()[index];
+        let mut readings = self.1.lock().unwrap();
+        let reading = readings[index].get_or_insert(ResourceReading {
+            current: None, capacity: max, read_at: None,
+            current_failed: false, capacity_failed: false,
+        });
+        reading.current_failed = current.is_none();
+        if let Some(value) = current {
+            reading.current = Some(value);
+            reading.read_at = Some(read_time());
+        }
+        reading.capacity = max;
+        if check_capacity { reading.capacity_failed = capacity.is_none(); }
+    }
+
     pub fn reset(&self) {
         *self.0.lock().unwrap() = [None; 3];
         *self.1.lock().unwrap() = [None; 3];
@@ -87,6 +108,7 @@ pub(crate) fn register(resource: &Resource) -> crate::Result<CapacityCache> {
             let (counter_y, capacity_y) = *[(27, 83), (95, 152), (160, 220)].get(index)?;
             let width = args.image.width();
             if args.image.height() != 720 || width != 1280 {
+                observed.observe(index, None, None, true);
                 return None;
             }
             let read = |roi, is_capacity| {
@@ -111,9 +133,8 @@ pub(crate) fn register(resource: &Resource) -> crate::Result<CapacityCache> {
             let current = read([width - 251, counter_y, 154, 31], false);
             let max = read([width - 290, capacity_y, 232, 23], true);
             let known = current.zip(max);
+            observed.observe(index, current, max, true);
             if let Some((current, max)) = known {
-                observed.0.lock().unwrap()[index] = Some(max);
-                observed.1.lock().unwrap()[index] = Some(ResourceReading {current, capacity:Some(max), read_at:read_time()});
                 eprintln!("仓库检查 {}: {current}/{max}", ["金币", "圣水", "黑油"][index]);
             }
             let hit = match param["state"].as_str()? {
@@ -129,6 +150,7 @@ pub(crate) fn register(resource: &Resource) -> crate::Result<CapacityCache> {
         "ResourceBelowCapacity",
         Box::new(FnRecognition::new(move |context, args| {
             if args.image.width() != 1280 || args.image.height() != 720 {
+                for index in 0..3 { cached.observe(index, None, None, false); }
                 return None;
             }
             let limits = *cached.0.lock().unwrap();
@@ -147,8 +169,8 @@ pub(crate) fn register(resource: &Resource) -> crate::Result<CapacityCache> {
                         best = Some(current);
                     }
                 }
+                cached.observe(index, best, None, false);
                 if let Some(current) = best {
-                    cached.1.lock().unwrap()[index] = Some(ResourceReading {current, capacity:max, read_at:read_time()});
                     if not_full.is_none() && below_capacity(Some(current), max) {
                         not_full = Some((index, current, max.unwrap()));
                     }
@@ -175,6 +197,33 @@ pub fn pipeline_override(enabled: bool) -> Value {
 #[cfg(test)]
 mod tests {
     use super::*;
+    #[test]
+    fn failed_reads_preserve_history_and_recovery_clears_only_the_recovered_field() {
+        let cache = CapacityCache::default();
+        cache.observe(2, None, None, true);
+        let empty = cache.readings()[2].unwrap();
+        assert_eq!(empty.current, None);
+        assert_eq!(empty.read_at, None);
+        assert!(empty.current_failed && empty.capacity_failed);
+        cache.observe(2, Some(499_962), Some(500_000), true);
+        let good = cache.readings()[2].unwrap();
+        cache.observe(2, None, None, true);
+        let failed = cache.readings()[2].unwrap();
+        assert_eq!(failed.current, good.current);
+        assert_eq!(failed.capacity, good.capacity);
+        assert_eq!(failed.read_at, good.read_at);
+        assert!(failed.current_failed && failed.capacity_failed);
+        cache.observe(2, Some(500_000), None, false);
+        let partial = cache.readings()[2].unwrap();
+        assert_eq!(partial.current, Some(500_000));
+        assert!(!partial.current_failed && partial.capacity_failed);
+        cache.observe(2, Some(500_000), Some(500_000), true);
+        let recovered = cache.readings()[2].unwrap();
+        assert!(!recovered.current_failed && !recovered.capacity_failed);
+        cache.reset();
+        assert!(cache.readings().iter().all(Option::is_none));
+    }
+
     #[test]
     fn cached_capacity_can_only_prove_not_full() {
         assert!(below_capacity(Some(409_224), Some(500_000)));

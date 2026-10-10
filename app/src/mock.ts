@@ -27,6 +27,15 @@ const SCRIPT: Array<Partial<NodeEvent> & { at: number; node: string; kind: strin
 export function createMockApi(): EngineApi {
   let settings: Settings = { ...DEFAULT_SETTINGS };
   let status: Status = { phase: "idle", detail: "", battles: 0, uptimeMs: 0, currentNode: "", panel: "" };
+  // Dev-only layout case: old count, old capacity, and failure before any success.
+  if (new URLSearchParams(location.search).get("storage") === "failed") {
+    const readAt = Date.now() / 1000 - 120;
+    status.resources = [
+      { current: 499962, capacity: 500000, readAt, currentFailed: true, capacityFailed: false },
+      { current: 31000000, capacity: 31000000, readAt, currentFailed: false, capacityFailed: true },
+      { current: null, capacity: null, readAt: null, currentFailed: true, capacityFailed: true },
+    ];
+  }
   let cursor = 0;
   let clock = 0;
 

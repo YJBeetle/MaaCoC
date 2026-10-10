@@ -33,7 +33,7 @@ export interface NodeEvent {
 
 export type Phase = "idle" | "connecting" | "ready" | "running" | "error";
 
-export interface ResourceReading { current: number; capacity: number | null; readAt: number; }
+export interface ResourceReading { current: number | null; capacity: number | null; readAt: number | null; currentFailed: boolean; capacityFailed: boolean; }
 
 export interface Status {
   phase: Phase;
