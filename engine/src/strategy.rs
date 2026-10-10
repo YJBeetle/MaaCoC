@@ -30,11 +30,12 @@ impl Strategy {
                 ["ReturnHome", "FindUnit", "FindSiege", "FindHero", "FindSpell"]
             }
         };
-        let mut pipeline = json!({"Deploy": {"next": next}});
+        let mut pipeline = json!({
+            "Deploy": {"next": next},
+            "FindNext": {"next": "SpreadZoom"},
+            "BattleReady": {"next": "SpreadZoom"}
+        });
         if matches!(self, Self::LeftSpread | Self::AirProbe) {
-            pipeline["FindNext"] = json!({"next": "SpreadZoom"});
-            // Resuming an existing battle also prepares the camera before placement.
-            pipeline["BattleReady"] = json!({"next": "SpreadZoom"});
             pipeline["FindUnit"] = json!({"next": "SpreadUnit1"});
             pipeline["FindSiege"] = json!({"next": "SpreadSiege"});
             pipeline["FindHero"] = json!({"next": "SpreadHero"});
@@ -99,7 +100,13 @@ mod tests {
         assert_eq!(data["BattleReady"]["next"], "SpreadZoom");
         assert_eq!(data["FindUnit"]["next"], "SpreadUnit1");
         assert_eq!(data["FindSpell"]["next"], "SpreadSpell1");
-        assert!(Strategy::UnitsFirst.pipeline_override().get("FindNext").is_none());
+        for preset in [Strategy::SpellsFirst, Strategy::UnitsFirst, Strategy::LeftSpread, Strategy::AirProbe] {
+            let nodes = preset.pipeline_override();
+            assert_eq!(nodes["FindNext"]["next"], "SpreadZoom");
+            assert_eq!(nodes["BattleReady"]["next"], "SpreadZoom");
+            // Camera preparation belongs only to the opening, never Deploy's loop.
+            assert!(!nodes["Deploy"]["next"].as_array().unwrap().contains(&serde_json::json!("SpreadZoom")));
+        }
         let nodes: serde_json::Value =
             serde_json::from_str(include_str!("../../assets/pipeline/left-spread.json")).unwrap();
         assert_eq!(nodes["SpreadUnit3"]["next"], "Deploy");

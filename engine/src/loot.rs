@@ -158,11 +158,7 @@ mod tests {
             assert_eq!(data["FindNext"]["next"], "LootCheck");
             assert_eq!(
                 data["LootCheck"]["custom_recognition_param"]["accept_next"],
-                if strategy == crate::Strategy::SpellsFirst {
-                    "SlideLeft"
-                } else {
-                    "SpreadZoom"
-                }
+                "SpreadZoom"
             );
         }
         assert!(LootFilter {
