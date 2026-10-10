@@ -1,5 +1,6 @@
 //! MaaCoC engine: device access, task lifecycle and recognition tooling.
 
+pub mod army;
 pub mod events;
 pub mod frames;
 pub mod loot;

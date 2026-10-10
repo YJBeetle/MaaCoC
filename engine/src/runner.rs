@@ -79,6 +79,7 @@ impl Runner {
             let resource = Resource::new()?;
             crate::storage::register(&resource)?;
             crate::loot::register(&resource)?;
+            crate::army::register(&resource)?;
             check(
                 resource.post_bundle(assets.to_str().ok_or("资源路径无效")?)?.wait(),
                 "加载资源",
@@ -126,6 +127,7 @@ impl Runner {
         let resource = Resource::new()?;
         crate::storage::register(&resource)?;
         crate::loot::register(&resource)?;
+        crate::army::register(&resource)?;
         check(
             resource.post_bundle(assets.to_str().ok_or("资源路径无效")?)?.wait(),
             "加载资源",
@@ -173,6 +175,26 @@ impl Runner {
 
     pub fn start(&self, entry: &str) -> Result<()> {
         self.start_with_strategy(entry, crate::Strategy::default())
+    }
+
+    pub fn start_army(&self, plan: &crate::army::ArmyPlan, cards: &[crate::army::ArmyCard]) -> Result<()> {
+        if self.running() {
+            return Err("请先停止挂机再配卡".into());
+        }
+        let pipeline = crate::army::pipeline(plan, cards)?;
+        self.bus.restart();
+        self.tasker.post_task("ArmyApply", &pipeline.to_string())?;
+        Ok(())
+    }
+
+    pub fn verify_army(&self, plan: &crate::army::ArmyPlan, cards: &[crate::army::ArmyCard]) -> Result<()> {
+        if self.running() {
+            return Err("请先停止挂机再配卡".into());
+        }
+        let pipeline = crate::army::verification_pipeline(plan, cards)?;
+        self.bus.restart();
+        self.tasker.post_task("ArmyApply", &pipeline.to_string())?;
+        Ok(())
     }
 
     pub fn start_with_strategy(&self, entry: &str, strategy: crate::Strategy) -> Result<()> {

@@ -28,6 +28,7 @@ fn usage() {
     println!(
         "用法: maacoc-engine <命令> [参数]
 
+  army <配置.json>               替换部队、法术和战车并核对数量
   devices                        列出 ADB 设备
   snap [输出.png]                 截一帧，报告设备与匹配空间尺寸
   shell <命令...>                 通过 MaaFramework 在设备上执行 adb shell 命令
@@ -63,6 +64,7 @@ fn run() -> Result<(), Error> {
         Some("shell") => shell(assets, &args[1..], preferred.as_deref()),
         Some("load") => load(assets),
         Some("run") => battle(assets, &args, preferred.as_deref()),
+        Some("army") => configure_army(assets, &args, preferred.as_deref()),
         Some("reco") => reco(assets, &args),
         Some("regress") => regress(assets, args.get(1).cloned()),
         Some("patch") => patch(assets, &args),
@@ -70,6 +72,37 @@ fn run() -> Result<(), Error> {
             usage();
             Ok(())
         }
+    }
+}
+
+fn configure_army(assets: &Path, args: &[String], preferred: Option<&str>) -> Result<(), Error> {
+    let path = args.get(1).ok_or("用法: army <配置.json>")?;
+    let plan = serde_json::from_str(&std::fs::read_to_string(path)?)?;
+    let cards: Vec<maacoc_engine::army::ArmyCard> =
+        serde_json::from_str(&std::fs::read_to_string(assets.join("army.json"))?)?;
+    let runner = Runner::connect(assets, DeviceTarget::Adb, preferred)?;
+    if args.iter().any(|arg| arg == "--verify-only") {
+        runner.verify_army(&plan, &cards)?;
+    } else {
+        runner.start_army(&plan, &cards)?;
+    }
+    let deadline = Instant::now() + Duration::from_secs(600);
+    let mut completed = false;
+    while Instant::now() < deadline {
+        for event in runner.poll() {
+            completed |= event.node == "ArmyComplete" && event.hit && event.kind == "action";
+            print_event(&event);
+        }
+        if !runner.running() {
+            break;
+        }
+        thread::sleep(Duration::from_millis(100));
+    }
+    runner.stop(Duration::from_secs(15));
+    if completed {
+        Ok(())
+    } else {
+        Err("配卡未完成，请检查最后失败的节点".into())
     }
 }
 
