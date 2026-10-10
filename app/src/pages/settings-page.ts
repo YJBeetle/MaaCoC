@@ -206,7 +206,7 @@ export class SettingsPage {
       state.settings.strategy, (value) => void this.persist({ strategy: value as Strategy }), "—",
     );
     if (strategy) strategy.disabled = state.running;
-    const fullStop = this.syncSwitch("f-full-stop", "满仓后停止刷资源", "金币、圣水和黑油全部达到容量时停止；无法读取时停止并提示。", state.settings.stopWhenFull, (v) => void this.persist({ stopWhenFull: v }));
+    const fullStop = this.syncSwitch("f-full-stop", "满仓后停止刷资源", "金币、圣水和黑油全部达到容量时停止；无法读取时提示并继续。", state.settings.stopWhenFull, (v) => void this.persist({ stopWhenFull: v }));
     if (fullStop) fullStop.toggleAttribute("disabled", state.running);
 
     this.syncSelect(
