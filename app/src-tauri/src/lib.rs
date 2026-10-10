@@ -29,6 +29,7 @@ pub struct Settings {
     pub strategy: Strategy,
     pub stop_when_full: bool,
     pub loot_filter: maacoc_engine::loot::LootFilter,
+    pub army: maacoc_engine::army::ArmyPlan,
 }
 
 impl Default for Settings {
@@ -45,6 +46,7 @@ impl Default for Settings {
             strategy: Strategy::default(),
             stop_when_full: true,
             loot_filter: Default::default(),
+            army: Default::default(),
         }
     }
 }
@@ -218,6 +220,9 @@ async fn save_settings<R: Runtime>(
     next: Settings,
 ) -> Result<Settings, String> {
     next.loot_filter.validate().map_err(|e| e.to_string())?;
+    if !next.army.entries.is_empty() {
+        next.army.validate(&read_army_cards(&app)?).map_err(|e| e.to_string())?;
+    }
     {
         let mut inner = state.inner.lock().unwrap();
         inner.settings = next.clone();
@@ -248,6 +253,40 @@ async fn nodes(state: State<'_, AppState>) -> Result<Vec<String>, String> {
         Some(list) => list.map_err(|e| e.to_string()),
         None => Ok(Vec::new()),
     }
+}
+
+fn read_army_cards<R: Runtime>(app: &AppHandle<R>) -> Result<Vec<maacoc_engine::army::ArmyCard>, String> {
+    let assets = assets_dir(app)?;
+    let source = std::fs::read_to_string(assets.join("army.json")).map_err(|e| e.to_string())?;
+    serde_json::from_str(&source).map_err(|e| e.to_string())
+}
+
+#[tauri::command]
+async fn army_cards<R: Runtime>(app: AppHandle<R>) -> Result<Vec<maacoc_engine::army::ArmyCard>, String> {
+    let assets = assets_dir(&app)?;
+    let mut cards = read_army_cards(&app)?;
+    for card in &mut cards {
+        let bytes = std::fs::read(assets.join("image").join(&card.preview)).map_err(|e| e.to_string())?;
+        card.preview = format!(
+            "data:image/png;base64,{}",
+            base64::engine::general_purpose::STANDARD.encode(bytes)
+        );
+    }
+    Ok(cards)
+}
+
+#[tauri::command]
+async fn apply_army<R: Runtime>(app: AppHandle<R>, state: State<'_, AppState>) -> Result<Status, String> {
+    let cards = read_army_cards(&app)?;
+    let mut inner = state.inner.lock().unwrap();
+    let runner = inner.runner.as_ref().ok_or("请先连接手机")?;
+    runner
+        .start_army(&inner.settings.army, &cards)
+        .map_err(|e| e.to_string())?;
+    inner.phase = Phase::Running;
+    inner.started = Some(Instant::now());
+    inner.events.clear();
+    Ok(status_of(&inner))
 }
 
 #[tauri::command]
@@ -438,10 +477,11 @@ async fn events(state: State<'_, AppState>) -> Result<Vec<NodeEvent>, String> {
         inner.started = None;
         inner.detail = match inner.events.iter().rev().find(|e| e.hit && e.kind == "action").cloned() {
             Some(e) if e.node == "StorageFullStop" => "金币、圣水和黑油全部满仓，挂机刷资源已停止".into(),
+            Some(e) if e.node == "ArmyComplete" => "配卡完成，兵种、法术和战车数量已核对".into(),
             Some(e)
                 if matches!(
                     e.node.as_str(),
-                    "StorageReadFailed" | "LootReadFailed" | "LootSkipLimit"
+                    "StorageReadFailed" | "LootReadFailed" | "LootSkipLimit" | "ArmyFailed"
                 ) =>
             {
                 inner.phase = Phase::Error;
@@ -507,6 +547,8 @@ pub fn run() {
             paths,
             devices,
             nodes,
+            army_cards,
+            apply_army,
             connect,
             start,
             stop,
@@ -598,6 +640,7 @@ mod tests {
         assert_eq!(
             keys,
             [
+                "army",
                 "autoStart",
                 "entry",
                 "frameIntervalMs",

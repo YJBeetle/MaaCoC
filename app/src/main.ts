@@ -14,12 +14,13 @@ import "@material/web/switch/switch.js";
 import "@material/web/select/outlined-select.js";
 import "@material/web/select/select-option.js";
 
-import type { EngineApi, Frame, NodeEvent, Paths, Phase, Settings, Status } from "./api";
+import type { ArmyCard, EngineApi, Frame, NodeEvent, Paths, Phase, Settings, Status } from "./api";
 import { DEFAULT_SETTINGS, formatUptime } from "./api";
 import { applyTheme } from "./theme";
 import { el } from "./dom";
 import { RunPage } from "./pages/run-page";
 import { StatsPage } from "./pages/stats-page";
+import { ArmyPage } from "./pages/army-page";
 import { SettingsPage } from "./pages/settings-page";
 
 const stateLabels: Record<Phase, string> = {
@@ -33,7 +34,7 @@ const stateLabels: Record<Phase, string> = {
 const idle: Status = { phase: "idle", detail: "", battles: 0, uptimeMs: 0, currentNode: "", panel: "" };
 
 const state = {
-  page: "run" as "run" | "stats" | "settings",
+  page: "run" as "run" | "stats" | "settings" | "army",
   status: idle,
   settings: { ...DEFAULT_SETTINGS } as Settings,
   events: [] as NodeEvent[],
@@ -41,6 +42,7 @@ const state = {
   devices: [] as { label: string; address: string }[],
   paths: { logDir: "" } as Paths,
   nodes: [] as string[],
+  cards: [] as ArmyCard[],
   error: "",
   autoConnect: false,
 };
@@ -58,6 +60,8 @@ async function loadApi(): Promise<EngineApi> {
       mode: "tauri",
       devices: () => call("devices"),
       nodes: () => call("nodes"),
+      armyCards: () => call("army_cards"),
+      applyArmy: () => call("apply_army"),
       settings: () => call("settings"),
       paths: () => call<Paths>("paths"),
       saveSettings: (next) => call("save_settings", { next }),
@@ -99,6 +103,14 @@ const ui = {
 };
 
 const runPage = new RunPage({ toggleRun, changeScreenSize });
+const armyPage = new ArmyPage(async next => {
+  state.settings = await api.saveSettings({ ...state.settings, ...next });
+  render();
+}, async () => {
+  try { state.status = await api.applyArmy(); state.error = ""; }
+  catch (err) { state.error = String(err); }
+  render();
+}, async () => { state.status = await api.stop(); render(); });
 const statsPage = new StatsPage();
 const settingsPage = new SettingsPage(persist);
 
@@ -107,6 +119,7 @@ function buildShell() {
   const rail = el("nav", { class: "rail", id: "rail" });
   for (const [key, icon, label] of [
     ["run", "play_arrow", "挂机"],
+    ["army", "style", "配卡"],
     ["stats", "insights", "战果"],
     ["settings", "settings", "设置"],
   ] as const) {
@@ -130,6 +143,7 @@ function buildShell() {
 
   const main = el("div", { class: "main" });
   ui.pages.run = runPage.element;
+  ui.pages.army = armyPage.element;
   ui.pages.stats = statsPage.element;
   ui.pages.settings = settingsPage.element;
 
@@ -142,8 +156,10 @@ function buildShell() {
 }
 
 async function persist(next: Partial<Settings>) {
-  state.settings = { ...state.settings, ...next };
-  state.settings = await api.saveSettings(state.settings);
+  try {
+    state.settings = await api.saveSettings({ ...state.settings, ...next });
+    state.error = "";
+  } catch (err) { state.error = String(err); }
   render();
 }
 
@@ -217,7 +233,7 @@ function go(page: string) {
   for (const item of document.querySelectorAll<HTMLElement>(".rail-item")) {
     item.setAttribute("aria-current", String(item.dataset.page === page));
   }
-  const titles: Record<string, string> = { run: "挂机刷资源", stats: "战果", settings: "设置" };
+  const titles: Record<string, string> = { run: "挂机刷资源", stats: "战果", settings: "设置", army: "自定义配卡" };
   ui.title.textContent = titles[page];
   // The action row lives inside the run page, so switching pages hides it.
   document.querySelector(".page")?.replaceChildren(ui.pages[page]);
@@ -242,6 +258,8 @@ function render() {
   if (probing) probeLayout();
   if (state.page === "run") {
     runPage.render({ ...state, sizeBusy });
+  } else if (state.page === "army") {
+    armyPage.render(state);
   } else if (state.page === "stats") {
     statsPage.render(state);
   } else {
@@ -289,7 +307,7 @@ function devOverrides() {
   // WKWebView screenshot can be measured instead of guessed at from Chrome.
   probing = params.get("probe") === "1";
   const page = params.get("page");
-  if (page === "run" || page === "stats" || page === "settings") state.page = page;
+  if (page === "run" || page === "stats" || page === "settings" || page === "army") state.page = page;
   const theme = params.get("theme");
   if (theme === "light" || theme === "dark" || theme === "system") state.settings.themeMode = theme;
   if (params.get("connect") === "1") state.autoConnect = true;
@@ -309,6 +327,7 @@ async function boot() {
   state.paths = await api.paths();
   state.devices = await api.devices();
   state.nodes = await api.nodes();
+  state.cards = await api.armyCards();
   render();
   if (startImmediately) {
     await connect();

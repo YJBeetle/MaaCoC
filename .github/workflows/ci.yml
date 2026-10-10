@@ -67,6 +67,8 @@ jobs:
           cache-dependency-path: app/package-lock.json
       - run: npm ci
         working-directory: app
+      - run: node --experimental-strip-types --test tests/*.test.ts
+        working-directory: app
       - run: npx tsc --noEmit
         working-directory: app
       - run: npm run build

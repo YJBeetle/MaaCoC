@@ -1,3 +1,6 @@
+export interface ArmyCard { id: string; group: string; name: string; preview: string; }
+export interface ArmyPlan { entries: { id: string; count: number }[]; }
+
 export interface LootFilter {
   enabled: boolean;
   minGold: number;
@@ -43,6 +46,7 @@ export interface Status {
 export type Strategy = "spells-first" | "units-first" | "left-spread" | "air-probe";
 
 export interface Settings {
+  army: ArmyPlan;
   strategy: Strategy;
   stopWhenFull: boolean;
   lootFilter: LootFilter;
@@ -77,6 +81,8 @@ export interface EngineApi {
   readonly mode: "tauri" | "mock";
   devices(): Promise<DeviceItem[]>;
   nodes(): Promise<string[]>;
+  armyCards(): Promise<ArmyCard[]>;
+  applyArmy(): Promise<Status>;
   settings(): Promise<Settings>;
   saveSettings(next: Settings): Promise<Settings>;
   connect(): Promise<Status>;
@@ -93,6 +99,7 @@ export interface EngineApi {
 }
 
 export const DEFAULT_SETTINGS: Settings = {
+  army: { entries: [] },
   strategy: "spells-first",
   stopWhenFull: true,
   lootFilter: { enabled: false, minGold: 0, minElixir: 0, minDark: 0, minGoldElixir: 1000000, matchAny: true, maxSkips: 30 },
