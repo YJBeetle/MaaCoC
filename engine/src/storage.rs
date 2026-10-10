@@ -122,6 +122,16 @@ mod tests {
         assert_eq!(pipeline_override(false), json!({}));
     }
     #[test]
+    fn unknown_capacity_dismisses_tooltip_and_continues_farming() {
+        let pipeline: Value = serde_json::from_str(include_str!("../../assets/pipeline/storage.json")).unwrap();
+        for resource in ["Gold", "Elixir", "Dark"] {
+            assert_eq!(pipeline[format!("StorageUnknown{resource}")]["next"], "StorageReadFailed");
+        }
+        assert_eq!(pipeline["StorageReadFailed"]["action"], "Click");
+        assert_eq!(pipeline["StorageReadFailed"]["next"], "StorageContinue");
+    }
+
+    #[test]
     fn missing_ambiguous_or_untrusted_ocr_is_unknown() {
         assert_eq!(capacity("每小时产量:500 000"), None);
         assert_eq!(capacity("最大储量:0"), None);

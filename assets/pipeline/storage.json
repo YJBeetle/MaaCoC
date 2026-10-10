@@ -4,9 +4,9 @@
         "action": "Click",
         "target": [
             1120,
-            35
+            49
         ],
-        "post_delay": 400,
+        "post_delay": 800,
         "next": "StorageGateGold",
         "on_error": "StorageReadFailed"
     },
@@ -47,7 +47,7 @@
         "action": "Click",
         "target": [
             1120,
-            35
+            49
         ],
         "next": "StorageContinue",
         "pre_delay": 0,
@@ -61,7 +61,7 @@
             1120,
             110
         ],
-        "post_delay": 400,
+        "post_delay": 800,
         "next": "StorageGateElixir",
         "on_error": "StorageReadFailed"
     },
@@ -116,7 +116,7 @@
             1120,
             175
         ],
-        "post_delay": 400,
+        "post_delay": 800,
         "next": "StorageGateDark",
         "on_error": "StorageReadFailed"
     },
@@ -185,14 +185,16 @@
         "action": "StopTask"
     },
     "StorageReadFailed": {
-        "focus": "无法可靠读取仓库容量，挂机刷资源已停止",
-        "action": "StopTask"
+        "focus": "仓库容量读取失败，本轮继续刷资源",
+        "action": "Click",
+        "target": [600, 150],
+        "next": "StorageContinue"
     },
     "StorageFullCloseGold": {
         "action": "Click",
         "target": [
             1120,
-            35
+            49
         ],
         "post_delay": 300,
         "next": "StorageOpenElixir",

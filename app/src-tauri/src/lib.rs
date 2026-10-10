@@ -592,7 +592,7 @@ async fn events(state: State<'_, AppState>) -> Result<Vec<NodeEvent>, String> {
             Some(e)
                 if matches!(
                     e.node.as_str(),
-                    "StorageReadFailed" | "LootReadFailed" | "LootSkipLimit" | "ArmyFailed"
+                    "LootReadFailed" | "LootSkipLimit" | "ArmyFailed"
                 ) =>
             {
                 inner.phase = Phase::Error;
