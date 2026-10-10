@@ -2,6 +2,6 @@ import { defineConfig } from "vite";
 
 export default defineConfig({
   clearScreen: false,
-  server: { port: 5173, strictPort: true },
+  server: { port: 5173, strictPort: true, watch: { usePolling: true } },
   build: { target: "es2022", outDir: "dist", emptyOutDir: true },
 });
