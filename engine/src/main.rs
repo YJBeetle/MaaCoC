@@ -219,7 +219,7 @@ fn battle(assets: &Path, args: &[String], preferred: Option<&str>) -> Result<(),
         None => Default::default(),
     };
     tactics.validate()?;
-    let runner = Runner::connect(assets, DeviceTarget::Adb, preferred)?;
+    let runner = Runner::connect_for_farming(assets, preferred)?;
     let recorder = record_dir.as_ref().map(FrameStore::open);
     if recorder.is_some() {
         runner.set_debug_mode(true)?;

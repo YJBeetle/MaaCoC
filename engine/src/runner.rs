@@ -106,6 +106,23 @@ impl Drop for Runner {
 }
 
 impl Runner {
+    /// Initialize MaaTouch against the final display size before farming.
+    /// Changing wm size on an existing controller leaves its input mapping stale.
+    pub fn connect_for_farming(assets: &Path, preferred: Option<&str>) -> Result<Self> {
+        let runner = Self::connect(assets, DeviceTarget::Adb, preferred)?;
+        let size = runner.shell("wm size")?;
+        let current = size.lines().rev().find_map(|line| {
+            line.strip_prefix("Override size:").or_else(|| line.strip_prefix("Physical size:"))
+        }).ok_or("无法读取设备分辨率")?.trim();
+        if current == crate::DEVICE_MATCH_SIZE {
+            return Ok(runner);
+        }
+        let address = runner.device_address().ok_or("当前设备不是 ADB 设备")?.to_owned();
+        runner.shell(&format!("wm size {}", crate::DEVICE_MATCH_SIZE))?;
+        drop(runner);
+        Self::connect(assets, DeviceTarget::Adb, Some(&address))
+    }
+
     pub fn connect(assets: &Path, target: DeviceTarget, preferred: Option<&str>) -> Result<Self> {
         if matches!(target, DeviceTarget::Headless) {
             let resource = Resource::new()?;
