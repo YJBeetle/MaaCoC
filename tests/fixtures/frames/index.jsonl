@@ -48,3 +48,5 @@
 {"file": "0025-BattleBlimp.png", "node": "FindSiege", "width": 1280, "height": 720, "label": "仍可投放的飞艇，卡面尺寸与位置校准", "expected_hit": true}
 {"file": "0026-DepletedBlimp.png", "node": "FindSiege", "width": 1280, "height": 720, "label": "飞艇投放后变灰，应跳过耗尽卡牌", "expected_hit": false}
 {"file": "0027-BoxClaimReward.png", "node": "OpenBox", "width": 1280, "height": 720, "label": "宝箱活动结算页领取奖励按钮", "expected_hit": true}
+{"file": "0028-FullGoldStorage.png", "node": "StorageFullGold", "width": 1280, "height": 720, "label": "金色满仓背景上的金币数字应可靠读取", "expected_hit": true}
+{"file": "0028-FullGoldStorage.png", "node": "StorageUnknownGold", "width": 1280, "height": 720, "label": "金色满仓背景上的金币数字应可靠读取", "expected_hit": false}

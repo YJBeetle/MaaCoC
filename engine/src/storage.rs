@@ -55,15 +55,21 @@ pub fn register(resource: &Resource) -> crate::Result<()> {
                 return None;
             }
             let read = |roi, is_capacity| {
-                let params = json!({"roi": roi, "only_rec": true, "threshold": 0.9});
-                let result = context
-                    .run_recognition_direct("OCR", &params.to_string(), args.image)
-                    .ok()??;
-                let value = ocr_number(&result.detail, is_capacity);
-                if value.is_none() {
-                    eprintln!("仓库 OCR 读取失败 roi={roi:?}: {}", result.detail["filtered"]);
+                // Whole-line recognition preserves spaced groups on normal bars.
+                // Full gold bars need text detection to remove the yellow margins.
+                let mut last_detail = json!(null);
+                for only_rec in if is_capacity { &[true][..] } else { &[true, false][..] } {
+                    let params = json!({"roi": roi, "only_rec": only_rec, "threshold": 0.9});
+                    let Some(result) = context
+                        .run_recognition_direct("OCR", &params.to_string(), args.image)
+                        .ok().flatten() else { continue; };
+                    if let Some(value) = ocr_number(&result.detail, is_capacity) {
+                        return Some(value);
+                    }
+                    last_detail = result.detail;
                 }
-                value
+                eprintln!("仓库 OCR 读取失败 roi={roi:?}: {}", last_detail["filtered"]);
+                None
             };
             let current = read([width - 251, counter_y, 154, 31], false);
             let max = read([width - 290, capacity_y, 232, 23], true);
