@@ -1,0 +1,738 @@
+[
+  {
+    "id": "Unit/0_Barbarian",
+    "group": "Unit",
+    "name": "Barbarian",
+    "template": "Army/Unit/0_Barbarian.png",
+    "currentTemplate": "Army/Unit/0_Barbarian-current.png",
+    "preview": "Army/Unit/0_Barbarian-preview.png"
+  },
+  {
+    "id": "Unit/1_Archer",
+    "group": "Unit",
+    "name": "Archer",
+    "template": "Army/Unit/1_Archer.png",
+    "currentTemplate": "Army/Unit/1_Archer-current.png",
+    "preview": "Army/Unit/1_Archer-preview.png"
+  },
+  {
+    "id": "Unit/3_Giant",
+    "group": "Unit",
+    "name": "Giant",
+    "template": "Army/Unit/3_Giant.png",
+    "currentTemplate": "Army/Unit/3_Giant-current.png",
+    "preview": "Army/Unit/3_Giant-preview.png"
+  },
+  {
+    "id": "Unit/4_Goblin",
+    "group": "Unit",
+    "name": "Goblin",
+    "template": "Army/Unit/4_Goblin.png",
+    "currentTemplate": "Army/Unit/4_Goblin-current.png",
+    "preview": "Army/Unit/4_Goblin-preview.png"
+  },
+  {
+    "id": "Unit/5_Breaker",
+    "group": "Unit",
+    "name": "Breaker",
+    "template": "Army/Unit/5_Breaker.png",
+    "currentTemplate": "Army/Unit/5_Breaker-current.png",
+    "preview": "Army/Unit/5_Breaker-preview.png"
+  },
+  {
+    "id": "Unit/6_Balloon",
+    "group": "Unit",
+    "name": "Balloon",
+    "template": "Army/Unit/6_Balloon.png",
+    "currentTemplate": "Army/Unit/6_Balloon-current.png",
+    "preview": "Army/Unit/6_Balloon-preview.png"
+  },
+  {
+    "id": "Unit/7_Wizard",
+    "group": "Unit",
+    "name": "Wizard",
+    "template": "Army/Unit/7_Wizard.png",
+    "currentTemplate": "Army/Unit/7_Wizard-current.png",
+    "preview": "Army/Unit/7_Wizard-preview.png"
+  },
+  {
+    "id": "Unit/8_Healer",
+    "group": "Unit",
+    "name": "Healer",
+    "template": "Army/Unit/8_Healer.png",
+    "currentTemplate": "Army/Unit/8_Healer-current.png",
+    "preview": "Army/Unit/8_Healer-preview.png"
+  },
+  {
+    "id": "Unit/9_Dragon",
+    "group": "Unit",
+    "name": "Dragon",
+    "template": "Army/Unit/9_Dragon.png",
+    "currentTemplate": "Army/Unit/9_Dragon-current.png",
+    "preview": "Army/Unit/9_Dragon-preview.png"
+  },
+  {
+    "id": "Unit/10_P.E.K.K.A",
+    "group": "Unit",
+    "name": "P.E.K.K.A",
+    "template": "Army/Unit/10_P.E.K.K.A.png",
+    "currentTemplate": "Army/Unit/10_P.E.K.K.A-current.png",
+    "preview": "Army/Unit/10_P.E.K.K.A-preview.png"
+  },
+  {
+    "id": "Unit/11_BabyDragon",
+    "group": "Unit",
+    "name": "BabyDragon",
+    "template": "Army/Unit/11_BabyDragon.png",
+    "currentTemplate": "Army/Unit/11_BabyDragon-current.png",
+    "preview": "Army/Unit/11_BabyDragon-preview.png"
+  },
+  {
+    "id": "Unit/12_Miner",
+    "group": "Unit",
+    "name": "Miner",
+    "template": "Army/Unit/12_Miner.png",
+    "currentTemplate": "Army/Unit/12_Miner-current.png",
+    "preview": "Army/Unit/12_Miner-preview.png"
+  },
+  {
+    "id": "Unit/13_ElectroDragon",
+    "group": "Unit",
+    "name": "ElectroDragon",
+    "template": "Army/Unit/13_ElectroDragon.png",
+    "currentTemplate": "Army/Unit/13_ElectroDragon-current.png",
+    "preview": "Army/Unit/13_ElectroDragon-preview.png"
+  },
+  {
+    "id": "Unit/14_Yeti",
+    "group": "Unit",
+    "name": "Yeti",
+    "template": "Army/Unit/14_Yeti.png",
+    "currentTemplate": "Army/Unit/14_Yeti-current.png",
+    "preview": "Army/Unit/14_Yeti-preview.png"
+  },
+  {
+    "id": "Unit/15_DragonRider",
+    "group": "Unit",
+    "name": "DragonRider",
+    "template": "Army/Unit/15_DragonRider.png",
+    "currentTemplate": "Army/Unit/15_DragonRider-current.png",
+    "preview": "Army/Unit/15_DragonRider-preview.png"
+  },
+  {
+    "id": "Unit/16_ElectroTitan",
+    "group": "Unit",
+    "name": "ElectroTitan",
+    "template": "Army/Unit/16_ElectroTitan.png",
+    "currentTemplate": "Army/Unit/16_ElectroTitan-current.png",
+    "preview": "Army/Unit/16_ElectroTitan-preview.png"
+  },
+  {
+    "id": "Unit/17_RootRider",
+    "group": "Unit",
+    "name": "RootRider",
+    "template": "Army/Unit/17_RootRider.png",
+    "currentTemplate": "Army/Unit/17_RootRider-current.png",
+    "preview": "Army/Unit/17_RootRider-preview.png"
+  },
+  {
+    "id": "Unit/18_Thrower",
+    "group": "Unit",
+    "name": "Thrower",
+    "template": "Army/Unit/18_Thrower.png",
+    "currentTemplate": "Army/Unit/18_Thrower-current.png",
+    "preview": "Army/Unit/18_Thrower-preview.png"
+  },
+  {
+    "id": "Unit/19_MeteorGolem",
+    "group": "Unit",
+    "name": "MeteorGolem",
+    "template": "Army/Unit/19_MeteorGolem.png",
+    "currentTemplate": "Army/Unit/19_MeteorGolem-current.png",
+    "preview": "Army/Unit/19_MeteorGolem-preview.png"
+  },
+  {
+    "id": "Unit/50_Minion",
+    "group": "Unit",
+    "name": "Minion",
+    "template": "Army/Unit/50_Minion.png",
+    "currentTemplate": "Army/Unit/50_Minion-current.png",
+    "preview": "Army/Unit/50_Minion-preview.png"
+  },
+  {
+    "id": "Unit/51_HogRider",
+    "group": "Unit",
+    "name": "HogRider",
+    "template": "Army/Unit/51_HogRider.png",
+    "currentTemplate": "Army/Unit/51_HogRider-current.png",
+    "preview": "Army/Unit/51_HogRider-preview.png"
+  },
+  {
+    "id": "Unit/52_Valkyrie",
+    "group": "Unit",
+    "name": "Valkyrie",
+    "template": "Army/Unit/52_Valkyrie.png",
+    "currentTemplate": "Army/Unit/52_Valkyrie-current.png",
+    "preview": "Army/Unit/52_Valkyrie-preview.png"
+  },
+  {
+    "id": "Unit/53_Golen",
+    "group": "Unit",
+    "name": "Golen",
+    "template": "Army/Unit/53_Golen.png",
+    "currentTemplate": "Army/Unit/53_Golen-current.png",
+    "preview": "Army/Unit/53_Golen-preview.png"
+  },
+  {
+    "id": "Unit/54_Witch",
+    "group": "Unit",
+    "name": "Witch",
+    "template": "Army/Unit/54_Witch.png",
+    "currentTemplate": "Army/Unit/54_Witch-current.png",
+    "preview": "Army/Unit/54_Witch-preview.png"
+  },
+  {
+    "id": "Unit/55_LavaHound",
+    "group": "Unit",
+    "name": "LavaHound",
+    "template": "Army/Unit/55_LavaHound.png",
+    "currentTemplate": "Army/Unit/55_LavaHound-current.png",
+    "preview": "Army/Unit/55_LavaHound-preview.png"
+  },
+  {
+    "id": "Unit/56_Bowler",
+    "group": "Unit",
+    "name": "Bowler",
+    "template": "Army/Unit/56_Bowler.png",
+    "currentTemplate": "Army/Unit/56_Bowler-current.png",
+    "preview": "Army/Unit/56_Bowler-preview.png"
+  },
+  {
+    "id": "Unit/57_IceGolem",
+    "group": "Unit",
+    "name": "IceGolem",
+    "template": "Army/Unit/57_IceGolem.png",
+    "currentTemplate": "Army/Unit/57_IceGolem-current.png",
+    "preview": "Army/Unit/57_IceGolem-preview.png"
+  },
+  {
+    "id": "Unit/58_Headhunter",
+    "group": "Unit",
+    "name": "Headhunter",
+    "template": "Army/Unit/58_Headhunter.png",
+    "currentTemplate": "Army/Unit/58_Headhunter-current.png",
+    "preview": "Army/Unit/58_Headhunter-preview.png"
+  },
+  {
+    "id": "Unit/59_ApprenticeWarden",
+    "group": "Unit",
+    "name": "ApprenticeWarden",
+    "template": "Army/Unit/59_ApprenticeWarden.png",
+    "currentTemplate": "Army/Unit/59_ApprenticeWarden-current.png",
+    "preview": "Army/Unit/59_ApprenticeWarden-preview.png"
+  },
+  {
+    "id": "Unit/60_Druid",
+    "group": "Unit",
+    "name": "Druid",
+    "template": "Army/Unit/60_Druid.png",
+    "currentTemplate": "Army/Unit/60_Druid-current.png",
+    "preview": "Army/Unit/60_Druid-preview.png"
+  },
+  {
+    "id": "Unit/61_Furnace",
+    "group": "Unit",
+    "name": "Furnace",
+    "template": "Army/Unit/61_Furnace.png",
+    "currentTemplate": "Army/Unit/61_Furnace-current.png",
+    "preview": "Army/Unit/61_Furnace-preview.png"
+  },
+  {
+    "id": "Unit/62_RuinWitch",
+    "group": "Unit",
+    "name": "RuinWitch",
+    "template": "Army/Unit/62_RuinWitch.png",
+    "currentTemplate": "Army/Unit/62_RuinWitch-current.png",
+    "preview": "Army/Unit/62_RuinWitch-preview.png"
+  },
+  {
+    "id": "Unit/100_Broom",
+    "group": "Unit",
+    "name": "Broom",
+    "template": "Army/Unit/100_Broom.png",
+    "currentTemplate": "Army/Unit/100_Broom-current.png",
+    "preview": "Army/Unit/100_Broom-preview.png"
+  },
+  {
+    "id": "Unit/101_BarbarianKicker",
+    "group": "Unit",
+    "name": "BarbarianKicker",
+    "template": "Army/Unit/101_BarbarianKicker.png",
+    "currentTemplate": "Army/Unit/101_BarbarianKicker-current.png",
+    "preview": "Army/Unit/101_BarbarianKicker-preview.png"
+  },
+  {
+    "id": "Unit/102_M.E.C.H.A",
+    "group": "Unit",
+    "name": "M.E.C.H.A",
+    "template": "Army/Unit/102_M.E.C.H.A.png",
+    "currentTemplate": "Army/Unit/102_M.E.C.H.A-current.png",
+    "preview": "Army/Unit/102_M.E.C.H.A-preview.png"
+  },
+  {
+    "id": "Unit/103_BattleRam",
+    "group": "Unit",
+    "name": "BattleRam",
+    "template": "Army/Unit/103_BattleRam.png",
+    "currentTemplate": "Army/Unit/103_BattleRam-current.png",
+    "preview": "Army/Unit/103_BattleRam-preview.png"
+  },
+  {
+    "id": "Unit/104_IceWizard",
+    "group": "Unit",
+    "name": "IceWizard",
+    "template": "Army/Unit/104_IceWizard.png",
+    "currentTemplate": "Army/Unit/104_IceWizard-current.png",
+    "preview": "Army/Unit/104_IceWizard-preview.png"
+  },
+  {
+    "id": "Unit/105_DebtCollector",
+    "group": "Unit",
+    "name": "DebtCollector",
+    "template": "Army/Unit/105_DebtCollector.png",
+    "currentTemplate": "Army/Unit/105_DebtCollector-current.png",
+    "preview": "Army/Unit/105_DebtCollector-preview.png"
+  },
+  {
+    "id": "Unit/106_GiantThrower",
+    "group": "Unit",
+    "name": "GiantThrower",
+    "template": "Army/Unit/106_GiantThrower.png",
+    "currentTemplate": "Army/Unit/106_GiantThrower-current.png",
+    "preview": "Army/Unit/106_GiantThrower-preview.png"
+  },
+  {
+    "id": "Unit/107_Firecracker",
+    "group": "Unit",
+    "name": "Firecracker",
+    "template": "Army/Unit/107_Firecracker.png",
+    "currentTemplate": "Army/Unit/107_Firecracker-current.png",
+    "preview": "Army/Unit/107_Firecracker-preview.png"
+  },
+  {
+    "id": "Unit/108_RamRider",
+    "group": "Unit",
+    "name": "RamRider",
+    "template": "Army/Unit/108_RamRider.png",
+    "currentTemplate": "Army/Unit/108_RamRider-current.png",
+    "preview": "Army/Unit/108_RamRider-preview.png"
+  },
+  {
+    "id": "Unit/109_PartyWizard",
+    "group": "Unit",
+    "name": "PartyWizard",
+    "template": "Army/Unit/109_PartyWizard.png",
+    "currentTemplate": "Army/Unit/109_PartyWizard-current.png",
+    "preview": "Army/Unit/109_PartyWizard-preview.png"
+  },
+  {
+    "id": "Unit/110_MeteorGolem",
+    "group": "Unit",
+    "name": "MeteorGolem",
+    "template": "Army/Unit/110_MeteorGolem.png",
+    "currentTemplate": "Army/Unit/110_MeteorGolem-current.png",
+    "preview": "Army/Unit/110_MeteorGolem-preview.png"
+  },
+  {
+    "id": "Unit/111_IceMinion",
+    "group": "Unit",
+    "name": "IceMinion",
+    "template": "Army/Unit/111_IceMinion.png",
+    "currentTemplate": "Army/Unit/111_IceMinion-current.png",
+    "preview": "Army/Unit/111_IceMinion-preview.png"
+  },
+  {
+    "id": "Unit/112_Lavaloon",
+    "group": "Unit",
+    "name": "Lavaloon",
+    "template": "Army/Unit/112_Lavaloon.png",
+    "currentTemplate": "Army/Unit/112_Lavaloon-current.png",
+    "preview": "Army/Unit/112_Lavaloon-preview.png"
+  },
+  {
+    "id": "Unit/113_Barcher",
+    "group": "Unit",
+    "name": "Barcher",
+    "template": "Army/Unit/113_Barcher.png",
+    "currentTemplate": "Army/Unit/113_Barcher-current.png",
+    "preview": "Army/Unit/113_Barcher-preview.png"
+  },
+  {
+    "id": "Unit/114_TotemThrower",
+    "group": "Unit",
+    "name": "TotemThrower",
+    "template": "Army/Unit/114_TotemThrower.png",
+    "currentTemplate": "Army/Unit/114_TotemThrower-current.png",
+    "preview": "Army/Unit/114_TotemThrower-preview.png"
+  },
+  {
+    "id": "Unit/115_WitchGolem",
+    "group": "Unit",
+    "name": "WitchGolem",
+    "template": "Army/Unit/115_WitchGolem.png",
+    "currentTemplate": "Army/Unit/115_WitchGolem-current.png",
+    "preview": "Army/Unit/115_WitchGolem-preview.png"
+  },
+  {
+    "id": "Unit/SuperBarbarian",
+    "group": "Unit",
+    "name": "SuperBarbarian",
+    "template": "Army/Unit/SuperBarbarian.png",
+    "currentTemplate": "Army/Unit/SuperBarbarian-current.png",
+    "preview": "Army/Unit/SuperBarbarian-preview.png"
+  },
+  {
+    "id": "Unit/SuperArcher",
+    "group": "Unit",
+    "name": "SuperArcher",
+    "template": "Army/Unit/SuperArcher.png",
+    "currentTemplate": "Army/Unit/SuperArcher-current.png",
+    "preview": "Army/Unit/SuperArcher-preview.png"
+  },
+  {
+    "id": "Unit/SuperGiant",
+    "group": "Unit",
+    "name": "SuperGiant",
+    "template": "Army/Unit/SuperGiant.png",
+    "currentTemplate": "Army/Unit/SuperGiant-current.png",
+    "preview": "Army/Unit/SuperGiant-preview.png"
+  },
+  {
+    "id": "Unit/SneakyGoblin",
+    "group": "Unit",
+    "name": "SneakyGoblin",
+    "template": "Army/Unit/SneakyGoblin.png",
+    "currentTemplate": "Army/Unit/SneakyGoblin-current.png",
+    "preview": "Army/Unit/SneakyGoblin-preview.png"
+  },
+  {
+    "id": "Unit/SuperWallBreaker",
+    "group": "Unit",
+    "name": "SuperWallBreaker",
+    "template": "Army/Unit/SuperWallBreaker.png",
+    "currentTemplate": "Army/Unit/SuperWallBreaker-current.png",
+    "preview": "Army/Unit/SuperWallBreaker-preview.png"
+  },
+  {
+    "id": "Unit/RocketBalloon",
+    "group": "Unit",
+    "name": "RocketBalloon",
+    "template": "Army/Unit/RocketBalloon.png",
+    "currentTemplate": "Army/Unit/RocketBalloon-current.png",
+    "preview": "Army/Unit/RocketBalloon-preview.png"
+  },
+  {
+    "id": "Unit/SuperWizard",
+    "group": "Unit",
+    "name": "SuperWizard",
+    "template": "Army/Unit/SuperWizard.png",
+    "currentTemplate": "Army/Unit/SuperWizard-current.png",
+    "preview": "Army/Unit/SuperWizard-preview.png"
+  },
+  {
+    "id": "Unit/SuperDragon",
+    "group": "Unit",
+    "name": "SuperDragon",
+    "template": "Army/Unit/SuperDragon.png",
+    "currentTemplate": "Army/Unit/SuperDragon-current.png",
+    "preview": "Army/Unit/SuperDragon-preview.png"
+  },
+  {
+    "id": "Unit/InfernoDragon",
+    "group": "Unit",
+    "name": "InfernoDragon",
+    "template": "Army/Unit/InfernoDragon.png",
+    "currentTemplate": "Army/Unit/InfernoDragon-current.png",
+    "preview": "Army/Unit/InfernoDragon-preview.png"
+  },
+  {
+    "id": "Unit/SuperMiner",
+    "group": "Unit",
+    "name": "SuperMiner",
+    "template": "Army/Unit/SuperMiner.png",
+    "currentTemplate": "Army/Unit/SuperMiner-current.png",
+    "preview": "Army/Unit/SuperMiner-preview.png"
+  },
+  {
+    "id": "Unit/SuperYeti",
+    "group": "Unit",
+    "name": "SuperYeti",
+    "template": "Army/Unit/SuperYeti.png",
+    "currentTemplate": "Army/Unit/SuperYeti-current.png",
+    "preview": "Army/Unit/SuperYeti-preview.png"
+  },
+  {
+    "id": "Unit/SuperMinion",
+    "group": "Unit",
+    "name": "SuperMinion",
+    "template": "Army/Unit/SuperMinion.png",
+    "currentTemplate": "Army/Unit/SuperMinion-current.png",
+    "preview": "Army/Unit/SuperMinion-preview.png"
+  },
+  {
+    "id": "Unit/SuperHogRider",
+    "group": "Unit",
+    "name": "SuperHogRider",
+    "template": "Army/Unit/SuperHogRider.png",
+    "currentTemplate": "Army/Unit/SuperHogRider-current.png",
+    "preview": "Army/Unit/SuperHogRider-preview.png"
+  },
+  {
+    "id": "Unit/SuperValkyrie",
+    "group": "Unit",
+    "name": "SuperValkyrie",
+    "template": "Army/Unit/SuperValkyrie.png",
+    "currentTemplate": "Army/Unit/SuperValkyrie-current.png",
+    "preview": "Army/Unit/SuperValkyrie-preview.png"
+  },
+  {
+    "id": "Unit/SuperWitch",
+    "group": "Unit",
+    "name": "SuperWitch",
+    "template": "Army/Unit/SuperWitch.png",
+    "currentTemplate": "Army/Unit/SuperWitch-current.png",
+    "preview": "Army/Unit/SuperWitch-preview.png"
+  },
+  {
+    "id": "Unit/IceHound",
+    "group": "Unit",
+    "name": "IceHound",
+    "template": "Army/Unit/IceHound.png",
+    "currentTemplate": "Army/Unit/IceHound-current.png",
+    "preview": "Army/Unit/IceHound-preview.png"
+  },
+  {
+    "id": "Unit/SuperBowler",
+    "group": "Unit",
+    "name": "SuperBowler",
+    "template": "Army/Unit/SuperBowler.png",
+    "currentTemplate": "Army/Unit/SuperBowler-current.png",
+    "preview": "Army/Unit/SuperBowler-preview.png"
+  },
+  {
+    "id": "Spell/SpellLightning",
+    "group": "Spell",
+    "name": "SpellLightning",
+    "template": "Army/Spell/SpellLightning.png",
+    "currentTemplate": "Army/Spell/SpellLightning-current.png",
+    "preview": "Army/Spell/SpellLightning-preview.png"
+  },
+  {
+    "id": "Spell/SpellHealing",
+    "group": "Spell",
+    "name": "SpellHealing",
+    "template": "Army/Spell/SpellHealing.png",
+    "currentTemplate": "Army/Spell/SpellHealing-current.png",
+    "preview": "Army/Spell/SpellHealing-preview.png"
+  },
+  {
+    "id": "Spell/SpellRage",
+    "group": "Spell",
+    "name": "SpellRage",
+    "template": "Army/Spell/SpellRage.png",
+    "currentTemplate": "Army/Spell/SpellRage-current.png",
+    "preview": "Army/Spell/SpellRage-preview.png"
+  },
+  {
+    "id": "Spell/SpellJump",
+    "group": "Spell",
+    "name": "SpellJump",
+    "template": "Army/Spell/SpellJump.png",
+    "currentTemplate": "Army/Spell/SpellJump-current.png",
+    "preview": "Army/Spell/SpellJump-preview.png"
+  },
+  {
+    "id": "Spell/SpellFreeze",
+    "group": "Spell",
+    "name": "SpellFreeze",
+    "template": "Army/Spell/SpellFreeze.png",
+    "currentTemplate": "Army/Spell/SpellFreeze-current.png",
+    "preview": "Army/Spell/SpellFreeze-preview.png"
+  },
+  {
+    "id": "Spell/SpellClone",
+    "group": "Spell",
+    "name": "SpellClone",
+    "template": "Army/Spell/SpellClone.png",
+    "currentTemplate": "Army/Spell/SpellClone-current.png",
+    "preview": "Army/Spell/SpellClone-preview.png"
+  },
+  {
+    "id": "Spell/SpellInvisibility",
+    "group": "Spell",
+    "name": "SpellInvisibility",
+    "template": "Army/Spell/SpellInvisibility.png",
+    "currentTemplate": "Army/Spell/SpellInvisibility-current.png",
+    "preview": "Army/Spell/SpellInvisibility-preview.png"
+  },
+  {
+    "id": "Spell/SpellRecall",
+    "group": "Spell",
+    "name": "SpellRecall",
+    "template": "Army/Spell/SpellRecall.png",
+    "currentTemplate": "Army/Spell/SpellRecall-current.png",
+    "preview": "Army/Spell/SpellRecall-preview.png"
+  },
+  {
+    "id": "Spell/SpellRevive",
+    "group": "Spell",
+    "name": "SpellRevive",
+    "template": "Army/Spell/SpellRevive.png",
+    "currentTemplate": "Army/Spell/SpellRevive-current.png",
+    "preview": "Army/Spell/SpellRevive-preview.png"
+  },
+  {
+    "id": "Spell/SpellPoison",
+    "group": "Spell",
+    "name": "SpellPoison",
+    "template": "Army/Spell/SpellPoison.png",
+    "currentTemplate": "Army/Spell/SpellPoison-current.png",
+    "preview": "Army/Spell/SpellPoison-preview.png"
+  },
+  {
+    "id": "Spell/SpellEarthquake",
+    "group": "Spell",
+    "name": "SpellEarthquake",
+    "template": "Army/Spell/SpellEarthquake.png",
+    "currentTemplate": "Army/Spell/SpellEarthquake-current.png",
+    "preview": "Army/Spell/SpellEarthquake-preview.png"
+  },
+  {
+    "id": "Spell/SpellSpeed",
+    "group": "Spell",
+    "name": "SpellSpeed",
+    "template": "Army/Spell/SpellSpeed.png",
+    "currentTemplate": "Army/Spell/SpellSpeed-current.png",
+    "preview": "Army/Spell/SpellSpeed-preview.png"
+  },
+  {
+    "id": "Spell/SpellSkeleton",
+    "group": "Spell",
+    "name": "SpellSkeleton",
+    "template": "Army/Spell/SpellSkeleton.png",
+    "currentTemplate": "Army/Spell/SpellSkeleton-current.png",
+    "preview": "Army/Spell/SpellSkeleton-preview.png"
+  },
+  {
+    "id": "Spell/SpellBat",
+    "group": "Spell",
+    "name": "SpellBat",
+    "template": "Army/Spell/SpellBat.png",
+    "currentTemplate": "Army/Spell/SpellBat-current.png",
+    "preview": "Army/Spell/SpellBat-preview.png"
+  },
+  {
+    "id": "Spell/SpellTotem",
+    "group": "Spell",
+    "name": "SpellTotem",
+    "template": "Army/Spell/SpellTotem.png",
+    "currentTemplate": "Army/Spell/SpellTotem-current.png",
+    "preview": "Army/Spell/SpellTotem-preview.png"
+  },
+  {
+    "id": "Spell/SpellOvergrowth",
+    "group": "Spell",
+    "name": "SpellOvergrowth",
+    "template": "Army/Spell/SpellOvergrowth.png",
+    "currentTemplate": "Army/Spell/SpellOvergrowth-current.png",
+    "preview": "Army/Spell/SpellOvergrowth-preview.png"
+  },
+  {
+    "id": "Spell/SpellIceBlock",
+    "group": "Spell",
+    "name": "SpellIceBlock",
+    "template": "Army/Spell/SpellIceBlock.png",
+    "currentTemplate": "Army/Spell/SpellIceBlock-current.png",
+    "preview": "Army/Spell/SpellIceBlock-preview.png"
+  },
+  {
+    "id": "Spell/SpellAngry",
+    "group": "Spell",
+    "name": "SpellAngry",
+    "template": "Army/Spell/SpellAngry.png",
+    "currentTemplate": "Army/Spell/SpellAngry-current.png",
+    "preview": "Army/Spell/SpellAngry-preview.png"
+  },
+  {
+    "id": "Siege/WallWrecker",
+    "group": "Siege",
+    "name": "WallWrecker",
+    "template": "Army/Siege/WallWrecker.png",
+    "currentTemplate": "Army/Siege/WallWrecker-current.png",
+    "preview": "Army/Siege/WallWrecker-preview.png"
+  },
+  {
+    "id": "Siege/BattleBlimp",
+    "group": "Siege",
+    "name": "BattleBlimp",
+    "template": "Army/Siege/BattleBlimp.png",
+    "currentTemplate": "Army/Siege/BattleBlimp-current.png",
+    "preview": "Army/Siege/BattleBlimp-preview.png"
+  },
+  {
+    "id": "Siege/StoneSlammer",
+    "group": "Siege",
+    "name": "StoneSlammer",
+    "template": "Army/Siege/StoneSlammer.png",
+    "currentTemplate": "Army/Siege/StoneSlammer-current.png",
+    "preview": "Army/Siege/StoneSlammer-preview.png"
+  },
+  {
+    "id": "Siege/SiegeBarracks",
+    "group": "Siege",
+    "name": "SiegeBarracks",
+    "template": "Army/Siege/SiegeBarracks.png",
+    "currentTemplate": "Army/Siege/SiegeBarracks-current.png",
+    "preview": "Army/Siege/SiegeBarracks-preview.png"
+  },
+  {
+    "id": "Siege/LogLauncher",
+    "group": "Siege",
+    "name": "LogLauncher",
+    "template": "Army/Siege/LogLauncher.png",
+    "currentTemplate": "Army/Siege/LogLauncher-current.png",
+    "preview": "Army/Siege/LogLauncher-preview.png"
+  },
+  {
+    "id": "Siege/FlameFlinger",
+    "group": "Siege",
+    "name": "FlameFlinger",
+    "template": "Army/Siege/FlameFlinger.png",
+    "currentTemplate": "Army/Siege/FlameFlinger-current.png",
+    "preview": "Army/Siege/FlameFlinger-preview.png"
+  },
+  {
+    "id": "Siege/BattleDrill",
+    "group": "Siege",
+    "name": "BattleDrill",
+    "template": "Army/Siege/BattleDrill.png",
+    "currentTemplate": "Army/Siege/BattleDrill-current.png",
+    "preview": "Army/Siege/BattleDrill-preview.png"
+  },
+  {
+    "id": "Siege/TroopLauncher",
+    "group": "Siege",
+    "name": "TroopLauncher",
+    "template": "Army/Siege/TroopLauncher.png",
+    "currentTemplate": "Army/Siege/TroopLauncher-current.png",
+    "preview": "Army/Siege/TroopLauncher-preview.png"
+  },
+  {
+    "id": "Siege/SkyWagon",
+    "group": "Siege",
+    "name": "SkyWagon",
+    "template": "Army/Siege/SkyWagon.png",
+    "currentTemplate": "Army/Siege/SkyWagon-current.png",
+    "preview": "Army/Siege/SkyWagon-preview.png"
+  }
+]

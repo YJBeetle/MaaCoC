@@ -133,3 +133,12 @@ scripts/refresh-cards/scframes.py var/coc-unpack/sc/ui.sc --textures-out var/coc
 卡面位置和动态区域目前按 `ui.sc` 这份样本及现有模板确定；游戏更新后如果卡底布局改变，
 需复查 `export_cards.py` 中的 `*_FACE_BOX` 与 `*_MASKS`。卡牌名与 SC 符号的对应关系
 由脚本内元数据人工维护。
+
+## 配兵界面模板
+
+`export_cards.py` 同时生成 `assets/image/Army/` 和 `assets/army.json`；
+使用 `--army-only` 可只更新配兵模板，保留已校准的战斗栏图片。
+兵种与法术抽屉为 116×116；战车使用 `train_item_siege_2025` 与独立 `_train` 卡面，尺寸 216×250。
+每张卡输出彩色识别图、不可用态提亮灰图、界面预览和总览缩略图；纯绿色区域略过动态信息。
+三辆战车总览会重叠，识别图只保留左侧 64 像素。
+配兵尺寸和位置依据 POCO F3 的 1280×720 实测画面，游戏更新后需要重新校准。

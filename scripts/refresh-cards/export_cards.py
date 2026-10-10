@@ -9,6 +9,7 @@
 from __future__ import annotations
 
 import argparse
+import json
 import math
 import os
 import sys
@@ -16,7 +17,7 @@ import tempfile
 from pathlib import Path
 from typing import NamedTuple
 
-from PIL import Image, ImageDraw
+from PIL import Image, ImageDraw, ImageOps
 
 # 同级拿 scframes，上一级 scripts/ 拿共用的 KTX 解码 sctx2png
 HERE = Path(__file__).resolve().parent
@@ -175,6 +176,8 @@ CARD_SCALE = 1.69 * 720 / 1080
 # 最终尺寸仍由 CARD_SCALE 决定；动态区域的纯绿遮罩在缩小后绘制。
 CARD_RENDER_SCALE = 1.5
 CARD_DOWNSAMPLE = Image.Resampling.BILINEAR
+# 配兵抽屉的不可用态，各类别的提亮效果按实际截图校准。
+ARMY_GRAY = {"Unit": (0.4, 128), "Spell": (0.6, 60), "Siege": (0.5, 86)}
 
 
 def scaled_box(box, size):
@@ -299,15 +302,103 @@ def render_cards(sc, out):
             print(f"导出 {len(cards)} 张 {group} 模板 → {target}")
 
 
+def render_army_cards(sc, out):
+    """配兵抽屉使用独立方形卡底；不复用战斗栏的长方形模板。"""
+    exports = dict(sc.exports())
+    renderer = scrender.Renderer(sc, sctx2png.ktx_image)
+    catalog = []
+    for group, cards in (("Unit", UNIT_CARDS), ("Spell", SPELL_CARDS),
+                         ("Siege", SIEGE_CARDS)):
+        target = out / group
+        target.mkdir(parents=True, exist_ok=True)
+        for card in cards:
+            background = ("train_item_new_spell" if group == "Spell" else
+                          "train_item_siege_2025" if group == "Siege" else "train_item_new")
+            layer = (0 if group in ("Spell", "Siege") or card.background_layer == 3 else
+                     2 if card.background_layer == 2 else 1)
+            meshes = list(renderer.meshes(exports[background], layer=layer))
+            bounds = renderer.bounds(meshes, 0)
+            size = (216, 250) if group == "Siege" else (116, 116)
+            image = Image.new("RGBA", size)
+            renderer.draw_meshes(image, meshes, bounds)
+            face = list(renderer.meshes(exports[card.symbol], layer=card.image_layer))
+            face_bounds = unit_icon_bounds(renderer.bounds(face, 0))
+            portrait = Image.new("RGBA", (166, 166))
+            renderer.draw_meshes(portrait, face, face_bounds)
+            portrait_size = (200, 200) if group == "Siege" else (108, 108)
+            portrait = portrait.convert("RGBa").resize(portrait_size, CARD_DOWNSAMPLE).convert("RGBA")
+            if group == "Siege":
+                train_symbol = card.symbol.replace("_Zeppelin", "_flyer").replace("_Ram", "_ram") + "_train"
+                train_face = list(renderer.meshes(exports[train_symbol]))
+                train_portrait = Image.new("RGBA", (234, 228))
+                renderer.draw_meshes(train_portrait, train_face, (-110, -110, 110, 110))
+                image.alpha_composite(train_portrait, (-9, 3))
+            else:
+                image.alpha_composite(portrait, (4, 4))
+            image = image.convert("RGB")
+            preview = f"Army/{group}/{card.name}-preview.png"
+            image.save(target / f"{card.name}-preview.png")
+            # 略过信息按钮、等级、底部人口数和边缘；蒙版在缩放之后绘制。
+            draw = ImageDraw.Draw(image)
+            masks = ((0, 216, 216, 250), (176, 0, 216, 45),
+                     (0, 175, 40, 216), (0, 0, 216, 6),
+                     (0, 0, 6, 250), (210, 0, 216, 250)) if group == "Siege" else ((0, 84, 116, 116), (86, 0, 116, 32),
+                        (0, 48, 35, 84), (0, 0, 116, 4),
+                        (0, 0, 4, 116), (112, 0, 116, 116))
+            for box in masks:
+                x0, y0, x1, y1 = box
+                draw.rectangle((x0, y0, x1 - 1, y1 - 1), fill=GREEN[:3])
+            image.save(target / f"{card.name}.png")
+            gray_scale, gray_add = ARMY_GRAY[group]
+            gray = ImageOps.grayscale(image).point(
+                lambda value: min(255, round(value * gray_scale + gray_add))).convert("RGB")
+            gray.putdata([GREEN[:3] if rgb == GREEN[:3] else value
+                          for rgb, value in zip(image.getdata(), gray.getdata())])
+            gray.save(target / f"{card.name}-gray.png")
+            # 军队总览缩略图没有底部人口栏，多出左上角数量和右上角移除按钮。
+            current = Image.open(target / f"{card.name}-preview.png")
+            if group == "Siege":
+                current = Image.new("RGBA", (116, 116))
+                current_base = list(renderer.meshes(exports["train_item_new"], layer=1))
+                renderer.draw_meshes(current, current_base, renderer.bounds(current_base, 0))
+                icon = Image.new("RGBA", (108, 108))
+                current_bounds = (-83, -128, 83, 52) if card.name == "BattleBlimp" else unit_icon_bounds(renderer.bounds(face, 0))
+                renderer.draw_meshes(icon, face, current_bounds)
+                current.alpha_composite(icon, (4, 4))
+                current = current.convert("RGB")
+            current = current.resize((92, 92), CARD_DOWNSAMPLE)
+            draw = ImageDraw.Draw(current)
+            for box in ((0, 0, 42, 25), (65, 0, 92, 25),
+                        (0, 48, 32, 92), (0, 82, 92, 92),
+                        (0, 0, 3, 92), (89, 0, 92, 92)):
+                x0, y0, x1, y1 = box
+                draw.rectangle((x0, y0, x1 - 1, y1 - 1), fill=GREEN[:3])
+            if group == "Siege":
+                # 三辆战车在总览中以 64 像素间距重叠；只匹配未遮挡的左侧。
+                current = current.crop((0, 0, 64, 92))
+            current.save(target / f"{card.name}-current.png")
+            catalog.append(dict(id=f"{group}/{card.name}", group=group,
+                                name=card.name.split("_", 1)[-1],
+                                template=f"Army/{group}/{card.name}.png",
+                                currentTemplate=f"Army/{group}/{card.name}-current.png",
+                                preview=preview))
+    (out.parent.parent / "army.json").write_text(
+        json.dumps(catalog, ensure_ascii=False, indent=2) + "\n", encoding="utf-8")
+    print(f"导出 {len(catalog)} 张配兵方形卡牌 → {out}")
+
+
 def main(argv=None):
     ap = argparse.ArgumentParser(description=__doc__.splitlines()[0])
     ap.add_argument("source", type=Path, help="已解压的 .sc 文件")
     ap.add_argument("--out", type=Path, default=REPO / "assets/image/Cards",
                     help="合成模板的输出根目录（默认 assets/image/Cards）")
+    ap.add_argument("--army-only", action="store_true", help="只生成配兵方形卡牌")
     args = ap.parse_args(argv)
     try:
         sc = scframes.ScFile(scframes.load_sc(args.source))
-        render_cards(sc, args.out)
+        if not args.army_only:
+            render_cards(sc, args.out)
+        render_army_cards(sc, args.out.parent / "Army")
     except (OSError, ValueError) as exc:
         ap.exit(1, f"{ap.prog}: {exc}\n")
     return 0
