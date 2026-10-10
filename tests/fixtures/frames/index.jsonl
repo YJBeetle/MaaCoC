@@ -50,3 +50,5 @@
 {"file": "0027-BoxClaimReward.png", "node": "OpenBox", "width": 1280, "height": 720, "label": "宝箱活动结算页领取奖励按钮", "expected_hit": true}
 {"file": "0028-FullGoldStorage.png", "node": "StorageFullGold", "width": 1280, "height": 720, "label": "金色满仓背景上的金币数字应可靠读取", "expected_hit": true}
 {"file": "0028-FullGoldStorage.png", "node": "StorageUnknownGold", "width": 1280, "height": 720, "label": "金色满仓背景上的金币数字应可靠读取", "expected_hit": false}
+{"file": "0029-BattleOpening.png", "node": "BattleReady", "width": 1280, "height": 720, "label": "当前版本开局的结束战斗按钮支持恢复投放", "expected_hit": true}
+{"file": "0028-FullGoldStorage.png", "node": "BattleReady", "width": 1280, "height": 720, "label": "村庄资源弹窗不能被当作战斗开局", "expected_hit": false}
