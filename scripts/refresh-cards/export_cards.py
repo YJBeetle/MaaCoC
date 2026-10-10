@@ -154,6 +154,9 @@ SPELL_FACE_BOX = (2.5, 24.4, 77, 99)
 SIEGE_FACE_BOX = (1.5, 9, 78.5, 86)
 # 英雄肖像的可见网格略有差异，但共享同一个 166×225 的 SC 画布。
 HERO_ICON_BOUNDS = (-83, -144.5, 83, 80.5)
+# 飞艇肖像的原始画布是 166×180，不能套普通兵的正方形留白。
+BLIMP_ICON_BOUNDS = (-83, -128, 83, 52)
+BLIMP_FACE_BOX = (5.35, 12.85, 74.65, 82.15)
 # 数量、等级等动态内容由 MAAFW 的 green_mask 跳过。
 UNIT_MASKS = ((0.39, 0.03, 0.95, 0.2), (0.06, 0.68, 0.4, 0.91))
 HERO_MASKS = ((0.03, 0.06, 0.43, 0.36), (0.05, 0.68, 0.38, 0.93))
@@ -284,14 +287,19 @@ def render_cards(sc, out):
                 if not face_meshes:
                     raise ValueError(f"{card.name} 的卡面图层不可绘制：{card.symbol}")
                 face_bounds = renderer.bounds(face_meshes, obj_id)
-                if group in ("Unit", "Siege"):
+                selected_face_box = face_box
+                if group == "Siege" and card.name == "BattleBlimp":
+                    face_bounds = BLIMP_ICON_BOUNDS
+                    selected_face_box = BLIMP_FACE_BOX
+                elif group in ("Unit", "Siege"):
                     face_bounds = unit_icon_bounds(face_bounds)
                 elif group == "Hero":
                     face_bounds = HERO_ICON_BOUNDS
                 layer_meshes, bounds = backgrounds[key]
                 image = compose_card(renderer, layer_meshes, bounds, face_meshes,
                                      face_bounds, CARD_SCALE,
-                                     face_box, masks + card.extra_masks)
+                                     selected_face_box,
+                                     masks + card.extra_masks)
                 image.save(group_stage / f"{card.name}.png")
         for group, cards, *_ in CARD_GROUPS:
             target = out / group
@@ -362,7 +370,7 @@ def render_army_cards(sc, out):
                 current_base = list(renderer.meshes(exports["train_item_new"], layer=1))
                 renderer.draw_meshes(current, current_base, renderer.bounds(current_base, 0))
                 icon = Image.new("RGBA", (108, 108))
-                current_bounds = (-83, -128, 83, 52) if card.name == "BattleBlimp" else unit_icon_bounds(renderer.bounds(face, 0))
+                current_bounds = BLIMP_ICON_BOUNDS if card.name == "BattleBlimp" else unit_icon_bounds(renderer.bounds(face, 0))
                 renderer.draw_meshes(icon, face, current_bounds)
                 current.alpha_composite(icon, (4, 4))
                 current = current.convert("RGB")
