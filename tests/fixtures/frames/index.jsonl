@@ -57,3 +57,8 @@
 {"file": "0032-XiaomiGoldStorage.png", "node": "StorageFullGold", "width": 1280, "height": 720, "label": "Xiaomi 13 Ultra 金币未满，不能触发满仓", "expected_hit": false}
 {"file": "0032-XiaomiGoldStorage.png", "node": "StorageUnknownGold", "width": 1280, "height": 720, "label": "Xiaomi 13 Ultra 金币提示可读取，不应判为未知", "expected_hit": false}
 {"file": "0033-XiaomiNoStorageTooltip.png", "node": "StorageUnknownGold", "width": 1280, "height": 720, "label": "仓库提示未弹出时判为未知，由继续分支处理", "expected_hit": true}
+{"file": "0034-XiaomiFullGoldStorage.png", "node": "StorageFullGold", "width": 1280, "height": 720, "label": "Xiaomi 金币达到容量，满条背景下仍须读到数值", "expected_hit": true}
+{"file": "0034-XiaomiFullGoldStorage.png", "node": "StorageUnknownGold", "width": 1280, "height": 720, "label": "满仓金币提示可读，不能判为未知", "expected_hit": false}
+{"file": "0035-XiaomiFullElixirStorage.png", "node": "StorageFullElixir", "width": 1280, "height": 720, "label": "Xiaomi 圣水达到容量", "expected_hit": true}
+{"file": "0036-XiaomiDarkStorage.png", "node": "StorageFullDark", "width": 1280, "height": 720, "label": "金币圣水满仓时黑油仍未满，不能提前停止", "expected_hit": false}
+{"file": "0036-XiaomiDarkStorage.png", "node": "StorageUnknownDark", "width": 1280, "height": 720, "label": "Xiaomi 黑油提示中的当前数量与容量可读取", "expected_hit": false}
