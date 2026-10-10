@@ -83,6 +83,8 @@ export interface EngineApi {
   nodes(): Promise<string[]>;
   armyCards(): Promise<ArmyCard[]>;
   applyArmy(): Promise<Status>;
+  readArmy(): Promise<Status>;
+  readArmyResult(): Promise<Settings>;
   settings(): Promise<Settings>;
   saveSettings(next: Settings): Promise<Settings>;
   connect(): Promise<Status>;

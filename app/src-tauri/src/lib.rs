@@ -276,6 +276,36 @@ async fn army_cards<R: Runtime>(app: AppHandle<R>) -> Result<Vec<maacoc_engine::
 }
 
 #[tauri::command]
+async fn read_army<R: Runtime>(app: AppHandle<R>, state: State<'_, AppState>) -> Result<Status, String> {
+    let cards = read_army_cards(&app)?;
+    let mut inner = state.inner.lock().unwrap();
+    let runner = inner.runner.as_ref().ok_or("请先连接手机")?;
+    runner.start_read_army(&cards).map_err(|e| e.to_string())?;
+    inner.phase = Phase::Running;
+    inner.started = Some(Instant::now());
+    inner.events.clear();
+    Ok(status_of(&inner))
+}
+
+#[tauri::command]
+async fn read_army_result<R: Runtime>(app: AppHandle<R>, state: State<'_, AppState>) -> Result<Settings, String> {
+    let next = {
+        let inner = state.inner.lock().unwrap();
+        if inner.detail != "已读取手机卡组" {
+            return Err("读取卡组尚未成功".into());
+        }
+        let runner = inner.runner.as_ref().ok_or("手机已断开")?;
+        if runner.running() {
+            return Err("读取尚未结束".into());
+        }
+        let mut next = inner.settings.clone();
+        next.army = runner.take_read_army().ok_or("没有读取结果")?;
+        next
+    };
+    save_settings(app, state, next).await
+}
+
+#[tauri::command]
 async fn apply_army<R: Runtime>(app: AppHandle<R>, state: State<'_, AppState>) -> Result<Status, String> {
     let cards = read_army_cards(&app)?;
     let mut inner = state.inner.lock().unwrap();
@@ -477,6 +507,7 @@ async fn events(state: State<'_, AppState>) -> Result<Vec<NodeEvent>, String> {
         inner.started = None;
         inner.detail = match inner.events.iter().rev().find(|e| e.hit && e.kind == "action").cloned() {
             Some(e) if e.node == "StorageFullStop" => "金币、圣水和黑油全部满仓，挂机刷资源已停止".into(),
+            Some(e) if e.node == "ArmyReadComplete" => "已读取手机卡组".into(),
             Some(e) if e.node == "ArmyComplete" => "配卡完成，兵种、法术和战车数量已核对".into(),
             Some(e)
                 if matches!(
@@ -549,6 +580,8 @@ pub fn run() {
             nodes,
             army_cards,
             apply_army,
+            read_army,
+            read_army_result,
             connect,
             start,
             stop,

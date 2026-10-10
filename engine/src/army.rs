@@ -220,7 +220,7 @@ pub fn pipeline(plan: &ArmyPlan, cards: &[ArmyCard]) -> crate::Result<Value> {
     let mut nodes = json!({
         "ArmyApply": {"next":["ArmyReload","ArmyOverview","ArmyOpenVillage"],"timeout":2000,"on_error":"ArmyFailed"},
         "ArmyReload":{"recognition":"OCR","expected":"重新载入游戏","roi":[250,400,380,70],"action":"Click","post_delay":4000,"next":"ArmyApply"},
-        "ArmyOpenVillage":{"recognition":"TemplateMatch","template":"Army/UI/Open.png","roi":[30,470,100,110],"threshold":0.95,"action":"Click","next":"ArmyOverview","timeout":2000,"on_error":"ArmyFailed"},
+        "ArmyOpenVillage":{"recognition":"TemplateMatch","template":"Army/UI/Open.png","roi":[30,470,100,110],"threshold":0.95,"action":"Click","target":[75,525,1,1],"post_delay":700,"next":"ArmyOverview","timeout":2000,"on_error":"ArmyFailed"},
         "ArmyOverview":{"recognition":"TemplateMatch","template":"Army/UI/Overview.png","roi":[380,0,100,140],"threshold":0.95,"action":"Click","target":true,"target_offset":[-150,0,20,30],"post_delay":500,"next":"ArmyCapacity","timeout":2000,"on_error":"ArmyFailed"},
         "ArmyCapacity":{"recognition":"Custom","custom_recognition":"ArmyInspect","custom_recognition_param":{"mode":"init"},"timeout":0,"on_error":"ArmyFailed"},
         "ArmyReady":{"recognition":"Custom","custom_recognition":"ArmyInspect","custom_recognition_param":{"mode":"ready","plan":plan},"timeout":0,"on_error":"ArmyFailed"},
@@ -391,6 +391,82 @@ pub fn verification_pipeline(plan: &ArmyPlan, cards: &[ArmyCard]) -> crate::Resu
     Ok(nodes)
 }
 
+pub type ReadResult = Arc<Mutex<Option<ArmyPlan>>>;
+
+/// Recognition result is published only after every occupied slot is identified.
+pub fn register_reader(resource: &Resource) -> crate::Result<ReadResult> {
+    let result = Arc::new(Mutex::new(None));
+    let output = result.clone();
+    resource.register_custom_recognition("ArmyRead", Box::new(FnRecognition::new(move |context, args| {
+        *output.lock().ok()? = None;
+        let cards: Vec<ArmyCard> = serde_json::from_str(args.param).ok()?;
+        let ocr = |roi: [i32;4], enlarged: bool| {
+            let crop = enlarged.then(|| enlarged_crop(args.image, roi)).flatten();
+            let region = if crop.is_some() { [0,0,roi[2]*4,roi[3]*4] } else { roi };
+            let result = context.run_recognition_direct("OCR", &json!({"roi":region,"threshold":if enlarged {0.65} else {0.8}}).to_string(), crop.as_ref().unwrap_or(args.image)).ok()??;
+            single_text(&result.detail, if enlarged {0.65} else {0.8}).map(str::to_owned)
+        };
+        let mut entries = Vec::new();
+        for group in ["Unit", "Spell", "Siege"] {
+            let (used, _) = ratio(&ocr(counter(group), false)?)?;
+            if used == 0 { continue; }
+            let (x, y, stride, slots, width, region) = match group {
+                "Unit" => (562,201,98,6,92,[554,193,665,113]),
+                "Spell" => (562,373,98,4,92,[554,368,426,115]),
+                _ => (998,373,64,3,64,[993,368,226,115]),
+            };
+            let mut matches: BTreeMap<i32, Vec<(f64, ArmyCard, maa_framework::common::Rect)>> = BTreeMap::new();
+            for card in cards.iter().filter(|c| c.group == group) {
+                let hit = context.run_recognition_direct("TemplateMatch", &json!({"template":card.current_template,"roi":region,"method":10001,"green_mask":true,"threshold":0.95}).to_string(), args.image).ok()??;
+                if !hit.hit { continue; }
+                let bbox = hit.box_rect;
+                let slot = ((bbox.x-x) as f64 / stride as f64).round() as i32;
+                if slot < 0 || slot >= slots || (bbox.x-x-slot*stride).abs() > 5 { return None; }
+                matches.entry(slot).or_default().push((crate::events::best_score(&hit.detail), card.clone(), bbox));
+            }
+            let before = entries.len();
+            for slot in 0..slots {
+                let Some(mut candidates) = matches.remove(&slot) else {
+                    // A quantity with no corresponding card must never be silently omitted.
+                    if ocr([x+slot*stride,y,43,25], true).and_then(|t| quantity(&t)).is_some_and(|q| q>0) {
+                        eprintln!("读取军队失败: {group} 第 {} 格有数量但卡牌无法确认",slot+1);
+                        return None;
+                    }
+                    continue;
+                };
+                candidates.sort_by(|a,b| b.0.total_cmp(&a.0));
+                if candidates.get(1).is_some_and(|second| candidates[0].0-second.0 < 0.01) {
+                    eprintln!("读取军队失败: {group} 第 {} 格存在相似卡牌",slot+1);
+                    return None;
+                }
+                let (_, card, bbox) = candidates.remove(0);
+                let count = quantity(&ocr([bbox.x,bbox.y,43,25],true)?)?;
+                if !(1..=400).contains(&count) || bbox.width != width { return None; }
+                entries.push(ArmyEntry { id: card.id, count });
+            }
+            if entries.len() == before { return None; }
+        }
+        let plan = ArmyPlan { entries };
+        if !plan.entries.is_empty() { plan.validate(&cards).ok()?; }
+        *output.lock().ok()? = Some(plan.clone());
+        Some((*args.roi, serde_json::to_string(&plan).ok()?))
+    })))?;
+    Ok(result)
+}
+
+pub fn read_pipeline(cards: &[ArmyCard]) -> Value {
+    json!({
+        "ArmyApply":{"next":["ArmyReload","ArmyOverview","ArmyOpenVillage"],"timeout":2000,"on_error":"ArmyFailed"},
+        "ArmyReload":{"recognition":"OCR","expected":"重新载入游戏","roi":[250,400,380,70],"action":"Click","post_delay":4000,"next":"ArmyApply"},
+        "ArmyOpenVillage":{"recognition":"TemplateMatch","template":"Army/UI/Open.png","roi":[30,470,100,110],"threshold":0.95,"action":"Click","target":[75,525,1,1],"post_delay":700,"next":"ArmyOverview","timeout":2000,"on_error":"ArmyFailed"},
+        "ArmyOverview":{"recognition":"TemplateMatch","template":"Army/UI/Overview.png","roi":[380,0,100,140],"threshold":0.95,"action":"Click","target":true,"target_offset":[-150,0,20,30],"post_delay":500,"next":"ArmyReadCurrent","timeout":2000,"on_error":"ArmyFailed"},
+        "ArmyReadCurrent":{"recognition":"Custom","custom_recognition":"ArmyRead","custom_recognition_param":cards,"next":"ArmyClose","timeout":0,"on_error":"ArmyFailed"},
+        "ArmyClose":{"recognition":"ColorMatch","roi":[0,0,1,1],"lower":[0,0,0],"upper":[255,255,255],"count":1,"action":"Click","target":[1208,80,1,1],"next":"ArmyReadComplete"},
+        "ArmyReadComplete":{"action":"StopTask","focus":"已读取手机卡组"},
+        "ArmyFailed":{"action":"StopTask","focus":"读取卡组失败，未修改部队"}
+    })
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -401,6 +477,24 @@ mod tests {
         assert_eq!(ratio("353/352"), None);
         assert_eq!(ratio("0/0"), None);
     }
+    #[test]
+    fn phone_reading_never_adds_or_removes_troops() {
+        let nodes = read_pipeline(&[]);
+        for node in nodes.as_object().unwrap().values() {
+            assert!(node.get("repeat").is_none());
+            assert_ne!(node["custom_recognition_param"]["mode"], "find");
+            if node["action"] == "Click" {
+                assert!(
+                    node["expected"] == "重新载入游戏"
+                        || node["template"] == "Army/UI/Open.png"
+                        || node["template"] == "Army/UI/Overview.png"
+                        || node["target"] == json!([1208, 80, 1, 1])
+                );
+            }
+        }
+        assert_eq!(nodes["ArmyReadCurrent"]["on_error"], "ArmyFailed");
+    }
+
     #[test]
     fn quantities_normalize_ocr_strokes_without_accepting_arbitrary_text() {
         assert_eq!(quantity("XI"), Some(1));

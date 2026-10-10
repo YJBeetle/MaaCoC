@@ -29,6 +29,7 @@ pub struct Runner {
     sink_id: i64,
     bus: EventBus,
     pub label: String,
+    army_read: crate::army::ReadResult,
 }
 
 fn check(status: MaaStatus, what: &str) -> Result<()> {
@@ -139,6 +140,7 @@ impl Runner {
     }
 
     fn assemble(controller: Option<Controller>, resource: Resource, label: String) -> Self {
+        let army_read = crate::army::register_reader(&resource).expect("注册军队读取识别");
         let tasker = Tasker::new().expect("创建 Tasker 失败");
         let _ = tasker.bind_resource(&resource);
         if let Some(ctrl) = &controller {
@@ -154,6 +156,7 @@ impl Runner {
             tasker,
             bus,
             label,
+            army_read,
         }
     }
 
@@ -175,6 +178,21 @@ impl Runner {
 
     pub fn start(&self, entry: &str) -> Result<()> {
         self.start_with_strategy(entry, crate::Strategy::default())
+    }
+
+    pub fn start_read_army(&self, cards: &[crate::army::ArmyCard]) -> Result<()> {
+        if self.running() {
+            return Err("请先停止正在运行的流程".into());
+        }
+        *self.army_read.lock().map_err(|_| "读取状态不可用")? = None;
+        self.bus.restart();
+        self.tasker
+            .post_task("ArmyApply", &crate::army::read_pipeline(cards).to_string())?;
+        Ok(())
+    }
+
+    pub fn take_read_army(&self) -> Option<crate::army::ArmyPlan> {
+        self.army_read.lock().ok()?.take()
     }
 
     pub fn start_army(&self, plan: &crate::army::ArmyPlan, cards: &[crate::army::ArmyCard]) -> Result<()> {

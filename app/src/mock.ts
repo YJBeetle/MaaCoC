@@ -48,6 +48,8 @@ export function createMockApi(): EngineApi {
       return [{ label: "K40", address: "f5d66ad2" }];
     },
     async armyCards() { return []; },
+    async readArmy() { status = { ...status, phase: "ready", detail: "已读取手机卡组" }; return status; },
+    async readArmyResult() { return settings; },
     async applyArmy() { status = { ...status, phase: "ready", detail: "配卡完成" }; return status; },
     async nodes() {
       return ["Main", "AttackLoop", "Launch"];

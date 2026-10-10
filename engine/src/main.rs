@@ -28,6 +28,7 @@ fn usage() {
     println!(
         "用法: maacoc-engine <命令> [参数]
 
+  army-read                      读取手机当前部队、法术和战车为 JSON
   army <配置.json>               替换部队、法术和战车并核对数量
   devices                        列出 ADB 设备
   snap [输出.png]                 截一帧，报告设备与匹配空间尺寸
@@ -64,6 +65,7 @@ fn run() -> Result<(), Error> {
         Some("shell") => shell(assets, &args[1..], preferred.as_deref()),
         Some("load") => load(assets),
         Some("run") => battle(assets, &args, preferred.as_deref()),
+        Some("army-read") => read_army(assets, preferred.as_deref()),
         Some("army") => configure_army(assets, &args, preferred.as_deref()),
         Some("reco") => reco(assets, &args),
         Some("regress") => regress(assets, args.get(1).cloned()),
@@ -73,6 +75,34 @@ fn run() -> Result<(), Error> {
             Ok(())
         }
     }
+}
+
+fn read_army(assets: &Path, preferred: Option<&str>) -> Result<(), Error> {
+    let cards: Vec<maacoc_engine::army::ArmyCard> =
+        serde_json::from_str(&std::fs::read_to_string(assets.join("army.json"))?)?;
+    let runner = Runner::connect(assets, DeviceTarget::Adb, preferred)?;
+    runner.start_read_army(&cards)?;
+    let deadline = Instant::now() + Duration::from_secs(90);
+    let mut complete = false;
+    while Instant::now() < deadline {
+        for event in runner.poll() {
+            eprintln!("读取军队: {} {} hit={}", event.node, event.kind, event.hit);
+            complete |= event.node == "ArmyReadComplete" && event.hit && event.kind == "action";
+        }
+        if !runner.running() {
+            break;
+        }
+        thread::sleep(Duration::from_millis(100));
+    }
+    runner.stop(Duration::from_secs(15));
+    if !complete {
+        return Err("读取卡组失败，未修改部队".into());
+    }
+    println!(
+        "{}",
+        serde_json::to_string_pretty(&runner.take_read_army().ok_or("缺少读取结果")?)?
+    );
+    Ok(())
 }
 
 fn configure_army(assets: &Path, args: &[String], preferred: Option<&str>) -> Result<(), Error> {

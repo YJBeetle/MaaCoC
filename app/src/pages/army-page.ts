@@ -9,6 +9,7 @@ export class ArmyPage {
   private summary = el("p");
   private error = el("p", { role: "alert" });
   private apply = el("md-filled-button", { text: "应用到手机（替换当前配置）" });
+  private read = el("md-outlined-button", { text: "读取手机当前卡组" });
   private stop = el("md-outlined-button", { text: "停止" });
   private search = el("input", { type: "search", placeholder: "搜索英文名称", "aria-label": "搜索卡牌" });
   private busy = false;
@@ -18,7 +19,7 @@ export class ArmyPage {
   private settings!: Settings;
   private cards: ArmyCard[] = [];
 
-  constructor(private persist: (next: Partial<Settings>) => Promise<void>, apply: () => Promise<void>, stop: () => Promise<void>) {
+  constructor(private persist: (next: Partial<Settings>) => Promise<void>, apply: () => Promise<void>, stop: () => Promise<void>, read: () => Promise<void>) {
     const tabs = el("div", { class: "army-toolbar" });
     for (const [group, label] of [["Unit", "兵种"], ["Spell", "法术"], ["Siege", "战车"]]) {
       const tab = el("md-outlined-button", { text: label });
@@ -30,9 +31,10 @@ export class ArmyPage {
     const clear = this.clear;
     clear.addEventListener("click", () => void this.save({ army: { entries: [] } }));
     this.apply.addEventListener("click", () => void apply());
+    this.read.addEventListener("click", () => void read());
     this.stop.addEventListener("click", () => void stop());
     const actions = el("div", { class: "army-toolbar" });
-    actions.append(this.apply, this.stop, clear);
+    actions.append(this.read, this.apply, this.stop, clear);
     const share = el("textarea", { rows: "3", placeholder: "粘贴 MC1: 分享码", "aria-label": "卡组分享码" });
     const message = el("p", { role: "status" });
     const exportButton = el("md-outlined-button", { text: "生成分享码" });
@@ -62,6 +64,7 @@ export class ArmyPage {
     this.busy = running;
     this.clear.toggleAttribute("disabled", running);
     this.apply.toggleAttribute("disabled", state.status.phase !== "ready" || !this.settings.army.entries.length);
+    this.read.toggleAttribute("disabled", state.status.phase !== "ready");
     this.stop.toggleAttribute("disabled", !running);
     this.grid.querySelectorAll<HTMLInputElement>("input").forEach(input => { input.disabled = running; });
     this.summary.textContent = this.settings.army.entries.map(entry => `${this.cards.find(c => c.id === entry.id)?.name || entry.id} ×${entry.count}`).join(" · ") || "尚未选择卡牌";

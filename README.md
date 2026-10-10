@@ -77,7 +77,8 @@ cargo run --bin maacoc-engine -- patch AttackStart threshold 0.9   # 只打印 d
 
 ## 自定义配卡与分享
 
-“配卡”页按英文名称选择兵种、法术和战车，填写数量后点击“应用到手机”。
+“配卡”页可以点击“读取手机当前卡组”回填部队、法术和战车；读取不会增删部队，遇到相似或无法确认的卡牌会停止。
+也可按英文名称选择卡牌，填写数量后点击“应用到手机”。
 流程先检查游戏当前开放的卡牌和军队容量，再替换现有配置；配完核对数量及总人口／容量。
 失败会停止，不会自动开始战斗。英雄、宠物和装备沿用手机当前配置。
 目前最多配置 6 种兵、6 种法术和 3 种战车；未配置的类别会被清空。
@@ -89,6 +90,7 @@ cargo run --bin maacoc-engine -- patch AttackStart threshold 0.9   # 只打印 d
 这份格式参考 [MAA 作业协议](https://docs.maa.plus/zh-cn/protocol/copilot-schema.html) 中编队与动作一起存储的思路。
 
 命令行也可使用 `cargo run --bin maacoc-engine -- army army.json --device <serial>`。
+使用 `cargo run --bin maacoc-engine -- army-read --device <serial>` 可只读导出当前卡组 JSON。
 增加 `--verify-only` 可只检查当前卡组，不移除或添加卡牌。
 JSON 形式为 `{"entries":[{"id":"Unit/13_ElectroDragon","count":11}]}`，卡牌 ID 见 `assets/army.json`。
 该命令同样会替换三类配置，数量为 0 的条目不要写入。

@@ -61,6 +61,8 @@ async function loadApi(): Promise<EngineApi> {
       devices: () => call("devices"),
       nodes: () => call("nodes"),
       armyCards: () => call("army_cards"),
+      readArmy: () => call("read_army"),
+      readArmyResult: () => call("read_army_result"),
       applyArmy: () => call("apply_army"),
       settings: () => call("settings"),
       paths: () => call<Paths>("paths"),
@@ -103,6 +105,7 @@ const ui = {
 };
 
 const runPage = new RunPage({ toggleRun, changeScreenSize });
+let readingArmy = false;
 const armyPage = new ArmyPage(async next => {
   state.settings = await api.saveSettings({ ...state.settings, ...next });
   render();
@@ -110,7 +113,11 @@ const armyPage = new ArmyPage(async next => {
   try { state.status = await api.applyArmy(); state.error = ""; }
   catch (err) { state.error = String(err); }
   render();
-}, async () => { state.status = await api.stop(); render(); });
+}, async () => { state.status = await api.stop(); render(); }, async () => {
+  try { state.status = await api.readArmy(); readingArmy = true; state.error = ""; }
+  catch (err) { state.error = String(err); }
+  render();
+});
 const statsPage = new StatsPage();
 const settingsPage = new SettingsPage(persist);
 
@@ -277,6 +284,10 @@ async function tick() {
     if (incoming.length) {
       state.events.push(...incoming);
       if (state.events.length > 400) state.events.splice(0, state.events.length - 400);
+    }
+    if (readingArmy && state.status.phase !== "running") {
+      readingArmy = false;
+      if (state.status.detail === "已读取手机卡组") state.settings = await api.readArmyResult();
     }
     const interval = state.settings.frameIntervalMs;
     // One capture at a time: a slow screenshot must not queue up behind itself.
