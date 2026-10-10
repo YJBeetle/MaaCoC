@@ -35,13 +35,15 @@ fn below_capacity(current: Option<u64>, capacity: Option<u64>) -> bool {
 
 fn number(text: &str) -> Option<u64> {
     let grouped: String = text.chars().filter(|c| !c.is_whitespace()).collect();
-    if grouped.contains('.') {
-        let groups: Vec<_> = grouped.split('.').collect();
-        if groups[0].is_empty() || groups.iter().skip(1).any(|g| g.len() != 3) {
+    if grouped.contains(['.', ',', '-']) {
+        let groups: Vec<_> = grouped.split(['.', ',', '-']).collect();
+        // OCR sometimes drops a grouping separator (31.000000) or reads it as '-'.
+        // Require complete three-digit groups; never accept decimal fractions.
+        if groups[0].is_empty() || groups.iter().skip(1).any(|g| g.is_empty() || g.len() % 3 != 0) {
             return None;
         }
     }
-    let compact: String = grouped.chars().filter(|c| *c != ',' && *c != '.').collect();
+    let compact: String = grouped.chars().filter(|c| *c != ',' && *c != '.' && *c != '-').collect();
     if compact.is_empty() || !compact.bytes().all(|b| b.is_ascii_digit()) {
         return None;
     }
@@ -89,18 +91,20 @@ pub(crate) fn register(resource: &Resource) -> crate::Result<CapacityCache> {
             }
             let read = |roi, is_capacity| {
                 // Whole-line recognition preserves spaced groups on normal bars.
-                // Full gold bars need text detection to remove the yellow margins.
+                // Text detection trims the colored bar margins; prefer it when available.
                 let mut last_detail = json!(null);
+                let mut best = None;
                 for only_rec in if is_capacity { &[true][..] } else { &[true, false][..] } {
                     let params = json!({"roi": roi, "only_rec": only_rec, "threshold": 0.9});
                     let Some(result) = context
                         .run_recognition_direct("OCR", &params.to_string(), args.image)
                         .ok().flatten() else { continue; };
                     if let Some(value) = ocr_number(&result.detail, is_capacity) {
-                        return Some(value);
+                        best = Some(value);
                     }
                     last_detail = result.detail;
                 }
+                if best.is_some() { return best; }
                 eprintln!("仓库 OCR 读取失败 roi={roi:?}: {}", last_detail["filtered"]);
                 None
             };
@@ -134,18 +138,20 @@ pub(crate) fn register(resource: &Resource) -> crate::Result<CapacityCache> {
             for index in (0..3).rev() {
                 let max = limits[index];
                 let roi = [1029, [27, 95, 160][index], 154, 31];
+                let mut best = None;
                 for only_rec in [true, false] {
                     let params = json!({"roi":roi,"only_rec":only_rec,"threshold":0.9});
                     let Some(result) = context.run_recognition_direct(
                         "OCR", &params.to_string(), args.image).ok().flatten() else { continue; };
-                    let current = ocr_number(&result.detail, false);
-                    if let Some(current) = current {
-                        cached.1.lock().unwrap()[index] = Some(ResourceReading {current, capacity:max, read_at:read_time()});
+                    if let Some(current) = ocr_number(&result.detail, false) {
+                        best = Some(current);
                     }
-                    if not_full.is_none() && below_capacity(current, max) {
-                        not_full = Some((index, current.unwrap(), max.unwrap()));
+                }
+                if let Some(current) = best {
+                    cached.1.lock().unwrap()[index] = Some(ResourceReading {current, capacity:max, read_at:read_time()});
+                    if not_full.is_none() && below_capacity(Some(current), max) {
+                        not_full = Some((index, current, max.unwrap()));
                     }
-                    if current.is_some() { break; }
                 }
             }
             // Cached data never confirms full storage. Open fresh tooltips instead.
@@ -189,6 +195,10 @@ mod tests {
         assert_eq!(number("31 000.000"), Some(31_000_000));
         assert_eq!(number("31000.000"), Some(31_000_000));
         assert_eq!(number("31.5"), None);
+        assert_eq!(number("500-000"), Some(500_000));
+        assert_eq!(capacity("最大储量：31.000000"), Some(31_000_000));
+        assert_eq!(number("-500000"), None);
+        assert_eq!(number("500-00"), None);
         assert_eq!(capacity("最大储量：500 000"), Some(500_000));
         assert!(number("32 000 000").unwrap() >= capacity("最大储量:31 000 000").unwrap());
     }

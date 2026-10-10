@@ -62,3 +62,9 @@
 {"file": "0035-XiaomiFullElixirStorage.png", "node": "StorageFullElixir", "width": 1280, "height": 720, "label": "Xiaomi 圣水达到容量", "expected_hit": true}
 {"file": "0036-XiaomiDarkStorage.png", "node": "StorageFullDark", "width": 1280, "height": 720, "label": "金币圣水满仓时黑油仍未满，不能提前停止", "expected_hit": false}
 {"file": "0036-XiaomiDarkStorage.png", "node": "StorageUnknownDark", "width": 1280, "height": 720, "label": "Xiaomi 黑油提示中的当前数量与容量可读取", "expected_hit": false}
+{"file": "0037-XiaomiFullGoldGrouped.png", "node": "StorageFullGold", "width": 1280, "height": 720, "label": "满仓读数含 OCR 分隔符误识别，仍须正确比较容量", "expected_hit": true}
+{"file": "0037-XiaomiFullGoldGrouped.png", "node": "StorageUnknownGold", "width": 1280, "height": 720, "label": "满仓读数含 OCR 分隔符误识别，仍须正确比较容量", "expected_hit": false}
+{"file": "0038-XiaomiFullElixirGrouped.png", "node": "StorageFullElixir", "width": 1280, "height": 720, "label": "满仓读数含 OCR 分隔符误识别，仍须正确比较容量", "expected_hit": true}
+{"file": "0038-XiaomiFullElixirGrouped.png", "node": "StorageUnknownElixir", "width": 1280, "height": 720, "label": "满仓读数含 OCR 分隔符误识别，仍须正确比较容量", "expected_hit": false}
+{"file": "0039-XiaomiFullDarkGrouped.png", "node": "StorageFullDark", "width": 1280, "height": 720, "label": "满仓读数含 OCR 分隔符误识别，仍须正确比较容量", "expected_hit": true}
+{"file": "0039-XiaomiFullDarkGrouped.png", "node": "StorageUnknownDark", "width": 1280, "height": 720, "label": "满仓读数含 OCR 分隔符误识别，仍须正确比较容量", "expected_hit": false}
