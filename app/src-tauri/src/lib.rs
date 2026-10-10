@@ -134,6 +134,15 @@ impl AppState {
 /// Where the pipeline/image assets live. Bundled apps resolve them next to the
 /// resources; `tauri dev` has no resource dir, so fall back to the source tree.
 fn assets_dir<R: Runtime>(app: &AppHandle<R>) -> Result<PathBuf, String> {
+    // Tauri also stages resources beside debug binaries. Those copies can lag
+    // behind template edits, so development runs must use the source assets.
+    #[cfg(debug_assertions)]
+    {
+        let source = PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("../../assets");
+        if source.join("pipeline").is_dir() {
+            return Ok(source);
+        }
+    }
     let candidates = [
         app.path().resolve("assets", BaseDirectory::Resource).ok(),
         std::env::current_dir().ok().map(|dir| dir.join("assets")),
