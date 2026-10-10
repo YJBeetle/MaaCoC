@@ -36,3 +36,9 @@
 {"file": "0010-StorageDark.png", "node": "StorageFullDark", "expected_hit": false, "width": 1280, "height": 720, "label": "实机未满仓容量弹窗"}
 {"file": "0010-StorageDark.png", "node": "StorageUnknownDark", "expected_hit": false, "width": 1280, "height": 720, "label": "实机未满仓容量弹窗"}
 {"file": "0003-FindUnit.png", "node": "StorageUnknownGold", "width": 1280, "height": 720, "expected_hit": true, "label": "战斗界面缺少仓库容量，不应继续检查"}
+{"file": "0020-EventUnits.png", "node": "FindUnit", "width": 1280, "height": 720, "label": "白背景活动兵 TotemThrower", "roi": [90, 590, 94, 128], "expected_hit": true}
+{"file": "0020-EventUnits.png", "node": "FindUnit", "width": 1280, "height": 720, "label": "白背景活动兵 Lavaloon", "roi": [185, 590, 95, 128], "expected_hit": true}
+{"file": "0020-EventUnits.png", "node": "FindUnit", "width": 1280, "height": 720, "label": "白背景活动兵 WitchGolem", "roi": [282, 590, 97, 128], "expected_hit": true}
+{"file": "0021-DepletedEventUnits.png", "node": "FindUnit", "width": 1280, "height": 720, "label": "已耗尽的白背景活动兵 TotemThrower", "roi": [90, 590, 94, 128], "expected_hit": false}
+{"file": "0021-DepletedEventUnits.png", "node": "FindUnit", "width": 1280, "height": 720, "label": "已耗尽的白背景活动兵 Lavaloon", "roi": [185, 590, 95, 128], "expected_hit": false}
+{"file": "0021-DepletedEventUnits.png", "node": "FindUnit", "width": 1280, "height": 720, "label": "已耗尽的白背景活动兵 WitchGolem", "roi": [282, 590, 97, 128], "expected_hit": false}
