@@ -30,7 +30,8 @@ function nodeName(event: NodeEvent): string {
 export class BattlePanel {
   readonly element = el("div", { class: "card bordered battle-panel" });
   readonly canvas = el("canvas", { "aria-label": "实时卡牌栏" }) as HTMLCanvasElement;
-  private readonly title = el("span", { text: "当前卡组 · 实时画面" });
+  private readonly title = el("span", { text: "卡牌栏 · 实时画面" });
+  private capturedAt: number | null = null;
   private readonly progress = el("span", { class: "battle-progress" });
   private readonly empty = el("div", { class: "battle-empty", text: "进入战斗后显示卡牌栏" });
 
@@ -38,6 +39,11 @@ export class BattlePanel {
     const heading = el("div", { class: "battle-heading" });
     heading.append(this.title, this.progress);
     this.element.append(heading, this.canvas, this.empty);
+  }
+
+  clear() {
+    this.capturedAt = null;
+    this.canvas.hidden = true;
   }
 
   render(state: { frame: Frame | null; status: Status; settings: Settings; events: NodeEvent[] }, draw: () => boolean) {
@@ -50,8 +56,14 @@ export class BattlePanel {
       "DeploySiege", "FindHero", "DeployHero", "SkillHero", "FindSpell", "DeploySpell", "WaitingEndLoop"].includes(node);
     const connected = state.status.phase === "ready" || state.status.phase === "running";
     const visible = connected && !!state.frame?.landscape && inBattle && draw();
-    this.canvas.hidden = !visible;
-    this.empty.hidden = visible;
+    if (visible) {
+      this.capturedAt = Date.now();
+      this.title.textContent = "卡牌栏 · 实时画面";
+    } else if (this.capturedAt) {
+      this.title.textContent = `最近卡牌画面 · ${new Date(this.capturedAt).toLocaleTimeString("zh-CN", {hour12:false})}`;
+    }
+    this.canvas.hidden = !visible && !this.capturedAt;
+    this.empty.hidden = visible || !!this.capturedAt;
     this.empty.textContent = state.frame && !state.frame.landscape ? "设备处于竖屏" : "进入战斗后显示卡牌栏";
   }
 }

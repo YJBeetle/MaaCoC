@@ -217,6 +217,10 @@ impl Runner {
         self.tasker.inited()
     }
 
+    pub fn storage_readings(&self) -> [Option<crate::storage::ResourceReading>; 3] {
+        self.storage_capacity.readings()
+    }
+
     pub fn resource(&self) -> &Resource {
         &self.resource
     }

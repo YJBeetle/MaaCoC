@@ -2,13 +2,30 @@
 use maa_framework::{custom::FnRecognition, resource::Resource};
 use serde_json::{json, Value};
 use std::sync::{Arc, Mutex};
+use serde::Serialize;
+
+#[derive(Debug, Clone, Copy, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct ResourceReading {
+    pub current: u64,
+    pub capacity: Option<u64>,
+    pub read_at: f64,
+}
+
+fn read_time() -> f64 {
+    std::time::SystemTime::now().duration_since(std::time::UNIX_EPOCH).unwrap_or_default().as_secs_f64()
+}
 
 #[derive(Clone, Default)]
-pub(crate) struct CapacityCache(Arc<Mutex<[Option<u64>; 3]>>);
+pub(crate) struct CapacityCache(Arc<Mutex<[Option<u64>; 3]>>, Arc<Mutex<[Option<ResourceReading>; 3]>>);
 
 impl CapacityCache {
+    pub fn readings(&self) -> [Option<ResourceReading>; 3] {
+        *self.1.lock().unwrap()
+    }
     pub fn reset(&self) {
         *self.0.lock().unwrap() = [None; 3];
+        *self.1.lock().unwrap() = [None; 3];
     }
 }
 
@@ -92,6 +109,7 @@ pub(crate) fn register(resource: &Resource) -> crate::Result<CapacityCache> {
             let known = current.zip(max);
             if let Some((current, max)) = known {
                 observed.0.lock().unwrap()[index] = Some(max);
+                observed.1.lock().unwrap()[index] = Some(ResourceReading {current, capacity:Some(max), read_at:read_time()});
                 eprintln!("仓库检查 {}: {current}/{max}", ["金币", "圣水", "黑油"][index]);
             }
             let hit = match param["state"].as_str()? {
@@ -110,24 +128,31 @@ pub(crate) fn register(resource: &Resource) -> crate::Result<CapacityCache> {
                 return None;
             }
             let limits = *cached.0.lock().unwrap();
+            let mut not_full = None;
+            // Keep all three historical counters available to the status panel.
             // Check dark elixir first: gold and elixir often fill up earlier.
             for index in (0..3).rev() {
-                let Some(max) = limits[index] else { continue; };
+                let max = limits[index];
                 let roi = [1029, [27, 95, 160][index], 154, 31];
                 for only_rec in [true, false] {
                     let params = json!({"roi":roi,"only_rec":only_rec,"threshold":0.9});
                     let Some(result) = context.run_recognition_direct(
                         "OCR", &params.to_string(), args.image).ok().flatten() else { continue; };
                     let current = ocr_number(&result.detail, false);
-                    if below_capacity(current, Some(max)) {
-                        eprintln!("仓库快速检查 {}: {}/{max}，未满", ["金币", "圣水", "黑油"][index], current.unwrap());
-                        return Some((*args.roi, json!({"resource":index,"current":current,"cached_capacity":max}).to_string()));
+                    if let Some(current) = current {
+                        cached.1.lock().unwrap()[index] = Some(ResourceReading {current, capacity:max, read_at:read_time()});
+                    }
+                    if not_full.is_none() && below_capacity(current, max) {
+                        not_full = Some((index, current.unwrap(), max.unwrap()));
                     }
                     if current.is_some() { break; }
                 }
             }
             // Cached data never confirms full storage. Open fresh tooltips instead.
-            None
+            not_full.map(|(index, current, max)| {
+                eprintln!("仓库快速检查 {}: {current}/{max}，未满", ["金币", "圣水", "黑油"][index]);
+                (*args.roi, json!({"resource":index,"current":current,"cached_capacity":max}).to_string())
+            })
         })),
     )?;
     Ok(cache)

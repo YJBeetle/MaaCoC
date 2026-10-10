@@ -16,6 +16,7 @@ export class RunPage {
   private readonly battle = new BattlePanel();
   private state: RunPageState | null = null;
   private readonly preview = new DevicePreview(() => this.renderBattle());
+  private readonly resources = el("div", { class: "resource-readings" });
   private readonly timeline = el("div", { class: "timeline", id: "timeline" });
   private readonly fab = el("md-fab", { id: "fab" });
   private readonly secondary = el("div", { class: "secondary" });
@@ -46,7 +47,7 @@ export class RunPage {
 
   clearPreview() {
     this.preview.clear();
-    this.battle.canvas.hidden = true;
+    this.battle.clear();
   }
 
   dispose() {
@@ -71,6 +72,7 @@ export class RunPage {
     this.preview.render(state);
     this.renderBattle();
     this.renderTimeline(state);
+    this.renderResources(state);
   }
 
   private build(): HTMLElement {
@@ -78,13 +80,29 @@ export class RunPage {
     const left = el("div", { class: "run-left" });
     const card = el("div", { class: "card bordered grow" });
     card.appendChild(this.preview.element);
-    left.append(card, this.battle.element, this.actions);
+    left.append(card, this.actions);
 
     const tlCard = el("div", { class: "card bordered timeline-card" });
-    tlCard.append(el("div", { class: "card-title", text: "节点" }), this.timeline);
+    tlCard.append(el("div", { class: "card-title", text: "运行日志" }), this.timeline);
 
-    grid.append(left, tlCard);
+    const right = el("div", { class: "run-right" });
+    const summary = el("div", { class: "card bordered status-card" });
+    summary.append(el("div", { class: "card-title", text: "状态 · 最近读取" }), this.resources, this.battle.element);
+    right.append(summary, tlCard);
+    grid.append(left, right);
     return grid;
+  }
+
+  private renderResources(state: RunPageState) {
+    const format = new Intl.NumberFormat("zh-CN");
+    const rows = ["金币", "圣水", "黑油"].map((name, index) => {
+      const reading = state.status.resources?.[index];
+      const row = el("div", { class: "resource-row" });
+      row.append(el("span", { text: name }), el("strong", { text: reading ? format.format(reading.current) : "未读取" }));
+      row.append(el("span", { class: "resource-meta", text: reading ? `${reading.capacity === null ? "容量未读取" : `容量 ${format.format(reading.capacity)}`} · ${new Date(reading.readAt * 1000).toLocaleTimeString("zh-CN", {hour12:false})}` : "等待仓库检查" }));
+      return row;
+    });
+    this.resources.replaceChildren(...rows);
   }
 
   private renderBattle() {

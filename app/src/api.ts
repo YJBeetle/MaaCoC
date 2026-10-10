@@ -33,6 +33,8 @@ export interface NodeEvent {
 
 export type Phase = "idle" | "connecting" | "ready" | "running" | "error";
 
+export interface ResourceReading { current: number; capacity: number | null; readAt: number; }
+
 export interface Status {
   phase: Phase;
   detail: string;
@@ -41,6 +43,7 @@ export interface Status {
   currentNode: string;
   /** Physical and current panel size, as `wm size` reports them. */
   panel: string;
+  resources?: (ResourceReading | null)[];
 }
 
 export type Strategy = "spells-first" | "units-first" | "left-spread" | "air-probe";
