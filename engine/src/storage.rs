@@ -26,7 +26,7 @@ fn capacity(text: &str) -> Option<u64> {
     number(amount).filter(|v| (1_000..=1_000_000_000).contains(v))
 }
 
-fn ocr_number(detail: &Value, capacity_line: bool) -> Option<u64> {
+pub(crate) fn ocr_number(detail: &Value, capacity_line: bool) -> Option<u64> {
     let results = detail.get("filtered")?.as_array()?;
     if results.len() != 1 {
         return None;

@@ -1,4 +1,4 @@
-import type { DeviceItem, Settings, Strategy } from "../api";
+import type { DeviceItem, Settings, Strategy, LootFilter } from "../api";
 import { DEFAULT_SETTINGS } from "../api";
 import { el } from "../dom";
 import { applyTheme, type ThemeMode } from "../theme";
@@ -53,6 +53,12 @@ function buildSettingsPage(): HTMLElement {
     el("div", { class: "field", id: "f-autostart" }),
   );
 
+  const loot = el("div", { class: "card bordered" });
+  loot.append(el("div", { class: "sect", text: "开战收益筛选" }));
+  for (const id of ["enabled", "mode", "gold", "elixir", "dark", "total", "skips"]) {
+    loot.append(el("div", { class: "field", id: `f-loot-${id}` }));
+  }
+
   const diag = el("div", { class: "card bordered" });
   diag.append(
     el("div", { class: "sect", text: "诊断" }),
@@ -72,12 +78,19 @@ function buildSettingsPage(): HTMLElement {
     el("div", { class: "field danger", id: "f-reset" }),
   );
 
-  wrap.append(device, diag, look, about);
+  wrap.append(device, loot, diag, look, about);
   return wrap;
 }
 
 export class SettingsPage {
   readonly element = buildSettingsPage();
+
+  private lootFilter = DEFAULT_SETTINGS.lootFilter;
+
+  private updateLoot = (patch: Partial<LootFilter>) => {
+    this.lootFilter = { ...this.lootFilter, ...patch };
+    void this.persist({ lootFilter: this.lootFilter });
+  };
 
   constructor(private persist: (next: Partial<Settings>) => Promise<void>) {}
 
@@ -155,7 +168,38 @@ export class SettingsPage {
     return sw;
   }
 
+  private syncNumber(id: string, title: string, value: number, min: number, max: number, key: keyof LootFilter, disabled: boolean) {
+    const field = this.fieldOf(id, title, key === "maxSkips" ? "达到上限后停止，避免一直消耗搜索费用。" : "输入整数，0 表示不限制该项。单位：资源数量。");
+    if (!field) return;
+    let input = field.querySelector<HTMLInputElement>("input");
+    if (!input) {
+      input = document.createElement("input");
+      input.type = "number"; input.min = String(min); input.max = String(max); input.step = "1";
+      input.setAttribute("aria-label", title);
+      input.style.cssText = "width:260px;max-width:100%;padding:12px;border:1px solid var(--md-sys-color-outline);border-radius:4px;background:transparent;color:inherit;font:inherit;box-sizing:border-box";
+      const control = input;
+      input.addEventListener("change", () => {
+        const number = control.valueAsNumber;
+        control.setCustomValidity(Number.isSafeInteger(number) && number >= min && number <= max ? "" : `请输入 ${min}～${max} 的整数`);
+        if (control.reportValidity()) this.updateLoot({ [key]: number });
+      });
+      field.append(input);
+    }
+    if (document.activeElement !== input) input.value = String(value);
+    input.disabled = disabled;
+  }
+
   render(state: SettingsPageState) {
+    this.lootFilter = state.settings.lootFilter ?? DEFAULT_SETTINGS.lootFilter;
+    const loot = this.lootFilter;
+    const enabled = this.syncSwitch("f-loot-enabled", "启用收益筛选", "停止后修改，下一次开始生效。只在搜索对手时判断，已开战时继续原流程。", loot.enabled, (v) => this.updateLoot({ enabled: v }));
+    enabled?.toggleAttribute("disabled", state.running);
+    const mode = this.syncSelect("f-loot-mode", "条件关系", "只计算大于 0 的门槛；全部为 0 时不限制收益。", [{value:"any",label:"任一条件满足就开战"},{value:"all",label:"全部条件满足才开战"}], loot.matchAny ? "any" : "all", (v) => this.updateLoot({matchAny:v === "any"}), "—");
+    if (mode) mode.disabled = state.running || !loot.enabled;
+    for (const [id,title,key] of [["gold","最低金币","minGold"],["elixir","最低圣水","minElixir"],["dark","最低黑油","minDark"],["total","最低金币＋圣水合计","minGoldElixir"],["skips","连续跳过上限","maxSkips"]] as const) {
+      this.syncNumber(`f-loot-${id}`, title, loot[key], key === "maxSkips" ? 1 : 0, key === "maxSkips" ? 1000 : 1000000000, key, state.running || !loot.enabled);
+    }
+
     const strategy = this.syncSelect(
       "f-strategy", "投放策略", "停止后切换，下一次开始生效。分散预设会缩小、拖动画面后在左侧多点投放。",
       [{ value: "spells-first", label: "法术优先（原有顺序）" }, { value: "units-first", label: "兵种优先" }, { value: "left-spread", label: "左侧分散投放" }, { value: "air-probe", label: "气球探路 + 分散投放" }],

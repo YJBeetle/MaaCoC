@@ -78,6 +78,7 @@ impl Runner {
         if matches!(target, DeviceTarget::Headless) {
             let resource = Resource::new()?;
             crate::storage::register(&resource)?;
+            crate::loot::register(&resource)?;
             check(
                 resource.post_bundle(assets.to_str().ok_or("资源路径无效")?)?.wait(),
                 "加载资源",
@@ -124,6 +125,7 @@ impl Runner {
         let controller = Some(controller);
         let resource = Resource::new()?;
         crate::storage::register(&resource)?;
+        crate::loot::register(&resource)?;
         check(
             resource.post_bundle(assets.to_str().ok_or("资源路径无效")?)?.wait(),
             "加载资源",
@@ -178,9 +180,20 @@ impl Runner {
     }
 
     pub fn start_farming(&self, entry: &str, strategy: crate::Strategy, stop_when_full: bool) -> Result<()> {
+        self.start_farming_with_loot(entry, strategy, stop_when_full, &crate::loot::LootFilter::default())
+    }
+
+    pub fn start_farming_with_loot(
+        &self,
+        entry: &str,
+        strategy: crate::Strategy,
+        stop_when_full: bool,
+        loot: &crate::loot::LootFilter,
+    ) -> Result<()> {
         if !self.inited() {
             return Err("Tasker 未初始化（资源或控制器未绑定）".into());
         }
+        loot.validate()?;
         self.bus.restart();
         let mut pipeline = strategy.pipeline_override();
         pipeline.as_object_mut().unwrap().extend(
@@ -189,6 +202,7 @@ impl Runner {
                 .unwrap()
                 .clone(),
         );
+        crate::loot::apply_override(&mut pipeline, loot);
         // Never wait on the returned job: the battle loop is a resident task.
         self.tasker.post_task(entry, &pipeline.to_string())?;
         Ok(())

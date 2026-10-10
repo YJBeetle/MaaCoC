@@ -28,6 +28,7 @@ pub struct Settings {
     pub theme_mode: String,
     pub strategy: Strategy,
     pub stop_when_full: bool,
+    pub loot_filter: maacoc_engine::loot::LootFilter,
 }
 
 impl Default for Settings {
@@ -43,6 +44,7 @@ impl Default for Settings {
             theme_mode: "system".into(),
             strategy: Strategy::default(),
             stop_when_full: true,
+            loot_filter: Default::default(),
         }
     }
 }
@@ -206,6 +208,7 @@ async fn save_settings<R: Runtime>(
     state: State<'_, AppState>,
     next: Settings,
 ) -> Result<Settings, String> {
+    next.loot_filter.validate().map_err(|e| e.to_string())?;
     {
         let mut inner = state.inner.lock().unwrap();
         inner.settings = next.clone();
@@ -285,7 +288,12 @@ fn begin(inner: &mut Inner) -> Result<(), String> {
     let entry = inner.settings.entry.clone();
     let runner = inner.runner.as_ref().ok_or("尚未连接设备")?;
     runner
-        .start_farming(&entry, inner.settings.strategy, inner.settings.stop_when_full)
+        .start_farming_with_loot(
+            &entry,
+            inner.settings.strategy,
+            inner.settings.stop_when_full,
+            &inner.settings.loot_filter,
+        )
         .map_err(|e| e.to_string())?;
     inner.phase = Phase::Running;
     inner.started = Some(Instant::now());
@@ -419,11 +427,16 @@ async fn events(state: State<'_, AppState>) -> Result<Vec<NodeEvent>, String> {
     {
         inner.phase = Phase::Ready;
         inner.started = None;
-        inner.detail = match inner.events.iter().rev().find(|e| e.hit && e.kind == "action") {
+        inner.detail = match inner.events.iter().rev().find(|e| e.hit && e.kind == "action").cloned() {
             Some(e) if e.node == "StorageFullStop" => "金币、圣水和黑油全部满仓，挂机刷资源已停止".into(),
-            Some(e) if e.node == "StorageReadFailed" => {
+            Some(e)
+                if matches!(
+                    e.node.as_str(),
+                    "StorageReadFailed" | "LootReadFailed" | "LootSkipLimit"
+                ) =>
+            {
                 inner.phase = Phase::Error;
-                "无法可靠读取仓库容量，挂机刷资源已停止".into()
+                e.focus.clone()
             }
             _ => "任务已结束".into(),
         };
@@ -550,6 +563,21 @@ mod tests {
         assert_eq!(back.strategy, Strategy::SpellsFirst);
     }
 
+    #[test]
+    fn loot_settings_are_backward_compatible_and_persist_thresholds() {
+        let old: Settings = serde_json::from_str("{\"entry\":\"Main\"}").unwrap();
+        assert!(!old.loot_filter.enabled);
+        assert_eq!(old.loot_filter.min_gold_elixir, 1_000_000);
+        let configured: Settings = serde_json::from_str(r#"{"lootFilter":{"enabled":true,"minGold":600000,"minElixir":700000,"minDark":9000,"minGoldElixir":0,"matchAny":false,"maxSkips":20}}"#).unwrap();
+        let back: Settings = serde_json::from_value(serde_json::to_value(configured).unwrap()).unwrap();
+        assert!(back.loot_filter.enabled);
+        assert_eq!(back.loot_filter.min_gold, 600000);
+        assert_eq!(back.loot_filter.min_elixir, 700000);
+        assert_eq!(back.loot_filter.min_dark, 9000);
+        assert!(!back.loot_filter.match_any);
+        assert_eq!(back.loot_filter.max_skips, 20);
+    }
+
     /// The frontend's `Settings` interface must carry exactly these keys. A
     /// field that only exists on one side is silently dropped by serde, which
     /// is how the theme setting stopped working.
@@ -564,6 +592,7 @@ mod tests {
                 "autoStart",
                 "entry",
                 "frameIntervalMs",
+                "lootFilter",
                 "overlayHits",
                 "preferredDevice",
                 "recordFrames",

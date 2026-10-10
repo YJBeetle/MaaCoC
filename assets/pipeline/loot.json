@@ -1,0 +1,33 @@
+{
+    "LootCheck": {
+        "focus": "开战前检查战利品",
+        "recognition": "Custom",
+        "custom_recognition": "AvailableLoot",
+        "custom_recognition_param": {"filter": {}, "accept_next": "SlideLeft"},
+        "next": "LootReadFailed",
+        "timeout": 1000,
+        "on_error": "LootReadFailed",
+        "pre_delay": 0,
+        "post_delay": 0
+    },
+    "LootSkip": {
+        "focus": "收益不足，搜索下一个对手",
+        "recognition": "TemplateMatch",
+        "template": "Next",
+        "green_mask": true,
+        "roi": [1005,440,253,146],
+        "action": "Click",
+        "next": "FindNext",
+        "timeout": 1000,
+        "on_error": "LootReadFailed",
+        "post_delay": 1500
+    },
+    "LootReadFailed": {
+        "focus": "无法可靠读取战利品，挂机刷资源已停止",
+        "action": "StopTask"
+    },
+    "LootSkipLimit": {
+        "focus": "连续跳过已达到上限，挂机刷资源已停止",
+        "action": "StopTask"
+    }
+}

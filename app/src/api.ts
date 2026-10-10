@@ -1,3 +1,13 @@
+export interface LootFilter {
+  enabled: boolean;
+  minGold: number;
+  minElixir: number;
+  minDark: number;
+  minGoldElixir: number;
+  matchAny: boolean;
+  maxSkips: number;
+}
+
 /** Contract between the UI and the engine.
 
 The same interface is served by the Tauri shell in the app and by a mock in the
@@ -35,6 +45,7 @@ export type Strategy = "spells-first" | "units-first" | "left-spread" | "air-pro
 export interface Settings {
   strategy: Strategy;
   stopWhenFull: boolean;
+  lootFilter: LootFilter;
   entry: string;
   preferredDevice: string | null;
   autoStart: boolean;
@@ -84,6 +95,7 @@ export interface EngineApi {
 export const DEFAULT_SETTINGS: Settings = {
   strategy: "spells-first",
   stopWhenFull: true,
+  lootFilter: { enabled: false, minGold: 0, minElixir: 0, minDark: 0, minGoldElixir: 1000000, matchAny: true, maxSkips: 30 },
   entry: "Main",
   preferredDevice: null,
   autoStart: false,
