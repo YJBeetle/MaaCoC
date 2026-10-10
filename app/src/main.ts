@@ -276,10 +276,14 @@ function render() {
 
 let lastFrameAt = 0;
 let frameInFlight = false;
+let tickInFlight = false;
 
 async function tick() {
+  if (tickInFlight) return;
+  tickInFlight = true;
   try {
     state.status = await api.status();
+    if (state.status.phase === "idle" || state.status.phase === "connecting") state.frame = null;
     const incoming = await api.events();
     if (incoming.length) {
       state.events.push(...incoming);
@@ -297,7 +301,7 @@ async function tick() {
       try {
         const frame = await api.frame();
         // A dropped poll keeps the last picture instead of blanking the stage.
-        if (frame) state.frame = frame;
+        if (state.status.phase !== "idle" && state.status.phase !== "connecting" && frame) state.frame = frame;
       } finally {
         frameInFlight = false;
       }
@@ -305,6 +309,8 @@ async function tick() {
     state.error = "";
   } catch (err) {
     state.error = String(err);
+  } finally {
+    tickInFlight = false;
   }
   render();
 }

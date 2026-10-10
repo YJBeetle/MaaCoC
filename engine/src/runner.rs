@@ -30,6 +30,7 @@ pub struct Runner {
     bus: EventBus,
     pub label: String,
     army_read: crate::army::ReadResult,
+    adb_target: Option<(std::path::PathBuf, String)>,
 }
 
 fn check(status: MaaStatus, what: &str) -> Result<()> {
@@ -37,6 +38,34 @@ fn check(status: MaaStatus, what: &str) -> Result<()> {
         Ok(())
     } else {
         Err(format!("{what} 失败: {status:?}").into())
+    }
+}
+
+fn adb_online(path: &Path, address: &str, timeout: Duration) -> bool {
+    use std::process::{Command, Stdio};
+    let Ok(mut child) = Command::new(path)
+        .args(["-s", address, "get-state"])
+        .stdout(Stdio::piped())
+        .stderr(Stdio::null())
+        .spawn()
+    else {
+        return false;
+    };
+    let deadline = Instant::now() + timeout;
+    loop {
+        match child.try_wait() {
+            Ok(Some(_)) => {
+                return child.wait_with_output().is_ok_and(|output| {
+                    output.status.success() && String::from_utf8_lossy(&output.stdout).trim() == "device"
+                });
+            }
+            Ok(None) if Instant::now() < deadline => thread::sleep(Duration::from_millis(20)),
+            _ => {
+                let _ = child.kill();
+                let _ = child.wait();
+                return false;
+            }
+        }
     }
 }
 
@@ -90,7 +119,7 @@ impl Runner {
             }
             return Ok(Self::assemble(None, resource, "无设备（仅试跑）".into()));
         }
-        let (controller, label) = match target {
+        let (controller, label, adb_target) = match target {
             DeviceTarget::Headless => return Err("无设备模式不需要建立连接".into()),
             DeviceTarget::Adb => {
                 let mut devices: Vec<_> = Toolkit::find_adb_devices()?;
@@ -116,7 +145,7 @@ impl Runner {
                         .config(&config)
                         .agent_path(agent.to_str().ok_or("MaaTouch 路径无效")?)
                         .build()?;
-                (controller, label)
+                (controller, label, (device.adb_path.clone(), device.address.clone()))
             }
         };
 
@@ -136,7 +165,9 @@ impl Runner {
         if !resource.loaded() {
             return Err("资源未就绪".into());
         }
-        Ok(Self::assemble(controller, resource, label))
+        let mut runner = Self::assemble(controller, resource, label);
+        runner.adb_target = Some(adb_target);
+        Ok(runner)
     }
 
     fn assemble(controller: Option<Controller>, resource: Resource, label: String) -> Self {
@@ -157,6 +188,7 @@ impl Runner {
             bus,
             label,
             army_read,
+            adb_target: None,
         }
     }
 
@@ -317,6 +349,14 @@ impl Runner {
         Tasker::set_reco_image_cache_limit(limit).map_err(|e| e.to_string().into())
     }
 
+    /// Query the current ADB transport rather than the controller's cached
+    /// connection flag. This does not send input or a shell command to the phone.
+    pub fn device_online(&self) -> bool {
+        self.adb_target.as_ref().is_some_and(|(path, address)| {
+            adb_online(path, address, Duration::from_secs(2))
+        })
+    }
+
     pub fn poll(&self) -> Vec<NodeEvent> {
         self.bus.drain()
     }
@@ -358,7 +398,39 @@ impl Runner {
 
 #[cfg(test)]
 mod tests {
-    use super::agent_dir;
+    use super::{agent_dir, adb_online};
+    use std::{path::Path, time::{Duration, Instant}};
+
+    #[cfg(unix)]
+    #[test]
+    fn adb_probe_rejects_missing_and_stalled_transport() {
+        assert!(!adb_online(Path::new("/nonexistent/adb"), "test", Duration::from_millis(50)));
+        // /bin/sleep rejects ADB arguments; it must never be treated as connected.
+        assert!(!adb_online(Path::new("/bin/sleep"), "test", Duration::from_millis(50)));
+        let start = Instant::now();
+        // A blocked process must be killed and reaped rather than blocking UI polling.
+        use std::os::unix::fs::PermissionsExt;
+        let path = std::env::temp_dir().join(format!("maacoc-adb-stall-{}", std::process::id()));
+        std::fs::write(&path, "#!/bin/sh\nexec /bin/sleep 2\n").unwrap();
+        std::fs::set_permissions(&path, std::fs::Permissions::from_mode(0o700)).unwrap();
+        assert!(!adb_online(&path, "test", Duration::from_millis(50)));
+        assert!(start.elapsed() < Duration::from_secs(1));
+        std::fs::remove_file(path).unwrap();
+    }
+
+    #[cfg(unix)]
+    #[test]
+    fn adb_probe_accepts_only_an_online_device() {
+        use std::os::unix::fs::PermissionsExt;
+        let path = std::env::temp_dir().join(format!("maacoc-adb-probe-{}", std::process::id()));
+        // Simulate adb's actual responses without contacting a phone.
+        for (response, exit, expected) in [("device", 0, true), ("offline", 0, false), ("unauthorized", 0, false), ("device", 1, false)] {
+            std::fs::write(&path, format!("#!/bin/sh\nprintf '%s\\n' '{response}'\nexit {exit}\n")).unwrap();
+            std::fs::set_permissions(&path, std::fs::Permissions::from_mode(0o700)).unwrap();
+            assert_eq!(adb_online(&path, "test", Duration::from_secs(1)), expected);
+        }
+        std::fs::remove_file(path).unwrap();
+    }
 
     #[test]
     fn resolves_checkout_and_installed_helpers_from_assets() {

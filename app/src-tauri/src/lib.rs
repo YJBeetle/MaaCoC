@@ -103,6 +103,7 @@ struct Inner {
     phase: Phase,
     detail: String,
     panel: String,
+    last_connection_check: Option<Instant>,
 }
 
 #[derive(Debug, Clone, Serialize)]
@@ -130,6 +131,7 @@ impl AppState {
                 phase: Phase::Idle,
                 detail: String::new(),
                 panel: String::new(),
+                last_connection_check: None,
             }),
         }
     }
@@ -344,6 +346,7 @@ async fn connect<R: Runtime>(app: AppHandle<R>, state: State<'_, AppState>) -> R
             inner.detail = runner.label.clone();
             inner.phase = Phase::Ready;
             inner.runner = Some(runner);
+            inner.last_connection_check = None;
             if let Some(runner) = inner.runner.as_ref() {
                 inner.panel = panel_sizes(runner).unwrap_or_default();
             }
@@ -396,7 +399,7 @@ async fn stop(state: State<'_, AppState>) -> Result<Status, String> {
     if let Some(runner) = inner.runner.as_ref() {
         runner.stop(Duration::from_secs(15));
     }
-    inner.phase = Phase::Ready;
+    inner.phase = if inner.runner.is_some() { Phase::Ready } else { Phase::Idle };
     inner.started = None;
     Ok(status_of(&inner))
 }
@@ -465,8 +468,38 @@ fn status_of(inner: &Inner) -> Status {
 
 #[tauri::command]
 async fn status(state: State<'_, AppState>) -> Result<Status, String> {
-    let inner = state.inner.lock().unwrap();
+    let mut inner = state.inner.lock().unwrap();
+    if inner.runner.is_some()
+        && inner.phase != Phase::Connecting
+        && inner.last_connection_check.is_none_or(|at| at.elapsed() >= Duration::from_secs(2))
+    {
+        inner.last_connection_check = Some(Instant::now());
+        if !inner.runner.as_ref().unwrap().device_online() {
+            let runner = inner.runner.take();
+            mark_device_disconnected(&mut inner);
+            let status = status_of(&inner);
+            // Stop/drop outside the state lock so polling can show disconnection
+            // even if the framework takes time to drain an in-flight action.
+            drop(inner);
+            if let Some(runner) = runner {
+                std::thread::spawn(move || {
+                    runner.stop(Duration::from_secs(5));
+                    drop(runner);
+                });
+            }
+            return Ok(status);
+        }
+    }
     Ok(status_of(&inner))
+}
+
+fn mark_device_disconnected(inner: &mut Inner) {
+    inner.phase = Phase::Idle;
+    inner.detail = "设备已断开，请连接设备后重试".into();
+    inner.panel.clear();
+    inner.started = None;
+    inner.last_reco = 0;
+    inner.last_connection_check = None;
 }
 
 #[tauri::command]
@@ -615,6 +648,23 @@ pub fn run() {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn unplugging_clears_device_state_and_stops_uptime() {
+        let state = AppState::new(Settings::default(), String::new());
+        let mut inner = state.inner.lock().unwrap();
+        inner.phase = Phase::Running;
+        inner.started = Some(Instant::now());
+        inner.panel = "物理 1080×2400".into();
+        inner.last_reco = 123;
+        mark_device_disconnected(&mut inner);
+        let status = status_of(&inner);
+        assert_eq!(status.phase, Phase::Idle);
+        assert_eq!(status.uptime_ms, 0);
+        assert!(status.panel.is_empty());
+        assert_eq!(inner.last_reco, 0);
+        assert!(status.detail.contains("设备已断开"));
+    }
 
     #[test]
     fn settings_defaults_are_conservative() {
