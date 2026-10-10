@@ -54,3 +54,6 @@
 {"file": "0028-FullGoldStorage.png", "node": "BattleReady", "width": 1280, "height": 720, "label": "村庄资源弹窗不能被当作战斗开局", "expected_hit": false}
 {"file": "0030-AttackStartCheckedBoxEn.png", "node": "AttackStart", "width": 1280, "height": 720, "label": "英文开战按钮带已完成勾选宝箱，原模板可识别", "expected_hit": true}
 {"file": "0031-BattleOpeningEn.png", "node": "BattleReady", "width": 1280, "height": 720, "label": "英文开局结束战斗按钮", "expected_hit": true}
+{"file": "0032-XiaomiGoldStorage.png", "node": "StorageFullGold", "width": 1280, "height": 720, "label": "Xiaomi 13 Ultra 金币未满，不能触发满仓", "expected_hit": false}
+{"file": "0032-XiaomiGoldStorage.png", "node": "StorageUnknownGold", "width": 1280, "height": 720, "label": "Xiaomi 13 Ultra 金币提示可读取，不应判为未知", "expected_hit": false}
+{"file": "0033-XiaomiNoStorageTooltip.png", "node": "StorageUnknownGold", "width": 1280, "height": 720, "label": "仓库提示未弹出时判为未知，由继续分支处理", "expected_hit": true}
