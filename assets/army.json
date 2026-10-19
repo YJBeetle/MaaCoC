@@ -256,6 +256,14 @@
     "preview": "Army/Unit/62_RuinWitch-preview.png"
   },
   {
+    "id": "Unit/63_RoyaleGhost",
+    "group": "Unit",
+    "name": "RoyaleGhost",
+    "template": "Army/Unit/63_RoyaleGhost.png",
+    "currentTemplate": "Army/Unit/63_RoyaleGhost-current.png",
+    "preview": "Army/Unit/63_RoyaleGhost-preview.png"
+  },
+  {
     "id": "Unit/100_Broom",
     "group": "Unit",
     "name": "Broom",
