@@ -1,7 +1,6 @@
 {"file": "0001-ExceptionConfirmation.png", "node": "ExceptionConfirmation", "ts": 1789935099.514697, "digest": "4207aeefd90e", "width": 1280, "height": 720, "label": "CoC 闲置断线弹窗", "meta": {}}
 {"file": "0002-FindUnit.png", "node": "FindUnit", "ts": 1789935099.596262, "digest": "273567881d89", "width": 1280, "height": 720, "label": "部落战侦察界面", "meta": {}}
 {"file": "0003-FindUnit.png", "node": "FindUnit", "ts": 1789935099.676409, "digest": "4919a31df0cb", "width": 1280, "height": 720, "label": "战斗中兵种条", "meta": {}}
-{"file": "0004-AttackStart.png", "node": "AttackStart", "ts": 1789935099.762849, "digest": "a6f60951a933", "width": 1280, "height": 720, "label": "村庄进攻按钮", "meta": {}}
 {"file": "0005-ReturnHome.png", "node": "ReturnHome", "ts": 1789935099.843159, "digest": "affac935a0d2", "width": 1280, "height": 720, "label": "战果回营按钮", "meta": {}}
 {"file": "0006-FindUnit-SuperDragon.png", "node": "FindUnit", "width": 1280, "height": 720, "label": "战斗中超级飞龙卡", "roi": [286, 590, 99, 129]}
 {"file": "0003-FindUnit.png", "node": "FindSiege", "width": 1280, "height": 720, "label": "战斗中 FlameFlinger 卡", "roi": [396, 590, 100, 129]}
@@ -42,7 +41,6 @@
 {"file": "0021-DepletedEventUnits.png", "node": "FindUnit", "width": 1280, "height": 720, "label": "已耗尽的白背景活动兵 TotemThrower", "roi": [90, 590, 94, 128], "expected_hit": false}
 {"file": "0021-DepletedEventUnits.png", "node": "FindUnit", "width": 1280, "height": 720, "label": "已耗尽的白背景活动兵 Lavaloon", "roi": [185, 590, 95, 128], "expected_hit": false}
 {"file": "0021-DepletedEventUnits.png", "node": "FindUnit", "width": 1280, "height": 720, "label": "已耗尽的白背景活动兵 WitchGolem", "roi": [282, 590, 97, 128], "expected_hit": false}
-{"file": "0022-AttackStartWithBox.png", "node": "AttackStart", "width": 1280, "height": 720, "label": "活动期间带宝箱的开战按钮", "expected_hit": true}
 {"file": "0023-StorageMixedSeparators.png", "node": "StorageUnknownGold", "width": 1280, "height": 720, "label": "仓库容量 OCR 混用空格和千位点，仍应识别为已知容量", "expected_hit": false}
 {"file": "0024-OpenBoxRewardContinue.png", "node": "OpenBoxContinue", "width": 1280, "height": 720, "label": "宝箱矿石奖励页继续按钮，位置低于旧版", "expected_hit": true}
 {"file": "0025-BattleBlimp.png", "node": "FindSiege", "width": 1280, "height": 720, "label": "仍可投放的飞艇，卡面尺寸与位置校准", "expected_hit": true}
@@ -52,7 +50,6 @@
 {"file": "0028-FullGoldStorage.png", "node": "StorageUnknownGold", "width": 1280, "height": 720, "label": "金色满仓背景上的金币数字应可靠读取", "expected_hit": false}
 {"file": "0029-BattleOpening.png", "node": "BattleReady", "width": 1280, "height": 720, "label": "当前版本开局的结束战斗按钮支持恢复投放", "expected_hit": true}
 {"file": "0028-FullGoldStorage.png", "node": "BattleReady", "width": 1280, "height": 720, "label": "村庄资源弹窗不能被当作战斗开局", "expected_hit": false}
-{"file": "0030-AttackStartCheckedBoxEn.png", "node": "AttackStart", "width": 1280, "height": 720, "label": "英文开战按钮带已完成勾选宝箱，原模板可识别", "expected_hit": true}
 {"file": "0031-BattleOpeningEn.png", "node": "BattleReady", "width": 1280, "height": 720, "label": "英文开局结束战斗按钮", "expected_hit": true}
 {"file": "0032-XiaomiGoldStorage.png", "node": "StorageFullGold", "width": 1280, "height": 720, "label": "Xiaomi 13 Ultra 金币未满，不能触发满仓", "expected_hit": false}
 {"file": "0032-XiaomiGoldStorage.png", "node": "StorageUnknownGold", "width": 1280, "height": 720, "label": "Xiaomi 13 Ultra 金币提示可读取，不应判为未知", "expected_hit": false}
@@ -68,3 +65,14 @@
 {"file": "0038-XiaomiFullElixirGrouped.png", "node": "StorageUnknownElixir", "width": 1280, "height": 720, "label": "满仓读数含 OCR 分隔符误识别，仍须正确比较容量", "expected_hit": false}
 {"file": "0039-XiaomiFullDarkGrouped.png", "node": "StorageFullDark", "width": 1280, "height": 720, "label": "满仓读数含 OCR 分隔符误识别，仍须正确比较容量", "expected_hit": true}
 {"file": "0039-XiaomiFullDarkGrouped.png", "node": "StorageUnknownDark", "width": 1280, "height": 720, "label": "满仓读数含 OCR 分隔符误识别，仍须正确比较容量", "expected_hit": false}
+{"file": "0040-VillageAttackStart.png", "node": "AttackStart", "width": 1280, "height": 720, "label": "新版村庄剑形开战按钮", "expected_hit": true}
+{"file": "0041-BattleEndButton.png", "node": "Surrender", "width": 1280, "height": 720, "label": "新版战斗中结束战斗按钮", "expected_hit": true}
+{"file": "0041-BattleEndButton.png", "node": "BattleReady", "width": 1280, "height": 720, "label": "新版战斗中允许恢复投放", "expected_hit": true}
+{"file": "0042-BattleGiveUp.png", "node": "Surrender", "width": 1280, "height": 720, "label": "新版战斗中放弃按钮", "expected_hit": true}
+{"file": "0043-VictoryReturnHome.png", "node": "ReturnHome", "width": 1280, "height": 720, "label": "新版战果页回营按钮", "expected_hit": true}
+{"file": "0044-ModeSelectFindMatch.png", "node": "FindMatch", "width": 1280, "height": 720, "label": "联机模式选择页搜索对手", "expected_hit": true}
+{"file": "0045-ArmyScreenAttack.png", "node": "AttackStartAgain", "width": 1280, "height": 720, "label": "军队配置页进攻按钮", "expected_hit": true}
+{"file": "0046-PrepFindNext.png", "node": "FindNext", "width": 1280, "height": 720, "label": "开战准备页下一个按钮", "expected_hit": true}
+{"file": "0041-BattleEndButton.png", "node": "AttackStart", "width": 1280, "height": 720, "label": "战斗中不能命中村庄开战按钮", "expected_hit": false}
+{"file": "0043-VictoryReturnHome.png", "node": "AttackStart", "width": 1280, "height": 720, "label": "战果页不能命中村庄开战按钮", "expected_hit": false}
+{"file": "0046-PrepFindNext.png", "node": "ReturnHome", "width": 1280, "height": 720, "label": "准备页不能误判为回营按钮", "expected_hit": false}
