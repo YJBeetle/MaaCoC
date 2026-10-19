@@ -76,3 +76,4 @@
 {"file": "0041-BattleEndButton.png", "node": "AttackStart", "width": 1280, "height": 720, "label": "战斗中不能命中村庄开战按钮", "expected_hit": false}
 {"file": "0043-VictoryReturnHome.png", "node": "AttackStart", "width": 1280, "height": 720, "label": "战果页不能命中村庄开战按钮", "expected_hit": false}
 {"file": "0046-PrepFindNext.png", "node": "ReturnHome", "width": 1280, "height": 720, "label": "准备页不能误判为回营按钮", "expected_hit": false}
+{"file": "0042-BattleGiveUp.png", "node": "FindUnit", "width": 1280, "height": 720, "roi": [180, 588, 100, 130], "label": "Royale Ghost 需活动兵卡底图层 2", "expected_hit": true}

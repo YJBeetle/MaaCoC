@@ -72,7 +72,7 @@ UNIT_CARDS = (
     CardSpec("60_Druid", "icon_unit_druid_bear"),
     CardSpec("61_Furnace", "icon_unit_furnace"),
     CardSpec("62_RuinWitch", "icon_unit_ruinwitch", image_layer=1),
-    CardSpec("63_RoyaleGhost", "icon_unit_royale_ghost"),
+    CardSpec("63_RoyaleGhost", "icon_unit_royale_ghost", background_layer=2),
     CardSpec("100_Broom", "icon_unit_majo", background_layer=2),
     CardSpec("101_BarbarianKicker", "icon_unit_footballbarbarian", background_layer=2),
     CardSpec("102_M.E.C.H.A", "icon_unit_mecha", background_layer=2),
