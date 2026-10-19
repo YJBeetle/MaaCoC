@@ -115,6 +115,7 @@ HERO_CARDS = (
              extra_masks=((0.4, 0.67, 0.96, 0.93),)),
     CardSpec("Prince", "icon_hero_minionprince"),
     CardSpec("Mars", "icon_hero_warriorPrincess"),
+    CardSpec("Duke", "icon_hero_dragonDuke"),
 )
 SPELL_CARDS = (
     CardSpec("SpellLightning", "icon_spell_lightning"),
