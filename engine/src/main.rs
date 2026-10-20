@@ -137,7 +137,7 @@ fn configure_army(assets: &Path, args: &[String], preferred: Option<&str>) -> Re
 }
 
 fn devices() -> Result<(), Error> {
-    let devices = Toolkit::find_adb_devices()?;
+    let devices = maacoc_engine::discover_adb_devices()?;
     if devices.is_empty() {
         println!("没有找到 ADB 设备");
         return Ok(());

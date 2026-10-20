@@ -7,7 +7,6 @@ use maa_framework::{
     controller::{AdbControllerBuilder, Controller},
     resource::Resource,
     tasker::Tasker,
-    toolkit::Toolkit,
 };
 use std::{
     path::Path,
@@ -142,9 +141,9 @@ impl Runner {
         let (controller, label, adb_target) = match target {
             DeviceTarget::Headless => return Err("无设备模式不需要建立连接".into()),
             DeviceTarget::Adb => {
-                let mut devices: Vec<_> = Toolkit::find_adb_devices()?;
+                let mut devices: Vec<_> = crate::discover_adb_devices()?;
                 if devices.is_empty() {
-                    return Err("没有找到 ADB 设备，请确认已连接并允许调试".into());
+                    return Err(crate::no_device_hint().into());
                 }
                 let device = match preferred {
                     Some(needle) => devices

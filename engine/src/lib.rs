@@ -45,8 +45,56 @@ pub struct DeviceInfo {
     pub adb_path: std::path::PathBuf,
 }
 
+/// MaaFramework's own finder only runs `search_path("adb")`, so it sees exactly
+/// what PATH holds. A `.app` started by Finder gets `/usr/bin:/bin:/usr/sbin:/sbin`
+/// with no shell profile behind it, discovers no adb, and then reports an empty
+/// device list even though the phone is connected — indistinguishable from "phone
+/// not authorised". Probe the usual install locations instead.
+pub fn discover_adb_devices() -> Result<Vec<maa_framework::toolkit::AdbDevice>> {
+    let found = maa_framework::toolkit::Toolkit::find_adb_devices()?;
+    if !found.is_empty() {
+        return Ok(found);
+    }
+    for adb in installed_adbs() {
+        let devices = maa_framework::toolkit::Toolkit::find_adb_devices_with_adb(&adb.to_string_lossy())?;
+        if !devices.is_empty() {
+            return Ok(devices);
+        }
+    }
+    Ok(found)
+}
+
+/// adb binaries that actually exist on this machine.
+pub fn installed_adbs() -> Vec<std::path::PathBuf> {
+    let mut candidates = Vec::new();
+    for key in ["ANDROID_HOME", "ANDROID_SDK_ROOT"] {
+        if let Ok(root) = std::env::var(key) {
+            candidates.push(std::path::PathBuf::from(root).join("platform-tools").join("adb"));
+        }
+    }
+    if let Ok(home) = std::env::var("HOME") {
+        let home = std::path::PathBuf::from(home);
+        candidates.push(home.join("Library/Android/sdk/platform-tools/adb"));
+        candidates.push(home.join("Android/Sdk/platform-tools/adb"));
+    }
+    candidates.push(std::path::PathBuf::from("/opt/homebrew/bin/adb"));
+    candidates.push(std::path::PathBuf::from("/usr/local/bin/adb"));
+    candidates.retain(|path| path.is_file());
+    candidates
+}
+
+/// The framework returns an empty list for both "no adb" and "no phone", but the
+/// user has to do opposite things about them.
+pub fn no_device_hint() -> &'static str {
+    if installed_adbs().is_empty() {
+        "找不到 adb 可执行文件，请安装 Android SDK platform-tools 或把 adb 加入 PATH"
+    } else {
+        "没有找到 ADB 设备，请确认已连接并允许调试"
+    }
+}
+
 pub fn list_devices() -> Result<Vec<DeviceInfo>> {
-    Ok(maa_framework::toolkit::Toolkit::find_adb_devices()?
+    Ok(discover_adb_devices()?
         .into_iter()
         .map(|device| DeviceInfo {
             label: device_model(&device).unwrap_or_else(|| device.address.clone()),
