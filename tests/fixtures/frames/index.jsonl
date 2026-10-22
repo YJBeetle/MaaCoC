@@ -80,3 +80,9 @@
 {"file": "0047-AttackStartFlameBig.png", "node": "AttackStart", "width": 1280, "height": 720, "label": "开战按钮火焰动画最大相位", "expected_hit": true}
 {"file": "0048-AttackStartFlameMid.png", "node": "AttackStart", "width": 1280, "height": 720, "label": "开战按钮火焰动画中间相位", "expected_hit": true}
 {"file": "0049-VillageAttackStartEn.png", "node": "AttackStart", "width": 1280, "height": 720, "label": "英文界面开战按钮，模板不含文字", "expected_hit": true}
+{"file": "0050-CompactGoldStorage.png", "node": "StorageFullGold", "width": 1280, "height": 720, "label": "新版紧凑资源栏金币数量与容量可读取且尚未满仓", "expected_hit": false}
+{"file": "0050-CompactGoldStorage.png", "node": "StorageUnknownGold", "width": 1280, "height": 720, "label": "新版紧凑资源栏金币数量与容量可读取且尚未满仓", "expected_hit": false}
+{"file": "0051-CompactElixirStorage.png", "node": "StorageFullElixir", "width": 1280, "height": 720, "label": "新版紧凑资源栏圣水数量与容量可读取且尚未满仓", "expected_hit": false}
+{"file": "0051-CompactElixirStorage.png", "node": "StorageUnknownElixir", "width": 1280, "height": 720, "label": "新版紧凑资源栏圣水数量与容量可读取且尚未满仓", "expected_hit": false}
+{"file": "0052-CompactDarkStorage.png", "node": "StorageFullDark", "width": 1280, "height": 720, "label": "新版紧凑资源栏黑油数量与容量可读取且尚未满仓", "expected_hit": false}
+{"file": "0052-CompactDarkStorage.png", "node": "StorageUnknownDark", "width": 1280, "height": 720, "label": "新版紧凑资源栏黑油数量与容量可读取且尚未满仓", "expected_hit": false}

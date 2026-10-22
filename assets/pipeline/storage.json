@@ -1,4 +1,10 @@
 {
+    "StorageTooltipText": {
+        "recognition": "ColorMatch",
+        "method": 4,
+        "lower": [200, 200, 200],
+        "upper": [255, 255, 255]
+    },
     "StorageOpenGold": {
         "focus": "StorageOpenGold!",
         "action": "Click",
@@ -59,8 +65,8 @@
         "focus": "StorageOpenElixir!",
         "action": "Click",
         "target": [
-            1120,
-            110
+            1200,
+            87
         ],
         "post_delay": 800,
         "next": "StorageGateElixir",
@@ -102,8 +108,8 @@
     "StorageCloseElixir": {
         "action": "Click",
         "target": [
-            1120,
-            110
+            1200,
+            87
         ],
         "next": "StorageContinue",
         "pre_delay": 0,
@@ -114,8 +120,8 @@
         "focus": "StorageOpenDark!",
         "action": "Click",
         "target": [
-            1120,
-            175
+            1200,
+            136
         ],
         "post_delay": 800,
         "next": "StorageGateDark",
@@ -157,8 +163,8 @@
     "StorageCloseDark": {
         "action": "Click",
         "target": [
-            1120,
-            175
+            1200,
+            136
         ],
         "next": "StorageContinue",
         "pre_delay": 0,
@@ -168,8 +174,8 @@
     "StorageFullClose": {
         "action": "Click",
         "target": [
-            1120,
-            175
+            1200,
+            136
         ],
         "next": "StorageFullStop"
     },
@@ -207,8 +213,8 @@
     "StorageFullCloseElixir": {
         "action": "Click",
         "target": [
-            1120,
-            110
+            1200,
+            87
         ],
         "post_delay": 300,
         "next": "StorageOpenDark",
