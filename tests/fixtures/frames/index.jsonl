@@ -86,3 +86,6 @@
 {"file": "0051-CompactElixirStorage.png", "node": "StorageUnknownElixir", "width": 1280, "height": 720, "label": "新版紧凑资源栏圣水数量与容量可读取且尚未满仓", "expected_hit": false}
 {"file": "0052-CompactDarkStorage.png", "node": "StorageFullDark", "width": 1280, "height": 720, "label": "新版紧凑资源栏黑油数量与容量可读取且尚未满仓", "expected_hit": false}
 {"file": "0052-CompactDarkStorage.png", "node": "StorageUnknownDark", "width": 1280, "height": 720, "label": "新版紧凑资源栏黑油数量与容量可读取且尚未满仓", "expected_hit": false}
+{"file": "0053-BattleSpeedButton.png", "node": "BattleSpeedUp", "width": 1280, "height": 720, "label": "最后 1 分钟倍速按钮出现在 y=368", "expected_hit": true}
+{"file": "0041-BattleEndButton.png", "node": "BattleSpeedUp", "width": 1280, "height": 720, "label": "同一按钮另一次出现在 y=310", "expected_hit": true}
+{"file": "0054-BattleSpeedUsed.png", "node": "BattleSpeedUp", "width": 1280, "height": 720, "label": "点过之后按钮消失，不得再命中", "expected_hit": false}
