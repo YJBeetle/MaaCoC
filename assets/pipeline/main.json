@@ -48,9 +48,23 @@
         "template": "FindMatch",
         "roi": [79,459,342,155],
         "action": "Click",
-        "next": "AttackStartAgain",
+        "next": ["RequestFreeTroops", "AttackStartAgain"],
         "timeout": 10000,
         "on_error": "AttackLoop",
+    },
+    // 军队配置页的援军槽位有两种内容：蛋糕＋"免费"，或宝石＋价格数字。
+    // 只在免费时点掉，付费时不碰。模板取蛋糕图标本体、不含"免费"文字，
+    // 因此中英文界面共用一张。点完仍照常进入进攻。
+    "RequestFreeTroops": {
+        "focus": "RequestFreeTroops!",
+        "recognition": "TemplateMatch",
+        "template": "RequestFreeTroops",
+        "roi": [900, 480, 280, 170],
+        "threshold": 0.95,
+        "action": "Click",
+        "timeout": 1000,
+        "next": "AttackStartAgain",
+        "on_error": "AttackStartAgain",
     },
     "AttackStartAgain": {
         "recognition": "TemplateMatch",

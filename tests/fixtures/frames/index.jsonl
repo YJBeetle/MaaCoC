@@ -89,3 +89,6 @@
 {"file": "0053-BattleSpeedButton.png", "node": "BattleSpeedUp", "width": 1280, "height": 720, "label": "最后 1 分钟倍速按钮出现在 y=368", "expected_hit": true}
 {"file": "0041-BattleEndButton.png", "node": "BattleSpeedUp", "width": 1280, "height": 720, "label": "同一按钮另一次出现在 y=310", "expected_hit": true}
 {"file": "0054-BattleSpeedUsed.png", "node": "BattleSpeedUp", "width": 1280, "height": 720, "label": "点过之后按钮消失，不得再命中", "expected_hit": false}
+{"file": "0055-ArmyFreeTroops.png", "node": "RequestFreeTroops", "width": 1280, "height": 720, "label": "军队页援军槽为蛋糕＋免费，应点掉", "expected_hit": true}
+{"file": "0056-ArmyPaidTroops.png", "node": "RequestFreeTroops", "width": 1280, "height": 720, "label": "同槽位为宝石报价时不得点击", "expected_hit": false}
+{"file": "0055-ArmyFreeTroops.png", "node": "AttackStartAgain", "width": 1280, "height": 720, "label": "免费帧上进攻按钮仍可命中", "expected_hit": true}
