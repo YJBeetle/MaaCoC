@@ -54,7 +54,7 @@
     },
     // 军队配置页的援军槽位有两种内容：蛋糕＋"免费"，或宝石＋价格数字。
     // 只在免费时点掉，付费时不碰。模板取蛋糕图标本体、不含"免费"文字，
-    // 因此中英文界面共用一张。点完仍照常进入进攻。
+    // 因此中英文界面共用一张。点完会弹出"添加援军"对话框，必须再点确认。
     "RequestFreeTroops": {
         "focus": "RequestFreeTroops!",
         "recognition": "TemplateMatch",
@@ -62,6 +62,22 @@
         "roi": [900, 480, 280, 170],
         "threshold": 0.95,
         "action": "Click",
+        "post_delay": 600,
+        "timeout": 1000,
+        "next": "RequestFreeConfirm",
+        "on_error": "RequestFreeConfirm",
+    },
+    // "添加援军"对话框右下角的绿色"确认"（左边是橙色"取消"）。
+    // 同样只取蛋糕图标、不含文字；ROI 限定在对话框按钮区，
+    // 因此不会和军队页那个免费按钮串（实测互相最高 0.501 / 0.271）。
+    "RequestFreeConfirm": {
+        "focus": "RequestFreeConfirm!",
+        "recognition": "TemplateMatch",
+        "template": "RequestFreeConfirm",
+        "roi": [660, 440, 280, 130],
+        "threshold": 0.95,
+        "action": "Click",
+        "post_delay": 400,
         "timeout": 1000,
         "next": "AttackStartAgain",
         "on_error": "AttackStartAgain",
