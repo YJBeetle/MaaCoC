@@ -96,3 +96,5 @@
 {"file": "0055-ArmyFreeTroops.png", "node": "RequestFreeConfirm", "width": 1280, "height": 720, "label": "军队页无对话框时不得命中确认", "expected_hit": false}
 {"file": "0057-ReinforceDialog.png", "node": "AttackStartAgain", "width": 1280, "height": 720, "label": "弹窗不遮挡进攻按钮，防误点只能靠节点顺序而非阈值", "expected_hit": true}
 {"file": "0057-ReinforceDialog.png", "node": "RequestFreeTroops", "width": 1280, "height": 720, "label": "弹窗打开后背景里的免费按钮仍可见，链路不得回头重跑", "expected_hit": true}
+{"file": "0058-ConnectionLostEn.png", "node": "Exception", "width": 1280, "height": 720, "label": "英文 CONNECTION LOST 断线框应被识别", "expected_hit": true}
+{"file": "0058-ConnectionLostEn.png", "node": "ExceptionConfirmation", "width": 1280, "height": 720, "label": "英文断线框的 TRY AGAIN 可点击", "expected_hit": true}
