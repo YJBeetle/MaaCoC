@@ -105,6 +105,10 @@ fn counter_values(detail: &Value) -> [Option<u64>; 3] {
     if let Some(items) = detail["filtered"].as_array() {
         for item in items {
             let Some(rect) = item["box"].as_array().filter(|r| r.len() == 4) else { continue; };
+            // Resource counters are right-aligned. Android's privacy indicator can
+            // cover their final digits while OCR still confidently reads the prefix.
+            let Some(right) = rect[0].as_i64().zip(rect[2].as_i64()).map(|(x,w)| x+w) else { continue; };
+            if !(1160..=1185).contains(&right) { continue; }
             let Some(y) = rect[1].as_i64().zip(rect[3].as_i64()).map(|(y,h)| y+h/2) else { continue; };
             let Some(value) = ocr_number(&json!({"filtered":[item]}), false) else { continue; };
             for (layout, centers) in layouts.iter_mut().zip(rows) {
@@ -290,6 +294,9 @@ mod tests {
         for ys in [[38,87,136], [42,110,175]] {
             assert_eq!(counter_values(&detail(ys)), [Some(31_000_000),Some(29_827_273),Some(386_614)]);
         }
+        let mut covered = detail([38,87,136]);
+        covered["filtered"][0] = json!({"box":[1080,28,55,20],"score":0.99,"text":"2914"});
+        assert_eq!(counter_values(&covered), [None,Some(29_827_273),Some(386_614)]);
         let mut missing = detail([38,87,136]);
         missing["filtered"][1]["score"] = json!(0.5);
         assert_eq!(counter_values(&missing), [Some(31_000_000),None,Some(386_614)]);
