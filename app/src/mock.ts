@@ -110,12 +110,16 @@ export function createMockApi(): EngineApi {
       status = { ...status, panel: reset ? "物理 1080×2400 · 当前 1080×2400" : "物理 1080×2400 · 当前 1080×1920" };
     },
     async start() {
+      // Exercise feedback during a slow native command without touching a phone.
+      if (new URLSearchParams(location.search).get("slowRun") === "1") await new Promise(resolve => setTimeout(resolve, 8000));
+      if (new URLSearchParams(location.search).get("startError") === "1") throw new Error("模拟启动失败，请重试");
       status = { ...status, phase: "running" };
       cursor = 0;
       clock = 0;
       return status;
     },
     async stop() {
+      if (new URLSearchParams(location.search).get("slowRun") === "1") await new Promise(resolve => setTimeout(resolve, 8000));
       status = { ...status, phase: "ready" };
       return status;
     },

@@ -45,6 +45,8 @@ const state = {
   nodes: [] as string[],
   cards: [] as ArmyCard[],
   error: "",
+  runAction: null as "starting" | "stopping" | null,
+  runError: "",
   autoConnect: false,
 };
 
@@ -173,6 +175,7 @@ async function persist(next: Partial<Settings>) {
 
 async function connect() {
   state.error = "";
+  state.runError = "";
   render();
   try {
     state.status = await api.connect();
@@ -223,17 +226,25 @@ function renderConnection() {
   // Swap text in place: rebuilding the button on every 4 Hz render flickered.
   setLabel(ui.link, "state", stateLabels[phase]);
   setLabel(ui.link, "action", connected ? "断开连接" : "连接设备");
-  ui.link.toggleAttribute("disabled", phase === "connecting");
+  ui.link.toggleAttribute("disabled", phase === "connecting" || state.runAction !== null);
 }
 
 async function toggleRun() {
+  if (state.runAction || sizeBusy) return;
+  const stopping = state.status.phase === "running";
+  if (!stopping && state.status.phase !== "ready") return;
   state.error = "";
-  try {
-    state.status = state.status.phase === "running" ? await api.stop() : await api.start();
-  } catch (err) {
-    state.error = String(err);
-  }
+  state.runError = "";
+  state.runAction = stopping ? "stopping" : "starting";
   render();
+  try {
+    state.status = stopping ? await api.stop() : await api.start();
+  } catch (err) {
+    state.runError = String(err);
+  } finally {
+    state.runAction = null;
+    render();
+  }
 }
 
 function go(page: string) {
@@ -250,7 +261,7 @@ function go(page: string) {
 
 function render() {
   const phase = state.status.phase;
-  const problem = state.error || (phase === "error" ? state.status.detail : "");
+  const problem = state.runError || state.error || (phase === "error" ? state.status.detail : "");
   ui.chip.textContent = problem;
   ui.chip.classList.toggle("error", Boolean(problem));
   const running = phase === "running";

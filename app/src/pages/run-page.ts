@@ -11,6 +11,7 @@ interface RunPageState {
   settings: Settings;
   events: NodeEvent[];
   sizeBusy: boolean;
+  runAction: "starting" | "stopping" | null;
 }
 
 export class RunPage {
@@ -74,14 +75,17 @@ export class RunPage {
     const phase = state.status.phase;
     const connected = phase === "ready" || phase === "running";
     const running = phase === "running";
+    const pending = state.runAction !== null;
+    const pendingLabel = state.runAction === "starting" ? "正在开始…" : "正在停止…";
 
-    this.fab.toggleAttribute("disabled", !connected);
-    this.actionLabel.textContent = running ? "停止刷资源" : "开始刷资源";
+    this.fab.toggleAttribute("disabled", !connected || pending || state.sizeBusy);
+    this.fab.setAttribute("aria-busy", String(pending));
+    this.actionLabel.textContent = pending ? pendingLabel : running ? "停止刷资源" : "开始刷资源";
     const icon = this.fab.querySelector("md-icon");
-    if (icon) icon.textContent = running ? "stop" : "play_arrow";
+    if (icon) icon.textContent = pending ? "hourglass_top" : running ? "stop" : "play_arrow";
 
-    for (const button of [this.sizeSet, this.sizeReset]) button.toggleAttribute("disabled", !connected || running || state.sizeBusy);
-    this.stageLabel.textContent = runStage(state.status, state.events);
+    for (const button of [this.sizeSet, this.sizeReset]) button.toggleAttribute("disabled", !connected || running || pending || state.sizeBusy);
+    this.stageLabel.textContent = pending ? pendingLabel : runStage(state.status, state.events);
     this.duration.textContent = formatUptime(state.status.uptimeMs);
     this.strategy.textContent = strategyLabel(state.settings);
     this.policy.textContent = `${state.settings.stopWhenFull ? "三项全满后停止" : "满仓停止未开启"} · ${state.settings.lootFilter.enabled ? "收益筛选已开启" : "不筛选收益"}`;
