@@ -456,7 +456,8 @@ pub fn register_reader(resource: &Resource) -> crate::Result<ReadResult> {
 
 pub fn read_pipeline(cards: &[ArmyCard]) -> Value {
     json!({
-        "ArmyApply":{"next":["ArmyReload","ArmyOverview","ArmyOpenVillage"],"timeout":2000,"on_error":"ArmyFailed"},
+        "ArmyApply":{"next":["ArmyReload","ArmyOverview","ArmyOpenVillage"],"timeout":2000,"on_error":"ArmyReadNotReady"},
+        "ArmyReadNotReady":{"action":"StopTask","focus":"未找到村庄或配兵界面，请回到村庄或打开配兵界面后重试；未修改部队"},
         "ArmyReload":{"recognition":"OCR","expected":"重新载入游戏","roi":[250,400,380,70],"action":"Click","post_delay":4000,"next":"ArmyApply"},
         "ArmyOpenVillage":{"recognition":"TemplateMatch","template":"Army/UI/Open.png","roi":[30,470,100,110],"threshold":0.95,"action":"Click","target":[75,525,1,1],"post_delay":700,"next":"ArmyOverview","timeout":2000,"on_error":"ArmyFailed"},
         "ArmyOverview":{"recognition":"TemplateMatch","template":"Army/UI/Overview.png","roi":[380,0,100,140],"threshold":0.95,"action":"Click","target":true,"target_offset":[-150,0,20,30],"post_delay":500,"next":"ArmyReadCurrent","timeout":2000,"on_error":"ArmyFailed"},
@@ -493,6 +494,8 @@ mod tests {
             }
         }
         assert_eq!(nodes["ArmyReadCurrent"]["on_error"], "ArmyFailed");
+        assert_eq!(nodes["ArmyApply"]["next"], json!(["ArmyReload", "ArmyOverview", "ArmyOpenVillage"]));
+        assert_eq!(nodes["ArmyApply"]["on_error"], "ArmyReadNotReady");
     }
 
     #[test]

@@ -84,6 +84,8 @@ pub enum Phase {
 pub struct Status {
     pub phase: Phase,
     pub detail: String,
+    /// A task can fail while its device connection remains usable.
+    pub task_error: String,
     pub battles: usize,
     pub uptime_ms: u64,
     pub current_node: String,
@@ -119,6 +121,7 @@ struct Inner {
     battles: usize,
     phase: Phase,
     detail: String,
+    task_error: String,
     panel: String,
     last_connection_check: Option<Instant>,
     retiring: Vec<std::thread::JoinHandle<()>>,
@@ -148,6 +151,7 @@ impl AppState {
                 battles: 0,
                 phase: Phase::Idle,
                 detail: String::new(),
+                task_error: String::new(),
                 panel: String::new(),
                 last_connection_check: None,
                 retiring: Vec::new(),
@@ -306,6 +310,7 @@ async fn read_army<R: Runtime>(app: AppHandle<R>, state: State<'_, AppState>) ->
     let runner = inner.runner.as_ref().ok_or("请先连接手机")?;
     runner.start_read_army(&cards).map_err(|e| e.to_string())?;
     inner.phase = Phase::Running;
+    inner.task_error.clear();
     inner.started = Some(Instant::now());
     inner.events.clear();
     Ok(status_of(&inner))
@@ -338,6 +343,7 @@ async fn apply_army<R: Runtime>(app: AppHandle<R>, state: State<'_, AppState>) -
         .start_army(&inner.settings.army, &cards)
         .map_err(|e| e.to_string())?;
     inner.phase = Phase::Running;
+    inner.task_error.clear();
     inner.started = Some(Instant::now());
     inner.events.clear();
     Ok(status_of(&inner))
@@ -349,6 +355,7 @@ async fn connect<R: Runtime>(app: AppHandle<R>, state: State<'_, AppState>) -> R
     {
         let mut inner = state.inner.lock().unwrap();
         inner.phase = Phase::Connecting;
+        inner.task_error.clear();
         inner.detail = String::new();
     }
     let outcome = assets_dir(&app).and_then(|assets| {
@@ -404,6 +411,7 @@ fn begin<R: Runtime>(inner: &mut Inner, app: &AppHandle<R>) -> Result<(), String
         )
         .map_err(|e| e.to_string())?;
     inner.phase = Phase::Running;
+    inner.task_error.clear();
     inner.started = Some(Instant::now());
     inner.events.clear();
     Ok(())
@@ -502,6 +510,7 @@ fn status_of(inner: &Inner) -> Status {
     Status {
         phase: inner.phase,
         detail: inner.detail.clone(),
+        task_error: inner.task_error.clone(),
         battles: inner.battles,
         uptime_ms: inner.started.map(|t| t.elapsed().as_millis() as u64).unwrap_or(0),
         current_node: inner.events.back().map(|e| e.label().to_string()).unwrap_or_default(),
@@ -556,6 +565,7 @@ fn shutdown(state: &AppState) {
 
 fn mark_device_disconnected(inner: &mut Inner) {
     inner.phase = Phase::Idle;
+    inner.task_error.clear();
     inner.detail = "设备已断开，请连接设备后重试".into();
     inner.panel.clear();
     inner.started = None;
@@ -601,25 +611,30 @@ async fn events(state: State<'_, AppState>) -> Result<Vec<NodeEvent>, String> {
         && !inner.events.is_empty()
         && inner.runner.as_ref().is_some_and(|runner| !runner.running())
     {
-        inner.phase = Phase::Ready;
-        inner.started = None;
-        inner.detail = match inner.events.iter().rev().find(|e| e.hit && e.kind == "action").cloned() {
-            Some(e) if e.node == "StorageFullStop" => "金币、圣水和黑油全部满仓，挂机刷资源已停止".into(),
-            Some(e) if e.node == "ArmyReadComplete" => "已读取手机卡组".into(),
-            Some(e) if e.node == "ArmyComplete" => "配卡完成，兵种、法术和战车数量已核对".into(),
-            Some(e)
-                if matches!(
-                    e.node.as_str(),
-                    "LootReadFailed" | "LootSkipLimit" | "ArmyFailed"
-                ) =>
-            {
-                inner.phase = Phase::Error;
-                e.focus.clone()
-            }
-            _ => "任务已结束".into(),
-        };
+        finish_task(&mut inner);
     }
     Ok(fresh)
+}
+
+fn finish_task(inner: &mut Inner) {
+    inner.phase = Phase::Ready;
+    inner.task_error.clear();
+    inner.started = None;
+    inner.detail = match inner.events.iter().rev().find(|e| e.hit && e.kind == "action").cloned() {
+        Some(e) if e.node == "StorageFullStop" => "金币、圣水和黑油全部满仓，挂机刷资源已停止".into(),
+        Some(e) if e.node == "ArmyReadComplete" => "已读取手机卡组".into(),
+        Some(e) if e.node == "ArmyComplete" => "配卡完成，兵种、法术和战车数量已核对".into(),
+        Some(e)
+            if matches!(
+                e.node.as_str(),
+                "LootReadFailed" | "LootSkipLimit" | "ArmyFailed" | "ArmyReadNotReady"
+            ) =>
+        {
+            inner.task_error = e.focus.clone();
+            e.focus.clone()
+        }
+        _ => "任务已结束".into(),
+    };
 }
 
 #[tauri::command]
@@ -741,6 +756,7 @@ mod tests {
         let state = AppState::new(Settings::default(), String::new());
         let mut inner = state.inner.lock().unwrap();
         inner.phase = Phase::Running;
+        inner.task_error.clear();
         inner.started = Some(Instant::now());
         inner.panel = "物理 1080×2400".into();
         inner.last_reco = 123;
@@ -751,6 +767,32 @@ mod tests {
         assert!(status.panel.is_empty());
         assert_eq!(inner.last_reco, 0);
         assert!(status.detail.contains("设备已断开"));
+    }
+
+    #[test]
+    fn task_failure_keeps_connection_ready_and_preserves_the_army() {
+        for name in ["ArmyFailed", "ArmyReadNotReady", "LootReadFailed", "LootSkipLimit"] {
+            let state = AppState::new(Settings::default(), String::new());
+            let mut inner = state.inner.lock().unwrap();
+            inner.phase = Phase::Running;
+            inner.started = Some(Instant::now());
+            inner.panel = "物理 1440×3200 · 当前 1080×1920".into();
+            let plan = inner.settings.army.clone();
+            inner.events.push_back(NodeEvent {
+                at: 1.0, reco_id: 0, wall: 0.0, kind: "action", node: name.into(),
+                focus: "请回到村庄后重试；未修改部队".into(), hit: true,
+                box_rect: None, score: 0.0, candidates: 0, filtered: 0, error: false,
+            });
+            finish_task(&mut inner);
+            let status = status_of(&inner);
+            assert_eq!(status.phase, Phase::Ready);
+            assert_eq!(status.task_error, "请回到村庄后重试；未修改部队");
+            assert!(!status.panel.is_empty());
+            assert_eq!(serde_json::to_value(&inner.settings.army).unwrap(), serde_json::to_value(plan).unwrap());
+            mark_device_disconnected(&mut inner);
+            assert_eq!(status_of(&inner).phase, Phase::Idle);
+            assert!(status_of(&inner).task_error.is_empty());
+        }
     }
 
     #[test]

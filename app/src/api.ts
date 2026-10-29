@@ -38,6 +38,7 @@ export interface ResourceReading { current: number | null; capacity: number | nu
 export interface Status {
   phase: Phase;
   detail: string;
+  taskError?: string;
   battles: number;
   uptimeMs: number;
   currentNode: string;

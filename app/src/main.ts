@@ -261,13 +261,13 @@ function go(page: string) {
 
 function render() {
   const phase = state.status.phase;
-  const problem = state.runError || state.error || (phase === "error" ? state.status.detail : "");
+  const problem = state.runError || state.status.taskError || state.error || (phase === "error" ? state.status.detail : "");
   ui.chip.textContent = problem;
   ui.chip.classList.toggle("error", Boolean(problem));
   const running = phase === "running";
   ui.meta.textContent = running
     ? `${formatUptime(state.status.uptimeMs)} · ${runStage(state.status, state.events)}`
-    : phase === "error"
+    : phase === "error" || state.status.taskError
       ? ""
       : state.status.detail;
 
