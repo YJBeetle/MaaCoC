@@ -166,6 +166,14 @@ fn read_counters(context: &maa_framework::context::Context, image: &maa_framewor
 
 pub(crate) fn register(resource: &Resource) -> crate::Result<CapacityCache> {
     let cache = CapacityCache::default();
+    let missing = cache.clone();
+    resource.register_custom_recognition(
+        "ResourceCapacityMissing",
+        Box::new(FnRecognition::new(move |_, args| {
+            missing.0.lock().unwrap().iter().any(Option::is_none)
+                .then(|| (*args.roi, "{}".to_owned()))
+        })),
+    )?;
     let observed = cache.clone();
     resource.register_custom_recognition(
         "ResourceCapacity",
@@ -194,6 +202,9 @@ pub(crate) fn register(resource: &Resource) -> crate::Result<CapacityCache> {
                 eprintln!("仓库检查 {}: {current}/{max}", ["金币", "圣水", "黑油"][index]);
             }
             let hit = match param["state"].as_str()? {
+                // Populate the status panel even when another resource is not
+                // full. A failed read continues; it must never confirm full.
+                "read" => true,
                 "full" => known.is_some_and(|(current, max)| current >= max),
                 "unknown" => known.is_none(),
                 _ => false,
@@ -315,6 +326,25 @@ mod tests {
         cache.0.lock().unwrap()[2] = Some(500_000);
         cache.reset();
         assert_eq!(*cache.0.lock().unwrap(), [None; 3]);
+    }
+
+    #[test]
+    fn missing_capacities_are_collected_before_the_quick_exit() {
+        let pipeline: Value = serde_json::from_str(include_str!("../../assets/pipeline/storage.json")).unwrap();
+        assert_eq!(pipeline["StorageQuickGate"]["next"], json!([
+            "StorageCapacityMissing", "StorageNotFull", "StorageOpenGold"
+        ]));
+        assert_eq!(pipeline["StorageCapacityMissing"]["next"], "StorageCollectOpenGold");
+        for (index, name) in ["Gold", "Elixir", "Dark"].iter().enumerate() {
+            assert_eq!(pipeline[format!("StorageCollectOpen{name}")]["next"], format!("StorageCollectRead{name}"));
+            let read = &pipeline[format!("StorageCollectRead{name}")];
+            assert_eq!(read["custom_recognition_param"], json!({"resource":index,"state":"read"}));
+            assert_eq!(read["next"], ["StorageCollectOpenElixir", "StorageCollectOpenDark", "StorageAfterCollectGate"][index]);
+            assert_eq!(read["on_error"], "StorageReadFailed");
+        }
+        // Collection cannot declare full or loop forever on an unread tooltip.
+        // Re-enter the existing fresh full-confirmation path after collecting.
+        assert_eq!(pipeline["StorageAfterCollectGate"]["next"], json!(["StorageNotFull", "StorageOpenGold"]));
     }
     #[test]
     fn grouped_counts_and_overflow_rewards_are_supported() {

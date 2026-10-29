@@ -2,8 +2,16 @@
     "StorageTooltipText": {
         "recognition": "ColorMatch",
         "method": 4,
-        "lower": [200, 200, 200],
-        "upper": [255, 255, 255]
+        "lower": [
+            200,
+            200,
+            200
+        ],
+        "upper": [
+            255,
+            255,
+            255
+        ]
     },
     "StorageOpenGold": {
         "focus": "StorageOpenGold!",
@@ -268,6 +276,7 @@
         "pre_delay": 1000,
         "post_delay": 0,
         "next": [
+            "StorageCapacityMissing",
             "StorageNotFull",
             "StorageOpenGold"
         ]
@@ -277,6 +286,102 @@
         "recognition": "Custom",
         "custom_recognition": "ResourceBelowCapacity",
         "next": "StorageContinue",
+        "pre_delay": 0,
+        "post_delay": 0
+    },
+    "StorageCapacityMissing": {
+        "recognition": "Custom",
+        "custom_recognition": "ResourceCapacityMissing",
+        "next": "StorageCollectOpenGold",
+        "pre_delay": 0,
+        "post_delay": 0
+    },
+    "StorageCollectOpenGold": {
+        "focus": "读取仓库容量",
+        "action": "Click",
+        "target": [
+            1200,
+            40
+        ],
+        "post_delay": 800,
+        "next": "StorageCollectReadGold",
+        "on_error": "StorageReadFailed"
+    },
+    "StorageCollectReadGold": {
+        "recognition": "Custom",
+        "custom_recognition": "ResourceCapacity",
+        "custom_recognition_param": {
+            "resource": 0,
+            "state": "read"
+        },
+        "action": "Click",
+        "target": [
+            600,
+            150
+        ],
+        "post_delay": 300,
+        "next": "StorageCollectOpenElixir",
+        "on_error": "StorageReadFailed"
+    },
+    "StorageCollectOpenElixir": {
+        "focus": "读取仓库容量",
+        "action": "Click",
+        "target": [
+            1200,
+            87
+        ],
+        "post_delay": 800,
+        "next": "StorageCollectReadElixir",
+        "on_error": "StorageReadFailed"
+    },
+    "StorageCollectReadElixir": {
+        "recognition": "Custom",
+        "custom_recognition": "ResourceCapacity",
+        "custom_recognition_param": {
+            "resource": 1,
+            "state": "read"
+        },
+        "action": "Click",
+        "target": [
+            600,
+            150
+        ],
+        "post_delay": 300,
+        "next": "StorageCollectOpenDark",
+        "on_error": "StorageReadFailed"
+    },
+    "StorageCollectOpenDark": {
+        "focus": "读取仓库容量",
+        "action": "Click",
+        "target": [
+            1200,
+            136
+        ],
+        "post_delay": 800,
+        "next": "StorageCollectReadDark",
+        "on_error": "StorageReadFailed"
+    },
+    "StorageCollectReadDark": {
+        "recognition": "Custom",
+        "custom_recognition": "ResourceCapacity",
+        "custom_recognition_param": {
+            "resource": 2,
+            "state": "read"
+        },
+        "action": "Click",
+        "target": [
+            600,
+            150
+        ],
+        "post_delay": 300,
+        "next": "StorageAfterCollectGate",
+        "on_error": "StorageReadFailed"
+    },
+    "StorageAfterCollectGate": {
+        "next": [
+            "StorageNotFull",
+            "StorageOpenGold"
+        ],
         "pre_delay": 0,
         "post_delay": 0
     }
