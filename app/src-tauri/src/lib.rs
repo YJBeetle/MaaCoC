@@ -19,6 +19,7 @@ use tauri::{path::BaseDirectory, AppHandle, Manager, Runtime, State};
 #[serde(rename_all = "camelCase", default)]
 pub struct Settings {
     pub entry: String,
+    #[serde(deserialize_with = "deserialize_preferred_device")]
     pub preferred_device: Option<String>,
     pub auto_start: bool,
     pub frame_interval_ms: u64,
@@ -31,6 +32,21 @@ pub struct Settings {
     pub stop_when_full: bool,
     pub loot_filter: maacoc_engine::loot::LootFilter,
     pub army: maacoc_engine::army::ArmyPlan,
+}
+
+/// The device picker used to persist "model · address" as its value. Restore
+/// the ADB identifier when loading that setting, including IPC saves, so an
+/// existing selection can reconnect without selecting a different device.
+fn deserialize_preferred_device<'de, D>(deserializer: D) -> Result<Option<String>, D::Error>
+where
+    D: serde::Deserializer<'de>,
+{
+    Ok(Option::<String>::deserialize(deserializer)?.map(|value| {
+        match value.rsplit_once(" · ") {
+            Some((_, address)) if !address.is_empty() => address.to_owned(),
+            _ => value,
+        }
+    }))
 }
 
 impl Default for Settings {
@@ -762,6 +778,26 @@ mod tests {
         assert_eq!(back.entry, "Main");
         assert_eq!(back.theme_mode, "dark");
         assert_eq!(back.strategy, Strategy::UnitsFirst);
+    }
+
+    #[test]
+    fn saved_device_label_loads_as_the_adb_address() {
+        let settings: Settings = serde_json::from_str(
+            r#"{"preferredDevice":"Xiaomi 13 Ultra · 10.24.24.6:5555","entry":"Main","autoStart":false}"#,
+        ).unwrap();
+        assert_eq!(settings.preferred_device.as_deref(), Some("10.24.24.6:5555"));
+        let saved = serde_json::to_value(&settings).unwrap();
+        assert_eq!(saved["preferredDevice"], "10.24.24.6:5555");
+        assert!(!settings.auto_start);
+    }
+
+    #[test]
+    fn device_addresses_and_no_preference_survive_settings_reload() {
+        for address in [None, Some("10.24.24.6:5555"), Some("test-usb-serial")] {
+            let settings = Settings { preferred_device: address.map(str::to_owned), ..Default::default() };
+            let reloaded: Settings = serde_json::from_str(&serde_json::to_string(&settings).unwrap()).unwrap();
+            assert_eq!(reloaded.preferred_device.as_deref(), address);
+        }
     }
 
     #[test]
