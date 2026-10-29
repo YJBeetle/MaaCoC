@@ -37,6 +37,14 @@ export function createMockApi(): EngineApi {
   let settings: Settings = { ...DEFAULT_SETTINGS };
   if (new URLSearchParams(location.search).get("army") === "sample") settings.army = structuredClone(sampleArmy);
   let status: Status = { phase: "idle", detail: "", battles: 0, uptimeMs: 0, currentNode: "", panel: "" };
+  if (new URLSearchParams(location.search).get("storage") === "sample") {
+    const readAt = Date.now() / 1000 - 20;
+    status.resources = [
+      { current: 31000000, capacity: 31000000, readAt, currentFailed: false, capacityFailed: false },
+      { current: 28410891, capacity: 31000000, readAt, currentFailed: false, capacityFailed: false },
+      { current: 414851, capacity: 500000, readAt, currentFailed: false, capacityFailed: false },
+    ];
+  }
   // Dev-only layout case: old count, old capacity, and failure before any success.
   if (new URLSearchParams(location.search).get("storage") === "failed") {
     const readAt = Date.now() / 1000 - 120;

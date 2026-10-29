@@ -15,6 +15,9 @@ const stages: Record<string, string> = {
   RewardOkay: "领取奖励", OpenBox: "领取奖励",
   Surrender: "结束战斗", SurrenderConfirmation: "结束战斗", TryReturnHome: "返回村庄",
   Exception: "恢复连接", OpenBoxTap: "领取奖励", CloseDialog: "关闭弹窗",
+  ExceptionConfirmation: "恢复连接", OpenBoxContinue: "领取奖励",
+  RequestFreeTroops: "请求免费援军", RequestFreeConfirm: "确认援军",
+  BattleSpeedUp: "加速战斗", StorageContinue: "准备出击",
 };
 
 function nodeName(event: NodeEvent): string {
@@ -23,6 +26,23 @@ function nodeName(event: NodeEvent): string {
     .replace(/^SpreadUnit\d+$/, "SpreadUnit")
     .replace(/^SpreadSpell\d+$/, "SpreadSpell")
     .replace(/^AirProbe\d+$/, "AirProbe");
+}
+
+function stageFor(node: string): string | undefined {
+  return stages[node] ?? (node.startsWith("Storage") ? "检查仓库" : node.startsWith("Loot") ? "筛选对手"
+    : node.startsWith("Tactic") ? "执行自定义战术" : node.startsWith("Army") ? "配置军队" : undefined);
+}
+
+/** Recognition misses are normal branching, not a change of user-facing stage. */
+export function runStage(status: Status, events: NodeEvent[]): string {
+  if (status.phase !== "running") return { idle: "等待连接", connecting: "正在连接", ready: "准备就绪", error: "需要处理" }[status.phase];
+  const event = [...events].reverse().find(event => !event.error && (event.hit || event.kind === "action") && stageFor(nodeName(event)));
+  return event ? stageFor(nodeName(event))! : stageFor(status.currentNode.replace(/!$/, "")) ?? "运行中";
+}
+
+export function strategyLabel(settings: Settings): string {
+  const preset = { "units-first": "兵种优先", "spells-first": "法术优先", "left-spread": "左侧分散投放", "air-probe": "气球探路" }[settings.strategy];
+  return settings.tactics.enabled ? `自定义战术 · ${preset}` : preset;
 }
 
 /** Events identify the phase; the card bar itself stays a live image, including
@@ -50,8 +70,7 @@ export class BattlePanel {
     const event = [...state.events].reverse().find((event) =>
       !event.error && (event.hit || event.kind === "action") && stages[nodeName(event)]);
     const node = event ? nodeName(event) : "";
-    const strategy = { "units-first": "兵种优先", "spells-first": "法术优先", "left-spread": "左侧分散投放", "air-probe": "气球探路" }[state.settings.strategy];
-    this.progress.textContent = `${strategy} · ${state.status.phase === "running" ? stages[node] ?? "运行中" : "已停止"}`;
+    this.progress.textContent = state.status.phase === "running" ? runStage(state.status, state.events) : "已停止";
     const inBattle = ["AirOpening", "AirProbeBalloon", "AirProbe", "SpreadHeroWait", "SpreadHeroSkillReady", "SpreadZoom", "SpreadZoomAgain", "SpreadPan", "SpreadUnit", "SpreadSiege", "SpreadHero", "SpreadSpell", "BattleReady", "SlideLeft", "Deploy", "FindUnit", "DeployUnit", "FindSiege",
       "DeploySiege", "FindHero", "DeployHero", "SkillHero", "FindSpell", "DeploySpell", "WaitingEndLoop"].includes(node);
     const connected = state.status.phase === "ready" || state.status.phase === "running";

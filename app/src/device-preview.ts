@@ -65,7 +65,8 @@ export class DevicePreview {
     this.state = next;
     const frame = this.state.frame;
     if (!frame) {
-      this.ui.void.textContent = this.state.status.phase === "connecting" ? "连接中…" : "未连接设备";
+      const phase = this.state.status.phase;
+      this.ui.void.textContent = phase === "connecting" ? "连接中…" : phase === "ready" || phase === "running" ? "正在获取设备画面…" : "未连接设备";
       this.showStageChildren([this.ui.void]);
       return;
     }

@@ -1,0 +1,50 @@
+.run-grid { width: 100%; max-width: 1600px; margin-inline: auto; flex: 1; min-height: 0; display: grid; grid-template-columns: minmax(0, 1fr) 340px; gap: 20px; }
+.run-left { min-height: 0; display: flex; flex-direction: column; gap: 16px; }
+.card.preview-card { display: flex; flex: 1; min-height: 240px; }
+.run-right { min-height: 0; display: flex; flex-direction: column; gap: 14px; overflow-y: auto; scrollbar-width: thin; }
+.status-card { flex: none; }
+.status-card > .battle-panel { border: 0; border-top: 1px solid var(--md-sys-color-outline-variant); border-radius: 0; background: transparent; }
+.run-overview { display: flex; flex-direction: column; gap: 6px; padding: 16px 18px; border-bottom: 1px solid var(--md-sys-color-outline-variant); }
+.run-overview-heading { display: flex; justify-content: space-between; align-items: center; font-size: 12px; color: var(--md-sys-color-on-surface-variant); }
+.run-duration { font-variant-numeric: tabular-nums; }
+.run-overview > strong { font-size: 20px; font-weight: 500; }
+.run-overview.is-running > strong { color: var(--md-sys-color-primary); }
+.run-strategy { font-size: 12px; }
+.run-policy { font-size: 11px; color: var(--md-sys-color-on-surface-variant); }
+.resource-readings { padding: 4px 18px 10px; }
+.resource-row { display: grid; grid-template-columns: 1fr auto; align-items: center; gap: 5px 12px; padding-block: 10px; }
+.resource-row + .resource-row { border-top: 1px solid var(--md-sys-color-outline-variant); }
+.resource-name { font-size: 13px; }
+.resource-row strong { font-variant-numeric: tabular-nums; font-size: 18px; font-weight: 500; }
+.resource-meter { grid-column: 1 / -1; height: 4px; border-radius: 8px; overflow: hidden; background: var(--md-sys-color-surface-container-highest); }
+.resource-meter > span { display: block; height: 100%; border-radius: inherit; background: var(--md-sys-color-primary); }
+.resource-meta { grid-column: 1 / -1; display: flex; justify-content: space-between; gap: 8px; font-size: 11px; color: var(--md-sys-color-on-surface-variant); }
+.resource-time, .resource-warning { grid-column: 1 / -1; font-size: 11px; line-height: 1.5; color: var(--md-sys-color-on-surface-variant); }
+.resource-warning { color: var(--md-sys-color-error); }
+.read-failed .resource-meter, .read-failed strong { opacity: .55; }
+.run-grid .card.timeline-card { flex: none; min-height: 0; border: 1px solid var(--md-sys-color-outline-variant); }
+.timeline-card > summary { display: flex; align-items: center; gap: 8px; padding: 14px 18px; cursor: pointer; list-style: none; font-size: 13px; }
+.timeline-card > summary::-webkit-details-marker { display: none; }
+.timeline-card > summary md-icon { --md-icon-size: 18px; color: var(--md-sys-color-on-surface-variant); }
+.timeline-card[open] > summary md-icon { transform: rotate(180deg); }
+.log-count { margin-left: auto; color: var(--md-sys-color-on-surface-variant); font-size: 11px; }
+.timeline-card .timeline { height: 220px; border-top: 1px solid var(--md-sys-color-outline-variant); }
+.tl-row { grid-template-columns: 36px 7px minmax(0, 1fr) auto; gap: 7px; padding: 8px 12px; font-size: 11px; }
+.tl-row > :nth-child(3) { overflow-wrap: anywhere; }
+.tl-row .v, .tl-row .t { font-size: 10px; }
+.actions { display: flex; flex: none; align-items: start; justify-content: space-between; gap: 12px; }
+.actions > md-filled-button { --md-filled-button-container-height: 48px; min-width: 156px; }
+.device-setup { font-size: 12px; color: var(--md-sys-color-on-surface-variant); text-align: right; }
+.device-setup > summary { cursor: pointer; padding: 16px 4px; }
+.secondary { display: flex; flex-wrap: wrap; justify-content: flex-end; gap: 4px; }
+.secondary md-text-button { --md-text-button-label-text-color: var(--md-sys-color-on-surface-variant); }
+.timeline-card > summary:focus-visible, .device-setup > summary:focus-visible { outline: 2px solid var(--md-sys-color-primary); outline-offset: -3px; }
+@media (max-width: 1050px) {
+  .run-grid { flex: none; grid-template-columns: minmax(0, 1fr); gap: 20px; }
+  .card.preview-card { flex: none; height: auto; aspect-ratio: 16 / 9; }
+  .run-right { overflow: visible; }
+  .resource-readings { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 18px; }
+  .resource-row + .resource-row { border-top: 0; }
+  .resource-row strong { font-size: 16px; }
+  .status-card > .battle-panel canvas { max-width: 680px; }
+}

@@ -22,6 +22,7 @@ import { RunPage } from "./pages/run-page";
 import { StatsPage } from "./pages/stats-page";
 import { ArmyPage } from "./pages/army-page";
 import { SettingsPage } from "./pages/settings-page";
+import { runStage } from "./battle-panel";
 
 const stateLabels: Record<Phase, string> = {
   idle: "未连接",
@@ -253,9 +254,8 @@ function render() {
   ui.chip.textContent = problem;
   ui.chip.classList.toggle("error", Boolean(problem));
   const running = phase === "running";
-  const node = state.status.currentNode;
   ui.meta.textContent = running
-    ? `${formatUptime(state.status.uptimeMs)} · 第 ${state.status.battles + 1} 局${node ? ` · ${node}` : ""}`
+    ? `${formatUptime(state.status.uptimeMs)} · ${runStage(state.status, state.events)}`
     : phase === "error"
       ? ""
       : state.status.detail;
