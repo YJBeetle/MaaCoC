@@ -71,8 +71,12 @@ fn number(text: &str) -> Option<u64> {
     compact.parse().ok()
 }
 
+fn normalize_capacity_label(text: &str) -> String {
+    text.replace('：', ":").replace("最人储量", "最大储量").replace("最大储昂", "最大储量")
+}
+
 fn capacity(text: &str) -> Option<u64> {
-    let text = text.replace('：', ":").replace("最人储量", "最大储量");
+    let text = normalize_capacity_label(text);
     let (label, amount) = text.split_once(':')?;
     if !label.contains("最大储量") && !label.to_ascii_lowercase().contains("max") {
         return None;
@@ -141,7 +145,7 @@ fn capacity_value(detail: &Value) -> Option<u64> {
         if label["score"].as_f64()? < 0.9 { continue; }
         let text = label["text"].as_str()?;
         if let Some(value) = capacity(text) { values.push(value); continue; }
-        let normalized = text.replace('：', ":");
+        let normalized = normalize_capacity_label(text);
         if normalized.trim_end_matches(':').trim() != "最大储量"
             && !normalized.trim_end_matches(':').trim().eq_ignore_ascii_case("max storage") { continue; }
         let rect = label["box"].as_array()?;
@@ -297,6 +301,16 @@ mod tests {
         let mut low = detail;
         low["filtered"][1]["score"] = json!(0.5);
         assert_eq!(capacity_value(&low), None);
+    }
+
+    #[test]
+    fn filtered_dark_capacity_label_typo_keeps_the_correct_amount() {
+        // Actual bright-text OCR output: the label is split from the amount.
+        // Falling back to the unfiltered pass misread this same amount as 5003000.
+        let detail: Value = serde_json::from_str(include_str!("../../tests/fixtures/storage/dark-capacity-label-20261030.json")).unwrap();
+        assert_eq!(capacity_value(&detail), Some(500_000));
+        assert_eq!(capacity("最大储昂：500 000"), Some(500_000));
+        assert_eq!(capacity("每小时产量：500 000"), None);
     }
 
     #[test]
