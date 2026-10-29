@@ -1,6 +1,15 @@
 import type { EngineApi, Frame, NodeEvent, Settings, Status } from "./api";
 import { DEFAULT_SETTINGS } from "./api";
 import frameUrl from "../../tests/fixtures/frames/0003-FindUnit.png?url";
+import catalog from "../../assets/army.json";
+
+const previews = import.meta.glob<string>("../../assets/image/Army/**/*-preview.png", { eager: true, query: "?url", import: "default" });
+const cards = catalog.map(card => ({ ...card, preview: previews[`../../assets/image/${card.preview}`] }));
+const sampleArmy = { entries: [
+  { id: "Unit/0_Barbarian", count: 20 }, { id: "Unit/1_Archer", count: 20 },
+  { id: "Unit/3_Giant", count: 4 }, { id: "Spell/SpellLightning", count: 3 },
+  { id: "Siege/WallWrecker", count: 1 },
+] };
 
 /** Browser-only stand-in so the UI can be driven and asserted without a phone
     or a native window. Loaded only from a dev build. */
@@ -26,6 +35,7 @@ const SCRIPT: Array<Partial<NodeEvent> & { at: number; node: string; kind: strin
 
 export function createMockApi(): EngineApi {
   let settings: Settings = { ...DEFAULT_SETTINGS };
+  if (new URLSearchParams(location.search).get("army") === "sample") settings.army = structuredClone(sampleArmy);
   let status: Status = { phase: "idle", detail: "", battles: 0, uptimeMs: 0, currentNode: "", panel: "" };
   // Dev-only layout case: old count, old capacity, and failure before any success.
   if (new URLSearchParams(location.search).get("storage") === "failed") {
@@ -54,10 +64,10 @@ export function createMockApi(): EngineApi {
   return {
     mode: "mock",
     async devices() {
-      return [{ label: "K40", address: "f5d66ad2" }];
+      return [{ label: "模拟设备", address: "preview" }];
     },
-    async armyCards() { return []; },
-    async readArmy() { status = { ...status, phase: "ready", detail: "已读取手机卡组" }; return status; },
+    async armyCards() { return cards; },
+    async readArmy() { settings = { ...settings, army: structuredClone(sampleArmy) }; status = { ...status, phase: "ready", detail: "已读取手机卡组" }; return status; },
     async readArmyResult() { return settings; },
     async applyArmy() { status = { ...status, phase: "ready", detail: "配卡完成" }; return status; },
     async nodes() {
@@ -77,7 +87,7 @@ export function createMockApi(): EngineApi {
       status = {
         ...status,
         phase: settings.autoStart ? "running" : "ready",
-        detail: "K40 @ f5d66ad2",
+        detail: "界面预览 · 模拟设备",
         panel: "物理 1080×2400 · 当前 1080×1920",
       };
       return status;
