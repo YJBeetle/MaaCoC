@@ -218,9 +218,11 @@ pub fn register(resource: &Resource) -> crate::Result<()> {
 pub fn pipeline(plan: &ArmyPlan, cards: &[ArmyCard]) -> crate::Result<Value> {
     plan.validate(cards)?;
     let mut nodes = json!({
-        "ArmyApply": {"next":["ArmyReload","ArmyOverview","ArmyOpenVillage"],"timeout":2000,"on_error":"ArmyFailed"},
+        "ArmyApply": {"next":["ArmyReload","ArmyOverview","ArmyOpenVillage","ArmyEditFromBattle","ArmyOpenBattle"],"timeout":2000,"on_error":"ArmyFailed"},
+        "ArmyOpenBattle":{"recognition":"TemplateMatch","template":"Army/UI/BattleVillage.png","roi":[20,540,200,180],"threshold":0.95,"action":"LongPress","duration":150,"pressure":255,"target":true,"post_delay":800,"next":"ArmyEditFromBattle","timeout":3000,"on_error":"ArmyFailed"},
+        "ArmyEditFromBattle":{"recognition":"TemplateMatch","template":"Army/UI/EditFromBattle.png","roi":[55,620,260,100],"threshold":0.95,"action":"LongPress","duration":150,"pressure":255,"target":true,"post_delay":800,"next":"ArmyOverview","timeout":3000,"on_error":"ArmyFailed"},
         "ArmyReload":{"recognition":"OCR","expected":"重新载入游戏","roi":[250,400,380,70],"action":"Click","post_delay":4000,"next":"ArmyApply"},
-        "ArmyOpenVillage":{"recognition":"TemplateMatch","template":"Army/UI/Open.png","roi":[30,470,100,110],"threshold":0.95,"action":"Click","target":[75,525,1,1],"post_delay":700,"next":"ArmyOverview","timeout":2000,"on_error":"ArmyFailed"},
+        "ArmyOpenVillage":{"recognition":"TemplateMatch","template":"Army/UI/Open.png","roi":[30,470,100,110],"threshold":0.95,"action":"Click","target":true,"post_delay":700,"next":"ArmyOverview","timeout":2000,"on_error":"ArmyFailed"},
         "ArmyOverview":{"recognition":"TemplateMatch","template":"Army/UI/Overview.png","roi":[380,0,100,140],"threshold":0.95,"action":"Click","target":true,"target_offset":[-150,0,20,30],"post_delay":500,"next":"ArmyCapacity","timeout":2000,"on_error":"ArmyFailed"},
         "ArmyCapacity":{"recognition":"Custom","custom_recognition":"ArmyInspect","custom_recognition_param":{"mode":"init"},"timeout":0,"on_error":"ArmyFailed"},
         "ArmyReady":{"recognition":"Custom","custom_recognition":"ArmyInspect","custom_recognition_param":{"mode":"ready","plan":plan},"timeout":0,"on_error":"ArmyFailed"},
@@ -408,7 +410,8 @@ pub fn register_reader(resource: &Resource) -> crate::Result<ReadResult> {
         };
         let mut entries = Vec::new();
         for group in ["Unit", "Spell", "Siege"] {
-            let (used, _) = ratio(&ocr(counter(group), false)?)?;
+            let (used, _) = ocr(counter(group), false).and_then(|text| ratio(&text))
+                .or_else(|| ocr(counter(group), true).and_then(|text| ratio(&text)))?;
             if used == 0 { continue; }
             let (x, y, stride, slots, width, region) = match group {
                 "Unit" => (562,201,98,6,92,[554,193,665,113]),
@@ -456,10 +459,12 @@ pub fn register_reader(resource: &Resource) -> crate::Result<ReadResult> {
 
 pub fn read_pipeline(cards: &[ArmyCard]) -> Value {
     json!({
-        "ArmyApply":{"next":["ArmyReload","ArmyOverview","ArmyOpenVillage"],"timeout":2000,"on_error":"ArmyReadNotReady"},
+        "ArmyApply":{"next":["ArmyReload","ArmyOverview","ArmyOpenVillage","ArmyEditFromBattle","ArmyOpenBattle"],"timeout":2000,"on_error":"ArmyReadNotReady"},
         "ArmyReadNotReady":{"action":"StopTask","focus":"未找到村庄或配兵界面，请回到村庄或打开配兵界面后重试；未修改部队"},
+        "ArmyOpenBattle":{"recognition":"TemplateMatch","template":"Army/UI/BattleVillage.png","roi":[20,540,200,180],"threshold":0.95,"action":"LongPress","duration":150,"pressure":255,"target":true,"post_delay":800,"next":"ArmyEditFromBattle","timeout":3000,"on_error":"ArmyFailed"},
+        "ArmyEditFromBattle":{"recognition":"TemplateMatch","template":"Army/UI/EditFromBattle.png","roi":[55,620,260,100],"threshold":0.95,"action":"LongPress","duration":150,"pressure":255,"target":true,"post_delay":800,"next":"ArmyOverview","timeout":3000,"on_error":"ArmyFailed"},
         "ArmyReload":{"recognition":"OCR","expected":"重新载入游戏","roi":[250,400,380,70],"action":"Click","post_delay":4000,"next":"ArmyApply"},
-        "ArmyOpenVillage":{"recognition":"TemplateMatch","template":"Army/UI/Open.png","roi":[30,470,100,110],"threshold":0.95,"action":"Click","target":[75,525,1,1],"post_delay":700,"next":"ArmyOverview","timeout":2000,"on_error":"ArmyFailed"},
+        "ArmyOpenVillage":{"recognition":"TemplateMatch","template":"Army/UI/Open.png","roi":[30,470,100,110],"threshold":0.95,"action":"Click","target":true,"post_delay":700,"next":"ArmyOverview","timeout":2000,"on_error":"ArmyFailed"},
         "ArmyOverview":{"recognition":"TemplateMatch","template":"Army/UI/Overview.png","roi":[380,0,100,140],"threshold":0.95,"action":"Click","target":true,"target_offset":[-150,0,20,30],"post_delay":500,"next":"ArmyReadCurrent","timeout":2000,"on_error":"ArmyFailed"},
         "ArmyReadCurrent":{"recognition":"Custom","custom_recognition":"ArmyRead","custom_recognition_param":cards,"next":"ArmyClose","timeout":0,"on_error":"ArmyFailed"},
         "ArmyClose":{"recognition":"ColorMatch","roi":[0,0,1,1],"lower":[0,0,0],"upper":[255,255,255],"count":1,"action":"Click","target":[1208,80,1,1],"next":"ArmyReadComplete"},
@@ -494,8 +499,43 @@ mod tests {
             }
         }
         assert_eq!(nodes["ArmyReadCurrent"]["on_error"], "ArmyFailed");
-        assert_eq!(nodes["ArmyApply"]["next"], json!(["ArmyReload", "ArmyOverview", "ArmyOpenVillage"]));
+        assert_eq!(nodes["ArmyApply"]["next"], json!(["ArmyReload", "ArmyOverview", "ArmyOpenVillage", "ArmyEditFromBattle", "ArmyOpenBattle"]));
         assert_eq!(nodes["ArmyApply"]["on_error"], "ArmyReadNotReady");
+    }
+
+    #[test]
+    fn updated_army_navigation_matches_real_720p_frames() {
+        let assets = std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("../assets");
+        let runner = crate::Runner::connect(&assets, crate::DeviceTarget::Headless, None).unwrap();
+        runner.resource().override_pipeline_json(&read_pipeline(&[])).unwrap();
+        for (node, image, expected) in [
+            ("ArmyOpenBattle", include_bytes!("../../tests/fixtures/army/village-compact.png").as_slice(), true),
+            ("ArmyEditFromBattle", include_bytes!("../../tests/fixtures/army/battle-menu.png").as_slice(), true),
+            ("ArmyOverview", include_bytes!("../../tests/fixtures/army/edit-overview.png").as_slice(), true),
+            ("ArmyEditFromBattle", include_bytes!("../../tests/fixtures/army/village-compact.png").as_slice(), false),
+        ] {
+            let trial = crate::trial::trial_node(runner.resource(), runner.tasker(), runner.bus(), node, image, None, None).unwrap();
+            assert_eq!(trial.hit, expected, "{}", trial.summary());
+            eprintln!("{}", trial.summary());
+        }
+    }
+
+    #[test]
+    fn updated_army_overview_reads_every_category_without_changing_troops() {
+        let assets = std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("../assets");
+        let cards: Vec<ArmyCard> = serde_json::from_str(include_str!("../../assets/army.json")).unwrap();
+        let runner = crate::Runner::connect(&assets, crate::DeviceTarget::Headless, None).unwrap();
+        runner.resource().override_pipeline_json(&read_pipeline(&cards)).unwrap();
+        let trial = crate::trial::trial_node(
+            runner.resource(), runner.tasker(), runner.bus(), "ArmyReadCurrent",
+            include_bytes!("../../tests/fixtures/army/edit-overview.png"), None, None,
+        ).unwrap();
+        assert!(trial.hit, "{}", trial.summary());
+        let plan = runner.take_read_army().unwrap();
+        for (group, expected) in [("Unit/", 17), ("Spell/", 11), ("Siege/", 3)] {
+            assert_eq!(plan.entries.iter().filter(|e| e.id.starts_with(group)).map(|e| e.count).sum::<u32>(), expected, "{plan:?}");
+        }
+        eprintln!("读取结果: {plan:?}");
     }
 
     #[test]
