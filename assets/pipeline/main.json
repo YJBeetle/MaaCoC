@@ -91,11 +91,16 @@
         "timeout": 10000,
         "on_error": "AttackLoop",
     },
+    // 下一个按钮只在开战准备页存在；开战后同一 ROI 是摧毁率面板。
+    // 模板为去文字的中性图（放大镜+边框+金币），中英文共用。阈值 0.9 把
+    // 准备页（实测 0.94~1.0）与开战/过渡帧（<=0.27）分开，避免收益筛选
+    // 在已开战时误触发并把整局停掉。
     "FindNext": {
         "recognition": "TemplateMatch",
         "template": "Next",
         "green_mask": true,
         "roi": [1005,440,253,146],
+        "threshold": 0.9,
         "next": "SpreadZoom",
     },
     "SlideLeft": {
