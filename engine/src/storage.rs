@@ -54,7 +54,7 @@ fn below_capacity(current: Option<u64>, capacity: Option<u64>) -> bool {
     current.zip(capacity).is_some_and(|(current, max)| current < max)
 }
 
-fn number(text: &str) -> Option<u64> {
+pub(crate) fn number(text: &str) -> Option<u64> {
     let grouped: String = text.chars().filter(|c| !c.is_whitespace()).collect();
     if grouped.contains(['.', ',', '-']) {
         let groups: Vec<_> = grouped.split(['.', ',', '-']).collect();

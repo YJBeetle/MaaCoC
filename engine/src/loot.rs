@@ -67,8 +67,40 @@ pub fn apply_override(pipeline: &mut Value, filter: &LootFilter) {
     pipeline["LootCheck"] = json!({"custom_recognition_param":{"filter":filter,"accept_next":accept_next}});
 }
 
+// 战利品三行的 Y 随对手名/徽章行数变化，固定 ROI 会错位读到空行。
+// 一次 OCR 整个面板，按行聚类（同一行可能拆成多框）再按 Y 取金/水/黑。
+fn panel_loot(detail: &Value) -> Option<[u64; 3]> {
+    let mut boxes: Vec<(i64, i64, String)> = Vec::new();
+    for item in detail["filtered"].as_array()? {
+        if item["score"].as_f64()? < 0.6 {
+            continue;
+        }
+        let Some(rect) = item["box"].as_array().filter(|r| r.len() == 4) else { continue };
+        let (Some(x), Some(y), Some(h)) = (rect[0].as_i64(), rect[1].as_i64(), rect[3].as_i64()) else { continue };
+        let Some(text) = item["text"].as_str() else { continue };
+        boxes.push((y + h / 2, x, text.to_owned()));
+    }
+    boxes.sort_by_key(|(y, x, _)| (*y, *x));
+    let mut lines: Vec<(i64, String)> = Vec::new();
+    for (y, _x, text) in boxes {
+        match lines.last_mut() {
+            Some((ly, acc)) if (y - *ly).abs() <= 10 => {
+                acc.push(' ');
+                acc.push_str(&text);
+            }
+            _ => lines.push((y, text)),
+        }
+    }
+    let values: Vec<u64> = lines
+        .iter()
+        .filter_map(|(_, t)| crate::storage::number(t))
+        .filter(|v| *v <= 1_000_000_000)
+        .collect();
+    (values.len() == 3).then(|| [values[0], values[1], values[2]])
+}
+
 pub fn register(resource: &Resource) -> crate::Result<()> {
-    let skips = Mutex::new((0_i64, 0_u32));
+    let skips = Mutex::new((0_i64, 0_u32, 0_u32));
     resource.register_custom_recognition(
         "AvailableLoot",
         Box::new(FnRecognition::new(move |context, args| {
@@ -76,32 +108,54 @@ pub fn register(resource: &Resource) -> crate::Result<()> {
             let filter: LootFilter = serde_json::from_value(param["filter"].clone()).ok()?;
             filter.validate().ok()?;
             let accept = param["accept_next"].as_str()?;
-            let read = |y| {
-                if args.image.width() != 1280 || args.image.height() != 720 {
-                    return None;
-                }
-                let result = context
-                    .run_recognition_direct(
-                        "OCR",
-                        &json!({"roi":[94,y,125,25],"only_rec":false,"threshold":0.9}).to_string(),
-                        args.image,
-                    )
-                    .ok()??;
-                crate::storage::ocr_number(&result.detail, false).filter(|v| *v <= 1_000_000_000)
-            };
-            let loot = read(98).zip(read(137)).zip(read(176)).map(|((g, e), d)| [g, e, d]);
+            if args.image.width() != 1280 || args.image.height() != 720 {
+                return None;
+            }
+            // 收益筛选只在准备页生效：没有"下一个"按钮说明已开战或仍在加载，
+            // 直接走原流程（已开战则投放打完），绝不因读不到战利品而停局。
+            let prep = context
+                .run_recognition_direct(
+                    "TemplateMatch",
+                    &json!({"template":"Next","green_mask":true,"roi":[1005,440,253,146],"threshold":0.9}).to_string(),
+                    args.image,
+                )
+                .ok()
+                .flatten()
+                .is_some();
+            if !prep {
+                context.override_next(args.node_name, &[accept]).ok()?;
+                return Some((*args.roi, json!({"loot":null,"next":accept}).to_string()));
+            }
+            let panel = context
+                .run_recognition_direct(
+                    "OCR",
+                    &json!({"roi":[90,70,180,160],"only_rec":false,"threshold":0.6}).to_string(),
+                    args.image,
+                )
+                .ok()??;
+            let loot = panel_loot(&panel.detail);
             let mut state = skips.lock().ok()?;
             if state.0 != args.task_id {
-                *state = (args.task_id, 0);
+                *state = (args.task_id, 0, 0);
             }
             let next = match loot {
-                None => "LootReadFailed",
+                // 点"下一个"后的换对手过渡帧面板为空，属正常瞬态；重试而非停局。
+                None => {
+                    state.2 += 1;
+                    if state.2 > 6 {
+                        "LootReadFailed"
+                    } else {
+                        "LootRetry"
+                    }
+                }
                 Some(values) if filter.accepts(values) => {
                     state.1 = 0;
+                    state.2 = 0;
                     accept
                 }
                 Some(_) => {
                     state.1 += 1;
+                    state.2 = 0;
                     if state.1 > filter.max_skips {
                         "LootSkipLimit"
                     } else {
@@ -167,5 +221,45 @@ mod tests {
         }
         .validate()
         .is_err());
+    }
+    #[test]
+    fn panel_loot_tolerates_shifted_rows_split_boxes_and_the_label() {
+        let item = |x, y, w, h, score, text: &str| json!({"box":[x,y,w,h],"score":score,"text":text});
+        let detail = |ys: [i64; 3]| json!({"filtered":[
+            item(101, ys[0] - 24, 117, 17, 0.99, "可获得的战利品"),
+            item(98, ys[0], 109, 21, 0.99, "1820646"),
+            item(96, ys[1], 120, 26, 0.99, "1900646"),
+            item(100, ys[2], 76, 24, 0.99, "11728"),
+        ]});
+        for ys in [[92, 127, 168], [103, 142, 180], [80, 118, 156]] {
+            assert_eq!(panel_loot(&detail(ys)), Some([1_820_646, 1_900_646, 11_728]));
+        }
+        // 同一行被拆成两框时按 X 拼接。
+        let split = json!({"filtered":[
+            item(98, 92, 50, 21, 0.99, "1820"),
+            item(150, 92, 59, 21, 0.99, "646"),
+            item(96, 127, 120, 26, 0.99, "1900646"),
+            item(100, 168, 76, 24, 0.99, "11728"),
+        ]});
+        assert_eq!(panel_loot(&split), Some([1_820_646, 1_900_646, 11_728]));
+        // 缺行 / 低置信度 / 多出一行数字都判读取失败，而不是猜一个值。
+        let missing = json!({"filtered":[
+            item(98, 92, 109, 21, 0.99, "1820646"),
+            item(96, 127, 120, 26, 0.99, "1900646"),
+        ]});
+        assert_eq!(panel_loot(&missing), None);
+        let low = json!({"filtered":[
+            item(98, 92, 109, 21, 0.99, "1820646"),
+            item(96, 127, 120, 26, 0.99, "1900646"),
+            item(100, 168, 76, 24, 0.5, "11728"),
+        ]});
+        assert_eq!(panel_loot(&low), None);
+        let extra = json!({"filtered":[
+            item(98, 92, 109, 21, 0.99, "1820646"),
+            item(96, 127, 120, 26, 0.99, "1900646"),
+            item(100, 168, 76, 24, 0.99, "11728"),
+            item(100, 205, 76, 24, 0.99, "999"),
+        ]});
+        assert_eq!(panel_loot(&extra), None);
     }
 }

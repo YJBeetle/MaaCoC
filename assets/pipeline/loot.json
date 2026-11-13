@@ -16,11 +16,19 @@
         "template": "Next",
         "green_mask": true,
         "roi": [1005,440,253,146],
+        "threshold": 0.9,
         "action": "Click",
         "next": "FindNext",
         "timeout": 1000,
-        "on_error": "LootReadFailed",
+        "on_error": "LootRetry",
         "post_delay": 1500
+    },
+    "LootRetry": {
+        "focus": "换对手过渡帧，稍候重读战利品",
+        "pre_delay": 800,
+        "next": "LootCheck",
+        "timeout": 1000,
+        "on_error": "LootReadFailed"
     },
     "LootReadFailed": {
         "focus": "无法可靠读取战利品，挂机刷资源已停止",
