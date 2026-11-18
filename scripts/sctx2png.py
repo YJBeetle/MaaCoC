@@ -207,6 +207,13 @@ def ktx_pages(blob: bytes):
         pos = blob.find(KTX, pos + 64)
 
 
+def atlas_image(data: bytes) -> Image.Image | None:
+    """Decode embedded KTX or an external SCTX atlas."""
+    if data.startswith(KTX):
+        return ktx_image(data)
+    return decode(data)
+
+
 def save(image: Image.Image, target: Path, max_edge: int) -> None:
     if max_edge and max(image.size) > max_edge:
         ratio = max_edge / max(image.size)

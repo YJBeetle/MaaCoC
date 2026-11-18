@@ -6,8 +6,9 @@
 
 卡底和人物图分存在 `ui.sc` 的不同符号里。脚本将两者的网格映射到同一画布，
 按顶点与 UV 直接绘制成卡牌：
-普通兵用 `unit_slot` 图层 1，编号 100 起的活动兵用图层 2；`icon_unit_elite_*` 超级兵
-用图层 3，并应用该图层在 SC 中记录的红色变换。英雄用 `hero_slot` 图层 2，法术用 `spell_slot` 图层 1；攻城机器用 `siege_slot` 图层 1。
+普通兵、活动兵和超级兵按实例名选择 `unit_slot` 的 `attack_button`、
+`attack_button_2` 和 `attack_button_3`，这样插入新图层后仍能取到原来的卡底。
+英雄用 `hero_slot` 图层 2，法术用 `spell_slot` 图层 1，攻城机器用 `siege_slot` 图层 1。
 数量、等级及卡底 alpha 低于 50% 的边角填成纯绿，供 MAAFW 的
 `green_mask` 跳过。
 每类卡牌共用一套遮罩位置；咏王另遮住右下角的模式切换开关。
@@ -20,7 +21,7 @@
 
 ```
 SCFILE 容器 = "SC" + 版本 + FlatBuffers 描述头长度 + 描述头 + zstd 帧
-描述头      = 包含符号元数据（当前 ui.sc 为 3043 条，每条有名字和 16 字节哈希）
+描述头      = 包含符号元数据（每条有名字和 16 字节哈希）
 正文        = 连续的 [u32 长度][flatbuffers 分块]
               Resources / Exports / TextFields / Shapes / MovieClips / Modifiers / TextureSets
 ```
@@ -50,10 +51,12 @@ pip install pillow zstandard texture2ddecoder
 adb pull "$(adb shell pm path com.supercell.clashofclans | tr -d '\r' | sed 's/^package://' | grep /split_install_time_asset_pack.apk)" var/coc-unpack/apk/
 ```
 
-从 APK 里取出指定的 `.sc` 文件：
+提取家乡的 `ui.sc`。19.32 版将它和外置的 `ui_*.sctx` 图集放在
+`assets/base-attachments/`，提取时按附件头里的原始路径匹配。
+旧版内嵌图集的 `assets/sc/ui.sc` 也可以用同一条命令提取。
 
 ```bash
-unzip -o -j var/coc-unpack/apk/split_install_time_asset_pack.apk assets/sc/ui.sc -d var/coc-unpack/sc
+python3 scripts/refresh-cards/extract_ui.py var/coc-unpack/apk/split_install_time_asset_pack.apk var/coc-unpack/sc
 ```
 
 ## 合成卡牌模板
@@ -63,9 +66,9 @@ scripts/refresh-cards/export_cards.py var/coc-unpack/sc/ui.sc
 scripts/refresh-cards/export_cards.py var/coc-unpack/sc/ui.sc --out /tmp/cards
 ```
 
-默认输出到 `assets/image/Cards/{Unit,Hero,Spell,Siege}/<卡牌名>.png`，与旧模板目录分开；
+默认输出到 `assets/image/Cards/{Unit,Hero,Spell,Siege}/<卡牌名>.png`；
 流水线中的 `FindUnit`、`FindHero`、`FindSpell`、`FindSiege` 从这四个目录读取模板。
-当前内置 63 张 Unit、5 张 Hero、18 张 Spell、9 张 Siege 的元数据；以后可在 `export_cards.py` 的
+当前内置 68 张 Unit、6 张 Hero、19 张 Spell、9 张 Siege 的元数据；以后可在 `export_cards.py` 的
 对应数组中追加卡牌及其 SC 符号，不扫描旧模板目录，也不导出建筑大师卡牌。
 Unit 文件名沿用原模板编号（如 `0_Barbarian.png`、`13_ElectroDragon.png`），
 超级兵仍用无编号名称；战车使用游戏中的英文名称，方便在文件夹中浏览。

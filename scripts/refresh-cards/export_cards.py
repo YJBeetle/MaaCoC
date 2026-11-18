@@ -34,7 +34,7 @@ class CardSpec(NamedTuple):
     name: str
     symbol: str
     image_layer: int | None = None
-    background_layer: int | None = None
+    background_layer: str | None = None
     background_symbol: str | None = None
     extra_masks: tuple[tuple[float, float, float, float], ...] = ()
 
@@ -72,40 +72,42 @@ UNIT_CARDS = (
     CardSpec("60_Druid", "icon_unit_druid_bear"),
     CardSpec("61_Furnace", "icon_unit_furnace"),
     CardSpec("62_RuinWitch", "icon_unit_ruinwitch", image_layer=1),
-    CardSpec("63_RoyaleGhost", "icon_unit_royale_ghost", background_layer=2),
-    CardSpec("100_Broom", "icon_unit_majo", background_layer=2),
-    CardSpec("101_BarbarianKicker", "icon_unit_footballbarbarian", background_layer=2),
-    CardSpec("102_M.E.C.H.A", "icon_unit_mecha", background_layer=2),
-    CardSpec("103_BattleRam", "icon_unit_battleram_cc", background_layer=2),
-    CardSpec("104_IceWizard", "icon_unit_icewizard", background_layer=2),
-    CardSpec("105_DebtCollector", "icon_unit_goblin_tax_collector", background_layer=2),
-    CardSpec("106_GiantThrower", "icon_unit_footballgiant", background_layer=2),
-    CardSpec("107_Firecracker", "icon_unit_firecracker", background_layer=2),
-    CardSpec("108_RamRider", "icon_unit_cookie_ramrider", background_layer=2),
-    CardSpec("109_PartyWizard", "icon_unit_partyWizard", background_layer=2),
-    CardSpec("110_MeteorGolem", "icon_unit_splitgolem", background_layer=2),
-    CardSpec("111_IceMinion", "icon_unit_ice_minion", background_layer=2),
-    CardSpec("112_Lavaloon", "icon_unit_lavaloon", background_layer=2),
-    CardSpec("113_Barcher", "icon_unit_barcher", background_layer=2),
-    CardSpec("114_TotemThrower", "icon_unit_totem_thrower", background_layer=2),
-    CardSpec("115_WitchGolem", "icon_unit_gravegolem", background_layer=2),
-    CardSpec("SuperBarbarian", "icon_unit_elite_barbarian", background_layer=3),
-    CardSpec("SuperArcher", "icon_unit_elite_archer", background_layer=3),
-    CardSpec("SuperGiant", "icon_unit_elite_giant", background_layer=3),
-    CardSpec("SneakyGoblin", "icon_unit_elite_goblin", background_layer=3),
-    CardSpec("SuperWallBreaker", "icon_unit_elite_wallbreaker", background_layer=3),
-    CardSpec("RocketBalloon", "icon_unit_elite_balloon", background_layer=3),
-    CardSpec("SuperWizard", "icon_unit_elite_wizard", background_layer=3),
-    CardSpec("SuperDragon", "icon_unit_elite_dragon", background_layer=3),
-    CardSpec("InfernoDragon", "icon_unit_elite_infernodragon", background_layer=3),
-    CardSpec("SuperMiner", "icon_unit_elite_miner", background_layer=3),
-    CardSpec("SuperYeti", "icon_unit_elite_yeti", background_layer=3),
-    CardSpec("SuperMinion", "icon_unit_elite_minion", background_layer=3),
-    CardSpec("SuperHogRider", "icon_unit_elite_hogrider", background_layer=3),
-    CardSpec("SuperValkyrie", "icon_unit_elite_valkyrie", background_layer=3),
-    CardSpec("SuperWitch", "icon_unit_elite_witch", background_layer=3),
-    CardSpec("IceHound", "icon_unit_elite_icehound", background_layer=3),
-    CardSpec("SuperBowler", "icon_unit_elite_bowler", background_layer=3),
+    CardSpec("63_RoyaleGhost", "icon_unit_royale_ghost", background_layer="attack_button_2"),
+    CardSpec("100_Broom", "icon_unit_majo", background_layer="attack_button_2"),
+    CardSpec("101_BarbarianKicker", "icon_unit_footballbarbarian", background_layer="attack_button_2"),
+    CardSpec("102_M.E.C.H.A", "icon_unit_mecha", background_layer="attack_button_2"),
+    CardSpec("103_BattleRam", "icon_unit_battleram_cc", background_layer="attack_button_2"),
+    CardSpec("104_IceWizard", "icon_unit_icewizard", background_layer="attack_button_2"),
+    CardSpec("105_DebtCollector", "icon_unit_goblin_tax_collector", background_layer="attack_button_2"),
+    CardSpec("106_GiantThrower", "icon_unit_footballgiant", background_layer="attack_button_2"),
+    CardSpec("107_Firecracker", "icon_unit_firecracker", background_layer="attack_button_2"),
+    CardSpec("108_RamRider", "icon_unit_cookie_ramrider", background_layer="attack_button_2"),
+    CardSpec("109_PartyWizard", "icon_unit_partyWizard", background_layer="attack_button_2"),
+    CardSpec("110_MeteorGolem", "icon_unit_splitgolem", background_layer="attack_button_2"),
+    CardSpec("111_IceMinion", "icon_unit_ice_minion", background_layer="attack_button_2"),
+    CardSpec("112_Lavaloon", "icon_unit_lavaloon", background_layer="attack_button_2"),
+    CardSpec("113_Barcher", "icon_unit_barcher", background_layer="attack_button_2"),
+    CardSpec("114_TotemThrower", "icon_unit_totem_thrower", background_layer="attack_button_2"),
+    CardSpec("115_WitchGolem", "icon_unit_gravegolem", background_layer="attack_button_2"),
+    CardSpec("116_FrostYeti", "icon_unit_christmas_yeti", background_layer="attack_button_2"),
+    CardSpec("117_BashBuck", "icon_unit_supermiemie", background_layer="attack_button_2"),
+    CardSpec("SuperBarbarian", "icon_unit_elite_barbarian", background_layer="attack_button_3"),
+    CardSpec("SuperArcher", "icon_unit_elite_archer", background_layer="attack_button_3"),
+    CardSpec("SuperGiant", "icon_unit_elite_giant", background_layer="attack_button_3"),
+    CardSpec("SneakyGoblin", "icon_unit_elite_goblin", background_layer="attack_button_3"),
+    CardSpec("SuperWallBreaker", "icon_unit_elite_wallbreaker", background_layer="attack_button_3"),
+    CardSpec("RocketBalloon", "icon_unit_elite_balloon", background_layer="attack_button_3"),
+    CardSpec("SuperWizard", "icon_unit_elite_wizard", background_layer="attack_button_3"),
+    CardSpec("SuperDragon", "icon_unit_elite_dragon", background_layer="attack_button_3"),
+    CardSpec("InfernoDragon", "icon_unit_elite_infernodragon", background_layer="attack_button_3"),
+    CardSpec("SuperMiner", "icon_unit_elite_miner", background_layer="attack_button_3"),
+    CardSpec("SuperYeti", "icon_unit_elite_yeti", background_layer="attack_button_3"),
+    CardSpec("SuperMinion", "icon_unit_elite_minion", background_layer="attack_button_3"),
+    CardSpec("SuperHogRider", "icon_unit_elite_hogrider", background_layer="attack_button_3"),
+    CardSpec("SuperValkyrie", "icon_unit_elite_valkyrie", background_layer="attack_button_3"),
+    CardSpec("SuperWitch", "icon_unit_elite_witch", background_layer="attack_button_3"),
+    CardSpec("IceHound", "icon_unit_elite_icehound", background_layer="attack_button_3"),
+    CardSpec("SuperBowler", "icon_unit_elite_bowler", background_layer="attack_button_3"),
 )
 HERO_CARDS = (
     CardSpec("King", "icon_hero_barbarianKing"),
@@ -136,6 +138,7 @@ SPELL_CARDS = (
     CardSpec("SpellOvergrowth", "icon_spell_overgrowth"),
     CardSpec("SpellIceBlock", "icon_spell_ice_block"),
     CardSpec("SpellAngry", "icon_spell_brainwash"),
+    CardSpec("SpellHeroic", "icon_spell_heroic"),
 )
 SIEGE_CARDS = (
     CardSpec("WallWrecker", "icon_unit_siege_machine_Ram", image_layer=0),
@@ -168,7 +171,7 @@ SIEGE_MASKS = ((0.35, 0.1, 0.62, 0.61),
                (0.04, 0.67, 0.39, 0.95),
                (0.39, 0.64, 0.99, 0.96))
 CARD_GROUPS = (
-    ("Unit", UNIT_CARDS, "unit_slot", 1, UNIT_FACE_BOX, UNIT_MASKS),
+    ("Unit", UNIT_CARDS, "unit_slot", "attack_button", UNIT_FACE_BOX, UNIT_MASKS),
     ("Hero", HERO_CARDS, "hero_slot", 2, HERO_FACE_BOX, HERO_MASKS),
     ("Spell", SPELL_CARDS, "spell_slot", 1, SPELL_FACE_BOX, SPELL_MASKS),
     ("Siege", SIEGE_CARDS, "siege_slot", 1, SIEGE_FACE_BOX, SIEGE_MASKS),
@@ -255,7 +258,7 @@ def compose_card(renderer, background_meshes, background_bounds, face_meshes,
 
 def render_cards(sc, out):
     exports = dict(sc.exports())
-    renderer = scrender.Renderer(sc, sctx2png.ktx_image)
+    renderer = scrender.Renderer(sc, sctx2png.atlas_image)
     out.parent.mkdir(parents=True, exist_ok=True)
     with tempfile.TemporaryDirectory(prefix=".cards-", dir=out.parent) as stage_name:
         stage = Path(stage_name)
@@ -272,8 +275,9 @@ def render_cards(sc, out):
                     background_id = exports.get(selected_background)
                     if background_id is None:
                         raise ValueError(f"{group} 缺少卡底符号 {selected_background}")
-                    layer_meshes = list(renderer.meshes(background_id,
-                                                        layer=selected_layer))
+                    layer = (sc.layer_index(background_id, selected_layer)
+                             if isinstance(selected_layer, str) else selected_layer)
+                    layer_meshes = list(renderer.meshes(background_id, layer=layer))
                     if not layer_meshes:
                         raise ValueError(f"卡底符号 {selected_background} 图层 {selected_layer} 不可绘制")
                     # hero_slot 顶部还有独立装饰，卡牌画布以指定卡底图层为准。
@@ -315,7 +319,7 @@ def render_cards(sc, out):
 def render_army_cards(sc, out):
     """配兵抽屉使用独立方形卡底；不复用战斗栏的长方形模板。"""
     exports = dict(sc.exports())
-    renderer = scrender.Renderer(sc, sctx2png.ktx_image)
+    renderer = scrender.Renderer(sc, sctx2png.atlas_image)
     catalog = []
     for group, cards in (("Unit", UNIT_CARDS), ("Spell", SPELL_CARDS),
                          ("Siege", SIEGE_CARDS)):
@@ -324,8 +328,13 @@ def render_army_cards(sc, out):
         for card in cards:
             background = ("train_item_new_spell" if group == "Spell" else
                           "train_item_siege_2025" if group == "Siege" else "train_item_new")
-            layer = (0 if group in ("Spell", "Siege") or card.background_layer == 3 else
-                     2 if card.background_layer == 2 else 1)
+            layer = 0
+            if group == "Unit":
+                layer_name = {
+                    "attack_button_2": "bg2",
+                    "attack_button_3": "bg3",
+                }.get(card.background_layer, "bg")
+                layer = sc.layer_index(exports[background], layer_name)
             meshes = list(renderer.meshes(exports[background], layer=layer))
             bounds = renderer.bounds(meshes, 0)
             size = (216, 250) if group == "Siege" else (116, 116)
@@ -369,7 +378,8 @@ def render_army_cards(sc, out):
             current = Image.open(target / f"{card.name}-preview.png")
             if group == "Siege":
                 current = Image.new("RGBA", (116, 116))
-                current_base = list(renderer.meshes(exports["train_item_new"], layer=1))
+                base_id = exports["train_item_new"]
+                current_base = list(renderer.meshes(base_id, layer=sc.layer_index(base_id, "bg")))
                 renderer.draw_meshes(current, current_base, renderer.bounds(current_base, 0))
                 icon = Image.new("RGBA", (108, 108))
                 current_bounds = BLIMP_ICON_BOUNDS if card.name == "BattleBlimp" else unit_icon_bounds(renderer.bounds(face, 0))
@@ -405,7 +415,7 @@ def main(argv=None):
     ap.add_argument("--army-only", action="store_true", help="只生成配兵方形卡牌")
     args = ap.parse_args(argv)
     try:
-        sc = scframes.ScFile(scframes.load_sc(args.source))
+        sc = scframes.ScFile(scframes.load_sc(args.source), args.source)
         if not args.army_only:
             render_cards(sc, args.out)
         render_army_cards(sc, args.out.parent / "Army")

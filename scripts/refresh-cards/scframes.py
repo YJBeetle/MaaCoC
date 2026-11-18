@@ -173,7 +173,8 @@ def split_chunks(blob):
 class ScFile:
     """一个 .sc：符号名、形状、纹理页。"""
 
-    def __init__(self, data: bytes):
+    def __init__(self, data: bytes, source: Path | None = None):
+        self.source = source
         blob, self.container = scfile_body(data) if data[:2] == b"SC" else (data, None)
         self.blob = blob
         parts, tab, off = [], {}, {}
@@ -226,8 +227,8 @@ class ScFile:
                 self._pages.append(best)
         return self._pages[index]
 
-    def page_ktx(self, index):
-        """该页的 KTX 原始字节，用于确认页号和解码出的图一一对应。"""
+    def page_data(self, index):
+        """读取该页的内嵌 KTX 或同目录下的外置 SCTX。"""
         st = self.tsets[index]
         for f in (1, 0):
             t = st.table(f)
@@ -236,6 +237,23 @@ class ScFile:
             n, v = t.vec(4)
             if n:
                 return t.b[v:v + n]
+            offset = t.at(5)
+            if offset is not None:
+                start = offset + u32(t.b, offset)
+                length = u32(t.b, start)
+                end = start + 4 + length
+                if end > len(t.b):
+                    raise ValueError(f"纹理页 {index} 的外置文件名越界")
+                name = t.b[start + 4:end].decode("utf-8")
+                if Path(name).name != name or not name.endswith(".sctx"):
+                    raise ValueError(f"纹理页 {index} 的外置文件名无效：{name}")
+                if self.source is None:
+                    raise ValueError(f"纹理页 {index} 需要外置文件 {name}")
+                path = self.source.with_name(name)
+                try:
+                    return path.read_bytes()
+                except FileNotFoundError as exc:
+                    raise ValueError(f"纹理页 {index} 缺少外置文件 {path}") from exc
         return None
 
     # ---- 几何 ---------------------------------------------------------
@@ -305,6 +323,15 @@ class ScFile:
             if 0 <= idx < len(self.strings):
                 yield self.strings[idx], self.export_ids[i]
 
+    def layer_index(self, obj_id, name):
+        """按 MovieClip 子对象的实例名查找图层。"""
+        for clip in self.clips_by_id.get(obj_id, ()):
+            for index, pos in enumerate(clip.struct_pos(6, 4)):
+                string_id = u32(clip.b, pos)
+                if string_id < len(self.strings) and self.strings[string_id] == name:
+                    return index
+        raise ValueError(f"对象 {obj_id} 缺少图层 {name}")
+
 
 def frame_table(sc: ScFile, merge=True):
     """符号名 -> [{page, x, y, w, h}]。merge 时同一页上的多块合成一个外接框。"""
@@ -366,16 +393,16 @@ def load_sc(source):
     return data
 
 
-def decode_texture_page(sc: ScFile, index, decode_ktx):
-    """按 TextureSets 页号解码 KTX，校验图像尺寸。"""
-    raw = sc.page_ktx(index)
-    image = decode_ktx(raw) if raw is not None else None
+def decode_texture_page(sc: ScFile, index, decode_atlas):
+    """按 TextureSets 页号解码图集，校验图像尺寸。"""
+    raw = sc.page_data(index)
+    image = decode_atlas(raw) if raw is not None else None
     if image is None or image.size != sc.page(index):
         raise ValueError("纹理页 %d 无法解码或尺寸不符" % index)
     return image
 
 
-def export_texture_pages(sc: ScFile, out: Path, decode_ktx):
+def export_texture_pages(sc: ScFile, out: Path, decode_atlas):
     """导出 TextureSets 中各页的原尺寸 PNG。"""
     out.mkdir(parents=True, exist_ok=True)
     lines = ["<!doctype html>", '<meta charset="utf-8">',
@@ -385,7 +412,7 @@ def export_texture_pages(sc: ScFile, out: Path, decode_ktx):
              "figure{margin:24px 0}</style>",
              "<h1>TextureSets 纹理页</h1>"]
     for index in range(len(sc.tsets)):
-        image = decode_texture_page(sc, index, decode_ktx)
+        image = decode_texture_page(sc, index, decode_atlas)
         filename = f"page-{index:03d}.png"
         image.save(out / filename)
         lines.append(f'<figure><figcaption>页 [{index}]：{image.width} × {image.height}'
@@ -414,7 +441,7 @@ def main(argv=None):
         ap.error("--filter 需要搭配 --png-out 或 --web-out")
 
     try:
-        sc = ScFile(load_sc(args.source))
+        sc = ScFile(load_sc(args.source), args.source)
     except (OSError, ValueError) as exc:
         ap.exit(1, "%s: %s\n" % (ap.prog, exc))
     frames = frame_table(sc, merge=not args.split)
@@ -500,11 +527,11 @@ def main(argv=None):
         try:
             # 解码器是共用脚本；只在导出图片时加载其依赖。
             sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
-            from sctx2png import ktx_image
+            from sctx2png import atlas_image
             if args.png_out:
                 from scrender import export as export_rendered_png
                 count, layers, skipped, failed = export_rendered_png(
-                    sc, args.png_out, ktx_image, args.max_size, args.filter or ())
+                    sc, args.png_out, atlas_image, args.max_size, args.filter or ())
                 print("导出 {:,} 个符号的 {:,} 张图层 PNG → {}"
                       "（浏览页 index.html；无网格 {:,} 个，失败 {:,} 个）".format(
                           count, layers, args.png_out, len(skipped), len(failed)))
@@ -514,7 +541,7 @@ def main(argv=None):
             if args.web_out:
                 from scrender import export_web
                 results, layers, skipped, failed = export_web(
-                    sc, args.web_out, ktx_image, args.max_size, args.filter or ())
+                    sc, args.web_out, atlas_image, args.max_size, args.filter or ())
                 animated = sum(count > 1 for _, _, count, _ in results)
                 print(f"导出 {layers:,} 张图层 WebP → {args.web_out}"
                       f"（预览 {len(results):,} 个符号，其中动画 {animated:,} 个；浏览页 index.html；"
@@ -523,7 +550,7 @@ def main(argv=None):
                     print(f"  渲染失败：{name}：{reason}")
                 render_failed |= bool(failed)
             if args.textures_out:
-                count = export_texture_pages(sc, args.textures_out, ktx_image)
+                count = export_texture_pages(sc, args.textures_out, atlas_image)
                 print("导出 {:,} 张纹理页 PNG → {}（浏览页 textures.html）".format(
                       count, args.textures_out))
         except (ImportError, OSError, ValueError) as exc:

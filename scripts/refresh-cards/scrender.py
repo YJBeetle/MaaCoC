@@ -15,6 +15,8 @@ from pathlib import Path
 
 from PIL import Image, ImageChops, ImageDraw
 
+from scframes import decode_texture_page
+
 
 IDENTITY = (1.0, 0.0, 0.0, 1.0, 0.0, 0.0)
 UV_SCALE = 65536.0
@@ -108,9 +110,9 @@ def write_preview(out, lines):
 
 
 class Renderer:
-    def __init__(self, sc, decode_ktx):
+    def __init__(self, sc, decode_atlas):
         self.sc = sc
-        self.decode_ktx = decode_ktx
+        self.decode_atlas = decode_atlas
         resources = sc.tab["resources"]
         self.frame_elements_count, self.frame_elements_at = resources.vec(4, 2)
         self.frame_elements = resources.b
@@ -167,10 +169,7 @@ class Renderer:
 
     def page(self, index):
         if index not in self.pages:
-            raw = self.sc.page_ktx(index)
-            image = self.decode_ktx(raw) if raw is not None else None
-            if image is None or image.size != self.sc.page(index):
-                raise ValueError(f"纹理页 {index} 无法解码或尺寸不符")
+            image = decode_texture_page(self.sc, index, self.decode_atlas)
             # SC 图集已经是预乘 alpha。按 RGBa 解释原始字节，避免
             # convert("RGBa") 再乘一次，导致 PNG 和 WebP 的半透明边缘发黑。
             self.pages[index] = Image.frombytes("RGBa", image.size, image.tobytes())
@@ -497,10 +496,10 @@ def text_field_ids(sc):
              for p in table.struct_pos(0, 40)} if table else set())
 
 
-def export(sc, out: Path, decode_ktx, max_size=1000, name_filters=()):
+def export(sc, out: Path, decode_atlas, max_size=1000, name_filters=()):
     """导出各图层的首帧 PNG 和浏览页。"""
     results, layers, skipped, failed = export_layers(
-        sc, out, decode_ktx, max_size, name_filters, animated=False)
+        sc, out, decode_atlas, max_size, name_filters, animated=False)
     return len(results), layers, skipped, failed
 
 
@@ -570,12 +569,12 @@ def save_web_frames(frames, path, count, fps):
         os.replace(temp / "result.webp", path)
 
 
-def export_layers(sc, out: Path, decode_ktx, max_size=1000, name_filters=(),
+def export_layers(sc, out: Path, decode_atlas, max_size=1000, name_filters=(),
                   animated=False):
     """导出独立图层；PNG 取首帧，WebP 取各自的动画。"""
     if animated and shutil.which("img2webp") is None:
         raise OSError("--web-out 需要 img2webp（libwebp 工具）")
-    renderer = Renderer(sc, decode_ktx)
+    renderer = Renderer(sc, decode_atlas)
     filters = tuple(value.casefold() for value in name_filters)
     symbols = sorted((name, obj_id) for name, obj_id in dict(sc.exports()).items()
                      if not filters or any(value in name.casefold() for value in filters))
@@ -688,7 +687,7 @@ def export_layers(sc, out: Path, decode_ktx, max_size=1000, name_filters=(),
     return results, layer_exported, skipped, failed
 
 
-def export_web(sc, out: Path, decode_ktx, max_size=1000, name_filters=()):
+def export_web(sc, out: Path, decode_atlas, max_size=1000, name_filters=()):
     """导出各图层的 WebP 动画和浏览页。"""
-    return export_layers(sc, out, decode_ktx, max_size, name_filters,
+    return export_layers(sc, out, decode_atlas, max_size, name_filters,
                          animated=True)
