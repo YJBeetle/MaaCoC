@@ -71,41 +71,29 @@ pub(crate) fn number(text: &str) -> Option<u64> {
     compact.parse().ok()
 }
 
-fn normalize_capacity_label(text: &str) -> String {
-    text.replace('：', ":").replace("最人储量", "最大储量").replace("最大储昂", "最大储量")
+fn is_capacity_label(text: &str) -> bool {
+    let label = text.trim().trim_end_matches([':', '：']).trim_end();
+    label == "最大储量" || label.eq_ignore_ascii_case("max storage")
 }
 
 fn capacity(text: &str) -> Option<u64> {
-    let text = normalize_capacity_label(text);
-    let (label, amount) = text.split_once(':')?;
-    if !label.contains("最大储量") && !label.to_ascii_lowercase().contains("max") {
+    let (label, amount) = text.split_once([':', '：'])?;
+    if !is_capacity_label(label) {
         return None;
     }
     number(amount).filter(|v| (1_000..=1_000_000_000).contains(v))
 }
 
-pub(crate) fn ocr_number(detail: &Value, capacity_line: bool) -> Option<u64> {
-    let results = detail.get("filtered")?.as_array()?;
-    if results.len() != 1 {
-        return None;
-    }
-    let item = &results[0];
+fn ocr_number(item: &Value) -> Option<u64> {
     if item.get("score")?.as_f64()? < 0.9 {
         return None;
     }
-    let text = item.get("text")?.as_str()?;
-    if capacity_line {
-        capacity(text)
-    } else {
-        number(text)
-    }
+    number(item.get("text")?.as_str()?)
 }
 
-// Use detected text positions instead of the pre-update resource-row spacing.
 // Never compact a list of successful reads: a missing elixir must not become dark elixir.
 fn counter_values(detail: &Value) -> [Option<u64>; 3] {
-    let mut layouts = [[None; 3]; 2];
-    let rows = [[38, 87, 136], [42, 110, 175]];
+    let mut counters = [None; 3];
     if let Some(items) = detail["filtered"].as_array() {
         for item in items {
             let Some(rect) = item["box"].as_array().filter(|r| r.len() == 4) else { continue; };
@@ -114,30 +102,19 @@ fn counter_values(detail: &Value) -> [Option<u64>; 3] {
             let Some(right) = rect[0].as_i64().zip(rect[2].as_i64()).map(|(x,w)| x+w) else { continue; };
             if !(1160..=1185).contains(&right) { continue; }
             let Some(y) = rect[1].as_i64().zip(rect[3].as_i64()).map(|(y,h)| y+h/2) else { continue; };
-            let Some(value) = ocr_number(&json!({"filtered":[item]}), false) else { continue; };
-            for (layout, centers) in layouts.iter_mut().zip(rows) {
-                for (slot, center) in layout.iter_mut().zip(centers) {
-                    if (y-center).abs() <= 10 {
-                        // Ambiguous boxes are rejected rather than choosing a number.
-                        *slot = match *slot { None => Some(Some(value)), Some(_) => Some(None) };
-                    }
+            let Some(value) = ocr_number(item) else { continue; };
+            for (slot, center) in counters.iter_mut().zip([38, 87, 136]) {
+                if (y-center).abs() <= 10 {
+                    // Ambiguous boxes are rejected rather than choosing a number.
+                    *slot = match *slot { None => Some(Some(value)), Some(_) => Some(None) };
                 }
             }
         }
     }
-    let layouts = layouts.map(|slots| slots.map(Option::flatten));
-    let counts = layouts.map(|slots| slots.iter().filter(|v| v.is_some()).count());
-    match counts[0].cmp(&counts[1]) {
-        std::cmp::Ordering::Greater => layouts[0],
-        std::cmp::Ordering::Less => layouts[1],
-        std::cmp::Ordering::Equal => std::array::from_fn(|i| {
-            (layouts[0][i] == layouts[1][i]).then_some(layouts[0][i]).flatten()
-        }),
-    }
+    counters.map(Option::flatten)
 }
 
-// The tooltip can overlap the other bars. Anchor the amount to its maximum-
-// capacity label, not a fixed Y coordinate or a nearby numeric line.
+// Require the maximum-capacity label and a number on its row.
 fn capacity_value(detail: &Value) -> Option<u64> {
     let items = detail["filtered"].as_array()?;
     let mut values = Vec::new();
@@ -145,14 +122,12 @@ fn capacity_value(detail: &Value) -> Option<u64> {
         if label["score"].as_f64()? < 0.9 { continue; }
         let text = label["text"].as_str()?;
         if let Some(value) = capacity(text) { values.push(value); continue; }
-        let normalized = normalize_capacity_label(text);
-        if normalized.trim_end_matches(':').trim() != "最大储量"
-            && !normalized.trim_end_matches(':').trim().eq_ignore_ascii_case("max storage") { continue; }
+        if !is_capacity_label(text) { continue; }
         let rect = label["box"].as_array()?;
         let right = rect[0].as_i64()? + rect[2].as_i64()?;
         let center = rect[1].as_i64()? + rect[3].as_i64()?/2;
         for amount in items {
-            let Some(value) = ocr_number(&json!({"filtered":[amount]}), false) else { continue; };
+            let Some(value) = ocr_number(amount) else { continue; };
             let r = amount["box"].as_array()?;
             let y = r[1].as_i64()? + r[3].as_i64()?/2;
             if r[0].as_i64()? >= right - 12 && (y-center).abs() <= 6
@@ -173,19 +148,11 @@ fn read_capacity(
     image: &maa_framework::buffer::MaaImageBuffer,
     index: usize,
 ) -> Option<u64> {
-    // In 19.32 the opaque tooltip puts the dark label further left.
-    // Crop to its first row so production and treasury numbers stay out.
+    // Crop the opaque tooltip to its first row, including the label and value.
     let row_top = [55, 105, 155][index];
-    let passes = [
-        ([832, row_top, 400, 42], ""),
-        ([960, 60, 285, 205], "StorageTooltipText"),
-        ([960, 60, 285, 205], ""),
-    ];
-    passes.into_iter().find_map(|(roi, color_filter)| {
-        let params = json!({"roi":roi,"only_rec":false,"threshold":0.9,"color_filter":color_filter});
-        context.run_recognition_direct("OCR", &params.to_string(), image)
-            .ok().flatten().and_then(|result| capacity_value(&result.detail))
-    })
+    let params = json!({"roi":[832,row_top,400,42],"only_rec":false,"threshold":0.9});
+    context.run_recognition_direct("OCR", &params.to_string(), image)
+        .ok().flatten().and_then(|result| capacity_value(&result.detail))
 }
 
 pub(crate) fn register(resource: &Resource) -> crate::Result<CapacityCache> {
@@ -310,19 +277,14 @@ mod tests {
         let mut missing = detail.clone();
         missing["filtered"][0]["text"] = json!("每小时产量：");
         assert_eq!(capacity_value(&missing), None);
+        let mut ambiguous = detail.clone();
+        ambiguous["filtered"].as_array_mut().unwrap().push(
+            json!({"box":[1140,176,65,22],"score":0.99,"text":"400000"}),
+        );
+        assert_eq!(capacity_value(&ambiguous), None);
         let mut low = detail;
         low["filtered"][1]["score"] = json!(0.5);
         assert_eq!(capacity_value(&low), None);
-    }
-
-    #[test]
-    fn filtered_dark_capacity_label_typo_keeps_the_correct_amount() {
-        // Actual bright-text OCR output: the label is split from the amount.
-        // Falling back to the unfiltered pass misread this same amount as 5003000.
-        let detail: Value = serde_json::from_str(include_str!("../../tests/fixtures/storage/dark-capacity-label-20261030.json")).unwrap();
-        assert_eq!(capacity_value(&detail), Some(500_000));
-        assert_eq!(capacity("最大储昂：500 000"), Some(500_000));
-        assert_eq!(capacity("每小时产量：500 000"), None);
     }
 
     #[test]
@@ -331,18 +293,19 @@ mod tests {
         let runner = crate::Runner::connect(&assets, crate::DeviceTarget::Headless, None).unwrap();
         let elixir = include_bytes!("../../tests/fixtures/storage/opaque-tooltip-elixir.png");
         let cases = [
-            ("StorageCollectReadGold", include_bytes!("../../tests/fixtures/storage/opaque-tooltip-gold.png").as_slice(), 31_000_000),
-            ("StorageCollectReadElixir", elixir.as_slice(), 31_000_000),
-            ("StorageCollectReadDark", include_bytes!("../../tests/fixtures/storage/opaque-tooltip-dark.png").as_slice(), 500_000),
+            ("StorageCollectReadGold", include_bytes!("../../tests/fixtures/storage/opaque-tooltip-gold.png").as_slice(), 15_801_274, 31_000_000),
+            ("StorageCollectReadElixir", elixir.as_slice(), 11_257_415, 31_000_000),
+            ("StorageCollectReadDark", include_bytes!("../../tests/fixtures/storage/opaque-tooltip-dark.png").as_slice(), 243_786, 500_000),
         ];
-        for (index, (node, frame, expected)) in cases.into_iter().enumerate() {
+        for (index, (node, frame, current, capacity)) in cases.into_iter().enumerate() {
             let trial = crate::trial::trial_node(
                 runner.resource(), runner.tasker(), runner.bus(), node, frame, None, None,
             ).unwrap();
             assert!(trial.hit, "{}", trial.summary());
             let reading = runner.storage_readings()[index].unwrap();
-            assert_eq!(reading.capacity, Some(expected), "{node}");
-            assert!(!reading.capacity_failed, "{node}");
+            assert_eq!(reading.current, Some(current), "{node}");
+            assert_eq!(reading.capacity, Some(capacity), "{node}");
+            assert!(!reading.current_failed && !reading.capacity_failed, "{node}");
         }
         // A gold read must not report a fresh capacity from the elixir tooltip.
         crate::trial::trial_node(
@@ -353,15 +316,17 @@ mod tests {
     }
 
     #[test]
-    fn compact_and_legacy_rows_do_not_shift_missing_resources() {
-        let detail = |ys: [i32;3]| json!({"filtered": ys.into_iter().zip(["31000000","29827273","386614"]).map(|(y,text)| json!({"box":[1050,y-10,120,20],"score":0.99,"text":text})).collect::<Vec<_>>()});
-        for ys in [[38,87,136], [42,110,175]] {
-            assert_eq!(counter_values(&detail(ys)), [Some(31_000_000),Some(29_827_273),Some(386_614)]);
-        }
-        let mut covered = detail([38,87,136]);
+    fn counter_rows_do_not_shift_missing_resources() {
+        let detail = json!({"filtered":[
+            {"box":[1050,28,120,20],"score":0.99,"text":"31000000"},
+            {"box":[1050,77,120,20],"score":0.99,"text":"29827273"},
+            {"box":[1050,126,120,20],"score":0.99,"text":"386614"}
+        ]});
+        assert_eq!(counter_values(&detail), [Some(31_000_000),Some(29_827_273),Some(386_614)]);
+        let mut covered = detail.clone();
         covered["filtered"][0] = json!({"box":[1080,28,55,20],"score":0.99,"text":"2914"});
         assert_eq!(counter_values(&covered), [None,Some(29_827_273),Some(386_614)]);
-        let mut missing = detail([38,87,136]);
+        let mut missing = detail;
         missing["filtered"][1]["score"] = json!(0.5);
         assert_eq!(counter_values(&missing), [Some(31_000_000),None,Some(386_614)]);
         missing["filtered"][2]["text"] = json!("最大储量:500000");
@@ -412,7 +377,6 @@ mod tests {
         assert_eq!(number("-500000"), None);
         assert_eq!(number("500-00"), None);
         assert_eq!(capacity("最大储量：500 000"), Some(500_000));
-        assert_eq!(capacity("最人储量：31000000"), Some(31_000_000));
         assert!(number("32 000 000").unwrap() >= capacity("最大储量:31 000 000").unwrap());
     }
     #[test]
@@ -447,14 +411,7 @@ mod tests {
         assert_eq!(capacity("最大储量:0"), None);
         assert_eq!(number("31O00000"), None);
         assert_eq!(
-            ocr_number(&json!({"filtered":[{"text":"500000","score":0.89}]}), false),
-            None
-        );
-        assert_eq!(
-            ocr_number(
-                &json!({"filtered":[{"text":"500000","score":0.99},{"text":"1","score":0.99}]}),
-                false
-            ),
+            ocr_number(&json!({"text":"500000","score":0.89})),
             None
         );
     }

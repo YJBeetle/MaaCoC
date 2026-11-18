@@ -1,18 +1,4 @@
 {
-    "StorageTooltipText": {
-        "recognition": "ColorMatch",
-        "method": 4,
-        "lower": [
-            200,
-            200,
-            200
-        ],
-        "upper": [
-            255,
-            255,
-            255
-        ]
-    },
     "StorageOpenGold": {
         "focus": "StorageOpenGold!",
         "action": "Click",
