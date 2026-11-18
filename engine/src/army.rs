@@ -218,11 +218,10 @@ pub fn register(resource: &Resource) -> crate::Result<()> {
 pub fn pipeline(plan: &ArmyPlan, cards: &[ArmyCard]) -> crate::Result<Value> {
     plan.validate(cards)?;
     let mut nodes = json!({
-        "ArmyApply": {"next":["ArmyReload","ArmyOverview","ArmyOpenVillage","ArmyEditFromBattle","ArmyOpenBattle"],"timeout":2000,"on_error":"ArmyFailed"},
+        "ArmyApply": {"next":["ArmyReload","ArmyOverview","ArmyEditFromBattle","ArmyOpenBattle"],"timeout":2000,"on_error":"ArmyFailed"},
         "ArmyOpenBattle":{"recognition":"TemplateMatch","template":"Army/UI/BattleVillage.png","roi":[20,540,200,180],"threshold":0.95,"action":"LongPress","duration":150,"pressure":255,"target":true,"post_delay":800,"next":"ArmyEditFromBattle","timeout":3000,"on_error":"ArmyFailed"},
         "ArmyEditFromBattle":{"recognition":"TemplateMatch","template":"Army/UI/EditFromBattle.png","roi":[55,620,260,100],"threshold":0.95,"action":"LongPress","duration":150,"pressure":255,"target":true,"post_delay":800,"next":"ArmyOverview","timeout":3000,"on_error":"ArmyFailed"},
         "ArmyReload":{"recognition":"OCR","expected":"重新载入游戏","roi":[250,400,380,70],"action":"Click","post_delay":4000,"next":"ArmyApply"},
-        "ArmyOpenVillage":{"recognition":"TemplateMatch","template":"Army/UI/Open.png","roi":[30,470,100,110],"threshold":0.95,"action":"Click","target":true,"post_delay":700,"next":"ArmyOverview","timeout":2000,"on_error":"ArmyFailed"},
         "ArmyOverview":{"recognition":"TemplateMatch","template":"Army/UI/Overview.png","roi":[380,0,100,140],"threshold":0.95,"action":"Click","target":true,"target_offset":[-150,0,20,30],"post_delay":500,"next":"ArmyCapacity","timeout":2000,"on_error":"ArmyFailed"},
         "ArmyCapacity":{"recognition":"Custom","custom_recognition":"ArmyInspect","custom_recognition_param":{"mode":"init"},"timeout":0,"on_error":"ArmyFailed"},
         "ArmyReady":{"recognition":"Custom","custom_recognition":"ArmyInspect","custom_recognition_param":{"mode":"ready","plan":plan},"timeout":0,"on_error":"ArmyFailed"},
@@ -459,12 +458,11 @@ pub fn register_reader(resource: &Resource) -> crate::Result<ReadResult> {
 
 pub fn read_pipeline(cards: &[ArmyCard]) -> Value {
     json!({
-        "ArmyApply":{"next":["ArmyReload","ArmyOverview","ArmyOpenVillage","ArmyEditFromBattle","ArmyOpenBattle"],"timeout":2000,"on_error":"ArmyReadNotReady"},
+        "ArmyApply":{"next":["ArmyReload","ArmyOverview","ArmyEditFromBattle","ArmyOpenBattle"],"timeout":2000,"on_error":"ArmyReadNotReady"},
         "ArmyReadNotReady":{"action":"StopTask","focus":"未找到村庄或配兵界面，请回到村庄或打开配兵界面后重试；未修改部队"},
         "ArmyOpenBattle":{"recognition":"TemplateMatch","template":"Army/UI/BattleVillage.png","roi":[20,540,200,180],"threshold":0.95,"action":"LongPress","duration":150,"pressure":255,"target":true,"post_delay":800,"next":"ArmyEditFromBattle","timeout":3000,"on_error":"ArmyFailed"},
         "ArmyEditFromBattle":{"recognition":"TemplateMatch","template":"Army/UI/EditFromBattle.png","roi":[55,620,260,100],"threshold":0.95,"action":"LongPress","duration":150,"pressure":255,"target":true,"post_delay":800,"next":"ArmyOverview","timeout":3000,"on_error":"ArmyFailed"},
         "ArmyReload":{"recognition":"OCR","expected":"重新载入游戏","roi":[250,400,380,70],"action":"Click","post_delay":4000,"next":"ArmyApply"},
-        "ArmyOpenVillage":{"recognition":"TemplateMatch","template":"Army/UI/Open.png","roi":[30,470,100,110],"threshold":0.95,"action":"Click","target":true,"post_delay":700,"next":"ArmyOverview","timeout":2000,"on_error":"ArmyFailed"},
         "ArmyOverview":{"recognition":"TemplateMatch","template":"Army/UI/Overview.png","roi":[380,0,100,140],"threshold":0.95,"action":"Click","target":true,"target_offset":[-150,0,20,30],"post_delay":500,"next":"ArmyReadCurrent","timeout":2000,"on_error":"ArmyFailed"},
         "ArmyReadCurrent":{"recognition":"Custom","custom_recognition":"ArmyRead","custom_recognition_param":cards,"next":"ArmyClose","timeout":0,"on_error":"ArmyFailed"},
         "ArmyClose":{"recognition":"ColorMatch","roi":[0,0,1,1],"lower":[0,0,0],"upper":[255,255,255],"count":1,"action":"Click","target":[1208,80,1,1],"next":"ArmyReadComplete"},
@@ -492,14 +490,13 @@ mod tests {
             if node["action"] == "Click" {
                 assert!(
                     node["expected"] == "重新载入游戏"
-                        || node["template"] == "Army/UI/Open.png"
                         || node["template"] == "Army/UI/Overview.png"
                         || node["target"] == json!([1208, 80, 1, 1])
                 );
             }
         }
         assert_eq!(nodes["ArmyReadCurrent"]["on_error"], "ArmyFailed");
-        assert_eq!(nodes["ArmyApply"]["next"], json!(["ArmyReload", "ArmyOverview", "ArmyOpenVillage", "ArmyEditFromBattle", "ArmyOpenBattle"]));
+        assert_eq!(nodes["ArmyApply"]["next"], json!(["ArmyReload", "ArmyOverview", "ArmyEditFromBattle", "ArmyOpenBattle"]));
         assert_eq!(nodes["ArmyApply"]["on_error"], "ArmyReadNotReady");
     }
 
