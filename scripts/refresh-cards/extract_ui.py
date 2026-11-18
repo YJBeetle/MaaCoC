@@ -17,27 +17,23 @@ def extract(apk: Path, out: Path):
     out.parent.mkdir(parents=True, exist_ok=True)
     with zipfile.ZipFile(apk) as archive, tempfile.TemporaryDirectory(dir=out.parent) as temp:
         stage = Path(temp)
-        if "assets/sc/ui.sc" in archive.namelist():
-            with archive.open("assets/sc/ui.sc") as source, (stage / "ui.sc").open("wb") as target:
-                shutil.copyfileobj(source, target)
-        else:
-            for entry in archive.infolist():
-                if not entry.filename.startswith("assets/base-attachments/") or not entry.filename.endswith(".scattachment"):
+        for entry in archive.infolist():
+            if not entry.filename.startswith("assets/base-attachments/") or not entry.filename.endswith(".scattachment"):
+                continue
+            with archive.open(entry) as source:
+                header = source.read(12)
+                if len(header) != 12:
                     continue
-                with archive.open(entry) as source:
-                    header = source.read(12)
-                    if len(header) != 12:
-                        continue
-                    version, offset, length = struct.unpack("<III", header)
-                    if version != 1 or not 12 + length <= offset < entry.file_size or length > 256:
-                        continue
-                    name = UI_PATH.fullmatch(source.read(length).rstrip(b"\0"))
-                    if not name:
-                        continue
-                    path = stage / name[1].decode("ascii")
-                    source.read(offset - 12 - length)
-                    with path.open("xb") as target:
-                        shutil.copyfileobj(source, target)
+                version, offset, length = struct.unpack("<III", header)
+                if version != 1 or not 12 + length <= offset < entry.file_size or length > 256:
+                    continue
+                name = UI_PATH.fullmatch(source.read(length).rstrip(b"\0"))
+                if not name:
+                    continue
+                path = stage / name[1].decode("ascii")
+                source.read(offset - 12 - length)
+                with path.open("xb") as target:
+                    shutil.copyfileobj(source, target)
         if not (stage / "ui.sc").is_file():
             raise ValueError("APK 中没有找到家乡的 ui.sc")
         out.mkdir(parents=True, exist_ok=True)

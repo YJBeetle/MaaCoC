@@ -53,7 +53,6 @@ adb pull "$(adb shell pm path com.supercell.clashofclans | tr -d '\r' | sed 's/^
 
 提取家乡的 `ui.sc`。19.32 版将它和外置的 `ui_*.sctx` 图集放在
 `assets/base-attachments/`，提取时按附件头里的原始路径匹配。
-旧版内嵌图集的 `assets/sc/ui.sc` 也可以用同一条命令提取。
 
 ```bash
 python3 scripts/refresh-cards/extract_ui.py var/coc-unpack/apk/split_install_time_asset_pack.apk var/coc-unpack/sc
