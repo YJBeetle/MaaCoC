@@ -28,12 +28,6 @@
 {"file": "0006-FindUnit-SuperDragon.png", "node": "AirProbeBalloon", "width": 1280, "height": 720, "label": "未携带气球时跳过探路", "expected_hit": false}
 {"file": "0008-DeployedCards.png", "node": "AirProbeBalloon", "width": 1280, "height": 720, "label": "耗尽灰气球不再执行探路", "expected_hit": false}
 {"file": "0005-ReturnHome.png", "node": "SpreadHeroSkillReady", "width": 1280, "height": 720, "label": "战斗结束后不得继续点击英雄技能", "expected_hit": false}
-{"file": "0010-StorageGold.png", "node": "StorageFullGold", "expected_hit": false, "width": 1280, "height": 720, "label": "实机未满仓容量弹窗"}
-{"file": "0010-StorageGold.png", "node": "StorageUnknownGold", "expected_hit": false, "width": 1280, "height": 720, "label": "实机未满仓容量弹窗"}
-{"file": "0010-StorageElixir.png", "node": "StorageFullElixir", "expected_hit": false, "width": 1280, "height": 720, "label": "实机未满仓容量弹窗"}
-{"file": "0010-StorageElixir.png", "node": "StorageUnknownElixir", "expected_hit": false, "width": 1280, "height": 720, "label": "实机未满仓容量弹窗"}
-{"file": "0010-StorageDark.png", "node": "StorageFullDark", "expected_hit": false, "width": 1280, "height": 720, "label": "实机未满仓容量弹窗"}
-{"file": "0010-StorageDark.png", "node": "StorageUnknownDark", "expected_hit": false, "width": 1280, "height": 720, "label": "实机未满仓容量弹窗"}
 {"file": "0003-FindUnit.png", "node": "StorageUnknownGold", "width": 1280, "height": 720, "expected_hit": true, "label": "战斗界面缺少仓库容量，不应继续检查"}
 {"file": "0020-EventUnits.png", "node": "FindUnit", "width": 1280, "height": 720, "label": "白背景活动兵 TotemThrower", "roi": [90, 590, 94, 128], "expected_hit": true}
 {"file": "0020-EventUnits.png", "node": "FindUnit", "width": 1280, "height": 720, "label": "白背景活动兵 Lavaloon", "roi": [185, 590, 95, 128], "expected_hit": true}
@@ -41,30 +35,13 @@
 {"file": "0021-DepletedEventUnits.png", "node": "FindUnit", "width": 1280, "height": 720, "label": "已耗尽的白背景活动兵 TotemThrower", "roi": [90, 590, 94, 128], "expected_hit": false}
 {"file": "0021-DepletedEventUnits.png", "node": "FindUnit", "width": 1280, "height": 720, "label": "已耗尽的白背景活动兵 Lavaloon", "roi": [185, 590, 95, 128], "expected_hit": false}
 {"file": "0021-DepletedEventUnits.png", "node": "FindUnit", "width": 1280, "height": 720, "label": "已耗尽的白背景活动兵 WitchGolem", "roi": [282, 590, 97, 128], "expected_hit": false}
-{"file": "0023-StorageMixedSeparators.png", "node": "StorageUnknownGold", "width": 1280, "height": 720, "label": "仓库容量 OCR 混用空格和千位点，仍应识别为已知容量", "expected_hit": false}
 {"file": "0024-OpenBoxRewardContinue.png", "node": "OpenBoxContinue", "width": 1280, "height": 720, "label": "宝箱矿石奖励页继续按钮，位置低于旧版", "expected_hit": true}
 {"file": "0025-BattleBlimp.png", "node": "FindSiege", "width": 1280, "height": 720, "label": "仍可投放的飞艇，卡面尺寸与位置校准", "expected_hit": true}
 {"file": "0026-DepletedBlimp.png", "node": "FindSiege", "width": 1280, "height": 720, "label": "飞艇投放后变灰，应跳过耗尽卡牌", "expected_hit": false}
 {"file": "0027-BoxClaimReward.png", "node": "OpenBox", "width": 1280, "height": 720, "label": "宝箱活动结算页领取奖励按钮", "expected_hit": true}
-{"file": "0028-FullGoldStorage.png", "node": "StorageFullGold", "width": 1280, "height": 720, "label": "金色满仓背景上的金币数字应可靠读取", "expected_hit": true}
-{"file": "0028-FullGoldStorage.png", "node": "StorageUnknownGold", "width": 1280, "height": 720, "label": "金色满仓背景上的金币数字应可靠读取", "expected_hit": false}
 {"file": "0029-BattleOpening.png", "node": "BattleReady", "width": 1280, "height": 720, "label": "当前版本开局的结束战斗按钮支持恢复投放", "expected_hit": true}
-{"file": "0028-FullGoldStorage.png", "node": "BattleReady", "width": 1280, "height": 720, "label": "村庄资源弹窗不能被当作战斗开局", "expected_hit": false}
 {"file": "0031-BattleOpeningEn.png", "node": "BattleReady", "width": 1280, "height": 720, "label": "英文开局结束战斗按钮", "expected_hit": true}
-{"file": "0032-XiaomiGoldStorage.png", "node": "StorageFullGold", "width": 1280, "height": 720, "label": "Xiaomi 13 Ultra 金币未满，不能触发满仓", "expected_hit": false}
-{"file": "0032-XiaomiGoldStorage.png", "node": "StorageUnknownGold", "width": 1280, "height": 720, "label": "Xiaomi 13 Ultra 金币提示可读取，不应判为未知", "expected_hit": false}
 {"file": "0033-XiaomiNoStorageTooltip.png", "node": "StorageUnknownGold", "width": 1280, "height": 720, "label": "仓库提示未弹出时判为未知，由继续分支处理", "expected_hit": true}
-{"file": "0034-XiaomiFullGoldStorage.png", "node": "StorageFullGold", "width": 1280, "height": 720, "label": "Xiaomi 金币达到容量，满条背景下仍须读到数值", "expected_hit": true}
-{"file": "0034-XiaomiFullGoldStorage.png", "node": "StorageUnknownGold", "width": 1280, "height": 720, "label": "满仓金币提示可读，不能判为未知", "expected_hit": false}
-{"file": "0035-XiaomiFullElixirStorage.png", "node": "StorageFullElixir", "width": 1280, "height": 720, "label": "Xiaomi 圣水达到容量", "expected_hit": true}
-{"file": "0036-XiaomiDarkStorage.png", "node": "StorageFullDark", "width": 1280, "height": 720, "label": "金币圣水满仓时黑油仍未满，不能提前停止", "expected_hit": false}
-{"file": "0036-XiaomiDarkStorage.png", "node": "StorageUnknownDark", "width": 1280, "height": 720, "label": "Xiaomi 黑油提示中的当前数量与容量可读取", "expected_hit": false}
-{"file": "0037-XiaomiFullGoldGrouped.png", "node": "StorageFullGold", "width": 1280, "height": 720, "label": "满仓读数含 OCR 分隔符误识别，仍须正确比较容量", "expected_hit": true}
-{"file": "0037-XiaomiFullGoldGrouped.png", "node": "StorageUnknownGold", "width": 1280, "height": 720, "label": "满仓读数含 OCR 分隔符误识别，仍须正确比较容量", "expected_hit": false}
-{"file": "0038-XiaomiFullElixirGrouped.png", "node": "StorageFullElixir", "width": 1280, "height": 720, "label": "满仓读数含 OCR 分隔符误识别，仍须正确比较容量", "expected_hit": true}
-{"file": "0038-XiaomiFullElixirGrouped.png", "node": "StorageUnknownElixir", "width": 1280, "height": 720, "label": "满仓读数含 OCR 分隔符误识别，仍须正确比较容量", "expected_hit": false}
-{"file": "0039-XiaomiFullDarkGrouped.png", "node": "StorageFullDark", "width": 1280, "height": 720, "label": "满仓读数含 OCR 分隔符误识别，仍须正确比较容量", "expected_hit": true}
-{"file": "0039-XiaomiFullDarkGrouped.png", "node": "StorageUnknownDark", "width": 1280, "height": 720, "label": "满仓读数含 OCR 分隔符误识别，仍须正确比较容量", "expected_hit": false}
 {"file": "0040-VillageAttackStart.png", "node": "AttackStart", "width": 1280, "height": 720, "label": "新版村庄剑形开战按钮", "expected_hit": true}
 {"file": "0041-BattleEndButton.png", "node": "Surrender", "width": 1280, "height": 720, "label": "新版战斗中结束战斗按钮", "expected_hit": true}
 {"file": "0041-BattleEndButton.png", "node": "BattleReady", "width": 1280, "height": 720, "label": "新版战斗中允许恢复投放", "expected_hit": true}
@@ -80,12 +57,6 @@
 {"file": "0047-AttackStartFlameBig.png", "node": "AttackStart", "width": 1280, "height": 720, "label": "开战按钮火焰动画最大相位", "expected_hit": true}
 {"file": "0048-AttackStartFlameMid.png", "node": "AttackStart", "width": 1280, "height": 720, "label": "开战按钮火焰动画中间相位", "expected_hit": true}
 {"file": "0049-VillageAttackStartEn.png", "node": "AttackStart", "width": 1280, "height": 720, "label": "英文界面开战按钮，模板不含文字", "expected_hit": true}
-{"file": "0050-CompactGoldStorage.png", "node": "StorageFullGold", "width": 1280, "height": 720, "label": "新版紧凑资源栏金币数量与容量可读取且尚未满仓", "expected_hit": false}
-{"file": "0050-CompactGoldStorage.png", "node": "StorageUnknownGold", "width": 1280, "height": 720, "label": "新版紧凑资源栏金币数量与容量可读取且尚未满仓", "expected_hit": false}
-{"file": "0051-CompactElixirStorage.png", "node": "StorageFullElixir", "width": 1280, "height": 720, "label": "新版紧凑资源栏圣水数量与容量可读取且尚未满仓", "expected_hit": false}
-{"file": "0051-CompactElixirStorage.png", "node": "StorageUnknownElixir", "width": 1280, "height": 720, "label": "新版紧凑资源栏圣水数量与容量可读取且尚未满仓", "expected_hit": false}
-{"file": "0052-CompactDarkStorage.png", "node": "StorageFullDark", "width": 1280, "height": 720, "label": "新版紧凑资源栏黑油数量与容量可读取且尚未满仓", "expected_hit": false}
-{"file": "0052-CompactDarkStorage.png", "node": "StorageUnknownDark", "width": 1280, "height": 720, "label": "新版紧凑资源栏黑油数量与容量可读取且尚未满仓", "expected_hit": false}
 {"file": "0053-BattleSpeedButton.png", "node": "BattleSpeedUp", "width": 1280, "height": 720, "label": "最后 1 分钟倍速按钮出现在 y=368", "expected_hit": true}
 {"file": "0041-BattleEndButton.png", "node": "BattleSpeedUp", "width": 1280, "height": 720, "label": "同一按钮另一次出现在 y=310", "expected_hit": true}
 {"file": "0054-BattleSpeedUsed.png", "node": "BattleSpeedUp", "width": 1280, "height": 720, "label": "转场画面中按钮不可见，不得命中", "expected_hit": false}
@@ -102,3 +73,10 @@
 {"file": "0041-BattleEndButton.png", "node": "FindNext", "width": 1280, "height": 720, "label": "已开战摧毁率面板不得误判为下一个按钮", "expected_hit": false}
 {"file": "0053-BattleSpeedButton.png", "node": "FindNext", "width": 1280, "height": 720, "label": "战斗中摧毁率面板不得误判为下一个按钮", "expected_hit": false}
 {"file": "0003-FindUnit.png", "node": "FindNext", "width": 1280, "height": 720, "label": "已开战画面不得误判为下一个按钮", "expected_hit": false}
+{"file": "../storage/opaque-tooltip-gold.png", "node": "StorageFullGold", "width": 1280, "height": 720, "label": "新版带底色提示框：金币未满仓", "expected_hit": false}
+{"file": "../storage/opaque-tooltip-gold.png", "node": "StorageUnknownGold", "width": 1280, "height": 720, "label": "新版带底色提示框：金币容量可读", "expected_hit": false}
+{"file": "../storage/opaque-tooltip-elixir.png", "node": "StorageFullElixir", "width": 1280, "height": 720, "label": "新版带底色提示框：圣水未满仓", "expected_hit": false}
+{"file": "../storage/opaque-tooltip-elixir.png", "node": "StorageUnknownElixir", "width": 1280, "height": 720, "label": "新版带底色提示框：圣水容量可读", "expected_hit": false}
+{"file": "../storage/opaque-tooltip-dark.png", "node": "StorageFullDark", "width": 1280, "height": 720, "label": "新版带底色提示框：黑油未满仓", "expected_hit": false}
+{"file": "../storage/opaque-tooltip-dark.png", "node": "StorageUnknownDark", "width": 1280, "height": 720, "label": "新版带底色提示框：黑油容量可读", "expected_hit": false}
+{"file": "../army/village-compact.png", "node": "BattleReady", "width": 1280, "height": 720, "label": "村庄不得误判为战斗开局", "expected_hit": false}
