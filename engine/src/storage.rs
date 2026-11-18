@@ -168,6 +168,26 @@ fn read_counters(context: &maa_framework::context::Context, image: &maa_framewor
         .map(|result| counter_values(&result.detail)).unwrap_or([None;3])
 }
 
+fn read_capacity(
+    context: &maa_framework::context::Context,
+    image: &maa_framework::buffer::MaaImageBuffer,
+    index: usize,
+) -> Option<u64> {
+    // In 19.32 the opaque tooltip puts the dark label further left.
+    // Crop to its first row so production and treasury numbers stay out.
+    let row_top = [55, 105, 155][index];
+    let passes = [
+        ([832, row_top, 400, 42], ""),
+        ([960, 60, 285, 205], "StorageTooltipText"),
+        ([960, 60, 285, 205], ""),
+    ];
+    passes.into_iter().find_map(|(roi, color_filter)| {
+        let params = json!({"roi":roi,"only_rec":false,"threshold":0.9,"color_filter":color_filter});
+        context.run_recognition_direct("OCR", &params.to_string(), image)
+            .ok().flatten().and_then(|result| capacity_value(&result.detail))
+    })
+}
+
 pub(crate) fn register(resource: &Resource) -> crate::Result<CapacityCache> {
     let cache = CapacityCache::default();
     let missing = cache.clone();
@@ -191,15 +211,7 @@ pub(crate) fn register(resource: &Resource) -> crate::Result<CapacityCache> {
                 return None;
             }
             let current = read_counters(context, args.image)[index];
-            let mut max = None;
-            // The transparent tooltip overlaps the other bars. Keep bright text
-            // first so dim digits behind it cannot become part of the capacity.
-            for filter in ["StorageTooltipText", ""] {
-                let params = json!({"roi":[960,60,285,205],"only_rec":false,"threshold":0.9,"color_filter":filter});
-                max = context.run_recognition_direct("OCR", &params.to_string(), args.image)
-                    .ok().flatten().and_then(|r| capacity_value(&r.detail));
-                if max.is_some() { break; }
-            }
+            let max = read_capacity(context, args.image, index);
             let known = current.zip(max);
             observed.observe(index, current, max, true);
             if let Some((current, max)) = known {
@@ -311,6 +323,33 @@ mod tests {
         assert_eq!(capacity_value(&detail), Some(500_000));
         assert_eq!(capacity("最大储昂：500 000"), Some(500_000));
         assert_eq!(capacity("每小时产量：500 000"), None);
+    }
+
+    #[test]
+    fn reads_opaque_capacity_tooltips_from_real_720p_frames() {
+        let assets = std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("../assets");
+        let runner = crate::Runner::connect(&assets, crate::DeviceTarget::Headless, None).unwrap();
+        let elixir = include_bytes!("../../tests/fixtures/storage/opaque-tooltip-elixir.png");
+        let cases = [
+            ("StorageCollectReadGold", include_bytes!("../../tests/fixtures/storage/opaque-tooltip-gold.png").as_slice(), 31_000_000),
+            ("StorageCollectReadElixir", elixir.as_slice(), 31_000_000),
+            ("StorageCollectReadDark", include_bytes!("../../tests/fixtures/storage/opaque-tooltip-dark.png").as_slice(), 500_000),
+        ];
+        for (index, (node, frame, expected)) in cases.into_iter().enumerate() {
+            let trial = crate::trial::trial_node(
+                runner.resource(), runner.tasker(), runner.bus(), node, frame, None, None,
+            ).unwrap();
+            assert!(trial.hit, "{}", trial.summary());
+            let reading = runner.storage_readings()[index].unwrap();
+            assert_eq!(reading.capacity, Some(expected), "{node}");
+            assert!(!reading.capacity_failed, "{node}");
+        }
+        // A gold read must not report a fresh capacity from the elixir tooltip.
+        crate::trial::trial_node(
+            runner.resource(), runner.tasker(), runner.bus(), "StorageCollectReadGold",
+            elixir, None, None,
+        ).unwrap();
+        assert!(runner.storage_readings()[0].unwrap().capacity_failed);
     }
 
     #[test]
