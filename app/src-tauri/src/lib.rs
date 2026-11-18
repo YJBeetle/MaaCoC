@@ -5,7 +5,7 @@
 //! browser against the same commands.
 
 use base64::Engine as _;
-use maacoc_engine::{frames::FrameStore, DeviceTarget, NodeEvent, Runner, Strategy, DEVICE_MATCH_SIZE};
+use maacoc_engine::{frames::FrameStore, DeviceTarget, NodeEvent, Runner, Strategy};
 use serde::{Deserialize, Serialize};
 use std::{
     collections::VecDeque,
@@ -351,24 +351,32 @@ async fn apply_army<R: Runtime>(app: AppHandle<R>, state: State<'_, AppState>) -
 
 #[tauri::command]
 async fn connect<R: Runtime>(app: AppHandle<R>, state: State<'_, AppState>) -> Result<Status, String> {
-    let preferred = state.inner.lock().unwrap().settings.preferred_device.clone();
-    {
+    let preferred = {
         let mut inner = state.inner.lock().unwrap();
+        if inner.phase == Phase::Connecting {
+            return Err("正在连接设备".into());
+        }
+        if let Some(runner) = inner.runner.as_ref() {
+            runner.stop(Duration::from_secs(10));
+            if runner.running() {
+                return Err("旧任务仍在停止，请稍后重试".into());
+            }
+        }
+        drop(inner.runner.take());
         inner.phase = Phase::Connecting;
         inner.task_error.clear();
         inner.detail = String::new();
-    }
+        inner.panel.clear();
+        inner.started = None;
+        inner.last_reco = 0;
+        inner.settings.preferred_device.clone()
+    };
     let outcome = assets_dir(&app).and_then(|assets| {
         Runner::connect(&assets, DeviceTarget::Adb, preferred.as_deref()).map_err(|e| e.to_string())
     });
     let mut inner = state.inner.lock().unwrap();
     match outcome {
         Ok(runner) => {
-            // Replacing a live Runner drops it; Drop stops the task first, but do
-            // it visibly here so a reconnect never races the old worker thread.
-            if let Some(old) = inner.runner.take() {
-                old.stop(Duration::from_secs(10));
-            }
             inner.detail = runner.label.clone();
             inner.phase = Phase::Ready;
             inner.runner = Some(runner);
@@ -379,7 +387,7 @@ async fn connect<R: Runtime>(app: AppHandle<R>, state: State<'_, AppState>) -> R
             apply_recording(&mut inner, &app)?;
             if inner.settings.auto_start {
                 // 连接成功就开跑；起不来仍然算连上了，把原因显示出来供手动重试。
-                if let Err(err) = begin(&mut inner, &app) {
+                if let Err(err) = begin(&mut inner) {
                     let label = std::mem::take(&mut inner.detail);
                     inner.detail = format!("{label}（自动开始失败: {err}）");
                 }
@@ -394,33 +402,37 @@ async fn connect<R: Runtime>(app: AppHandle<R>, state: State<'_, AppState>) -> R
     }
 }
 
-fn begin<R: Runtime>(inner: &mut Inner, app: &AppHandle<R>) -> Result<(), String> {
-    let panel = panel_sizes(inner.runner.as_ref().ok_or("尚未连接设备")?)?;
-    if !panel.ends_with("当前 1080×1920") {
-        resize_controller(inner, app, false)?;
-    }
+fn begin(inner: &mut Inner) -> Result<(), String> {
     let entry = inner.settings.entry.clone();
-    let runner = inner.runner.as_ref().ok_or("尚未连接设备")?;
-    runner
-        .start_farming_with_tactics(
-            &entry,
-            inner.settings.strategy,
-            inner.settings.stop_when_full,
-            &inner.settings.loot_filter,
-            &inner.settings.tactics,
-        )
-        .map_err(|e| e.to_string())?;
+    let runner = inner.runner.as_mut().ok_or("尚未连接设备")?;
+    let result = runner.start_farming_with_tactics(
+        &entry,
+        inner.settings.strategy,
+        inner.settings.stop_when_full,
+        &inner.settings.loot_filter,
+        &inner.settings.tactics,
+    );
+    if result.is_ok() {
+        if let Some(physical) = inner.panel.split(" · ").next().filter(|s| !s.is_empty()) {
+            let size = maacoc_engine::DEVICE_MATCH_SIZE.replace('x', "×");
+            inner.panel = format!("{physical} · 当前 {size}");
+        }
+    } else if !runner.running() {
+        inner.panel = panel_sizes(runner).unwrap_or_default();
+    }
+    result.map_err(|e| e.to_string())?;
     inner.phase = Phase::Running;
     inner.task_error.clear();
     inner.started = Some(Instant::now());
     inner.events.clear();
+    inner.last_reco = 0;
     Ok(())
 }
 
 #[tauri::command]
-async fn start<R: Runtime>(app: AppHandle<R>, state: State<'_, AppState>) -> Result<Status, String> {
+async fn start(state: State<'_, AppState>) -> Result<Status, String> {
     let mut inner = state.inner.lock().unwrap();
-    begin(&mut inner, &app)?;
+    begin(&mut inner)?;
     Ok(status_of(&inner))
 }
 
@@ -429,39 +441,46 @@ async fn stop(state: State<'_, AppState>) -> Result<Status, String> {
     let mut inner = state.inner.lock().unwrap();
     if let Some(runner) = inner.runner.as_ref() {
         runner.stop(Duration::from_secs(15));
+        if runner.running() {
+            return Err("任务仍在停止，请稍后重试".into());
+        }
     }
     inner.phase = if inner.runner.is_some() { Phase::Ready } else { Phase::Idle };
     inner.started = None;
+    restore_after_farming(&mut inner);
     Ok(status_of(&inner))
 }
 
 #[tauri::command]
 async fn disconnect(state: State<'_, AppState>) -> Result<Status, String> {
     let mut inner = state.inner.lock().unwrap();
-    if let Some(runner) = inner.runner.take() {
+    let mut restore_error = None;
+    if let Some(runner) = inner.runner.as_mut() {
         runner.stop(Duration::from_secs(10));
+        if runner.running() {
+            return Err("任务仍在停止，请稍后重试".into());
+        }
+        if let Err(err) = runner.restore_farming_screen() {
+            restore_error = Some(format!("恢复默认分辨率失败: {err}"));
+        }
     }
+    drop(inner.runner.take());
     inner.phase = Phase::Idle;
     inner.detail = String::new();
     inner.panel = String::new();
     inner.started = None;
+    if let Some(err) = restore_error {
+        inner.task_error = err;
+    }
     Ok(status_of(&inner))
 }
 
 /// Read `wm size` and render it as "物理 W×H · 当前 W×H". A device with no
 /// override reports the physical size once, so current equals physical.
 fn panel_sizes(runner: &Runner) -> Result<String, String> {
-    let out = runner.shell("wm size").map_err(|e| e.to_string())?;
-    let grab = |key: &str| {
-        out.lines()
-            .find_map(|line| line.strip_prefix(key))
-            .map(|rest| rest.trim().replace('x', "×"))
-    };
-    let physical = grab("Physical size:").unwrap_or_default();
-    let current = grab("Override size:").unwrap_or_else(|| physical.clone());
-    if physical.is_empty() {
-        return Ok(String::new());
-    }
+    let size = runner.screen_size().map_err(|err| err.to_string())?;
+    let physical = size.physical.replace('x', "×");
+    let current = size.current().replace('x', "×");
     Ok(format!("物理 {physical} · 当前 {current}"))
 }
 
@@ -469,40 +488,27 @@ fn panel_sizes(runner: &Runner) -> Result<String, String> {
 /// logical size the assets were cropped for, or hand the phone its stock
 /// geometry back. Re-reads the panel so the stage badge shows the new size.
 #[tauri::command]
-async fn screen_size<R: Runtime>(app: AppHandle<R>, state: State<'_, AppState>, reset: bool) -> Result<(), String> {
+async fn screen_size(state: State<'_, AppState>, reset: bool) -> Result<(), String> {
     let mut inner = state.inner.lock().unwrap();
-    resize_controller(&mut inner, &app, reset)
+    let runner = inner.runner.as_mut().ok_or("尚未连接设备")?;
+    runner.set_screen_size(reset).map_err(|err| err.to_string())?;
+    inner.panel = panel_sizes(runner)?;
+    inner.last_reco = 0;
+    Ok(())
 }
 
-fn resize_controller<R: Runtime>(inner: &mut Inner, app: &AppHandle<R>, reset: bool) -> Result<(), String> {
-    let runner = inner.runner.as_ref().ok_or("尚未连接设备")?;
-    if runner.running() {
-        return Err("战斗进行中，请先停止再改分辨率".into());
-    }
-    let address = runner.device_address().ok_or("当前设备不是 ADB 设备")?.to_owned();
-    let cmd = if reset { "wm size reset".to_owned() } else { format!("wm size {DEVICE_MATCH_SIZE}") };
-    runner.shell(&cmd).map_err(|e| e.to_string())?;
-    // MaaTouch caches the display geometry on connection. Recreate the
-    // controller after wm size so clicks use the new coordinate mapping.
-    drop(inner.runner.take());
+fn restore_after_farming(inner: &mut Inner) {
+    let Some(runner) = inner.runner.as_mut().filter(|runner| runner.needs_farming_screen_reset()) else {
+        return;
+    };
+    let result = runner.restore_farming_screen();
+    inner.panel = panel_sizes(runner).unwrap_or_default();
     inner.last_reco = 0;
-    inner.last_connection_check = None;
-    let outcome = assets_dir(app).and_then(|assets| {
-        Runner::connect(&assets, DeviceTarget::Adb, Some(&address)).map_err(|e| e.to_string())
-    });
-    match outcome {
-        Ok(runner) => {
-            inner.panel = panel_sizes(&runner)?;
-            inner.detail = runner.label.clone();
-            inner.runner = Some(runner);
-            inner.phase = Phase::Ready;
-            apply_recording(inner, app)
+    if let Err(err) = result {
+        if !inner.task_error.is_empty() {
+            inner.task_error.push('。');
         }
-        Err(err) => {
-            mark_device_disconnected(inner);
-            inner.detail = err.clone();
-            Err(err)
-        }
+        inner.task_error.push_str(&format!("恢复默认分辨率失败: {err}"));
     }
 }
 
@@ -530,6 +536,9 @@ async fn status(state: State<'_, AppState>) -> Result<Status, String> {
         if !inner.runner.as_ref().unwrap().device_online() {
             let runner = inner.runner.take();
             mark_device_disconnected(&mut inner);
+            if runner.as_ref().is_some_and(Runner::needs_farming_screen_reset) {
+                inner.detail.push_str("，未能确认恢复默认分辨率");
+            }
             let status = status_of(&inner);
             // Keep cleanup handles so process exit waits until MAA has stopped
             // using its libraries; detached cleanup can race static destructors.
@@ -576,6 +585,10 @@ fn mark_device_disconnected(inner: &mut Inner) {
 #[tauri::command]
 async fn events(state: State<'_, AppState>) -> Result<Vec<NodeEvent>, String> {
     let mut inner = state.inner.lock().unwrap();
+    // Observe idle first so the final action is already in the event queue
+    // when determining why the task finished.
+    let finished = inner.phase == Phase::Running
+        && inner.runner.as_ref().is_some_and(|runner| !runner.running());
     let fresh = match inner.runner.as_ref() {
         Some(runner) => runner.poll(),
         None => Vec::new(),
@@ -607,11 +620,9 @@ async fn events(state: State<'_, AppState>) -> Result<Vec<NodeEvent>, String> {
             }
         }
     }
-    if inner.phase == Phase::Running
-        && !inner.events.is_empty()
-        && inner.runner.as_ref().is_some_and(|runner| !runner.running())
-    {
+    if finished {
         finish_task(&mut inner);
+        restore_after_farming(&mut inner);
     }
     Ok(fresh)
 }

@@ -7,9 +7,10 @@ use maa_framework::{
     controller::{AdbControllerBuilder, Controller},
     resource::Resource,
     tasker::Tasker,
+    toolkit::AdbDevice,
 };
 use std::{
-    path::Path,
+    path::{Path, PathBuf},
     thread,
     time::{Duration, Instant},
 };
@@ -32,7 +33,60 @@ pub struct Runner {
     pub label: String,
     army_read: crate::army::ReadResult,
     storage_capacity: crate::storage::CapacityCache,
-    adb_target: Option<(std::path::PathBuf, String)>,
+    adb: Option<AdbConnection>,
+    farming_screen: bool,
+    screen_geometry_stale: bool,
+}
+
+struct AdbConnection {
+    device: AdbDevice,
+    agent: PathBuf,
+}
+
+impl AdbConnection {
+    fn connect(&self) -> Result<Controller> {
+        let device = &self.device;
+        let config = serde_json::to_string(&device.config)?;
+        let controller =
+            AdbControllerBuilder::new(device.adb_path.to_str().ok_or("adb 路径无效")?, &device.address)
+                // LongPress silently degrades to Click with AdbShell.
+                .input_methods(maa_framework::sys::MaaAdbInputMethod_Maatouch as _)
+                .config(&config)
+                .agent_path(self.agent.to_str().ok_or("MaaTouch 路径无效")?)
+                .build()?;
+        check(controller.wait(controller.post_connection()?), "连接设备")?;
+        if !controller.connected() {
+            return Err(format!("{} 未能建立连接", device.address).into());
+        }
+        Ok(controller)
+    }
+}
+
+pub struct ScreenSize {
+    pub physical: String,
+    pub override_size: Option<String>,
+}
+
+impl ScreenSize {
+    fn parse(output: &str) -> Result<Self> {
+        let read = |key| {
+            output.lines().find_map(|line| {
+                let value = line.strip_prefix(key)?.trim();
+                let (width, height) = value.split_once('x')?;
+                (width.parse::<u32>().ok()? > 0 && height.parse::<u32>().ok()? > 0).then(|| value.to_owned())
+            })
+        };
+        let physical = read("Physical size:").ok_or("无法读取设备物理分辨率")?;
+        let override_size = read("Override size:");
+        if override_size.is_none() && output.lines().any(|line| line.starts_with("Override size:")) {
+            return Err("无法读取设备覆盖分辨率".into());
+        }
+        Ok(Self { physical, override_size })
+    }
+
+    pub fn current(&self) -> &str {
+        self.override_size.as_deref().unwrap_or(&self.physical)
+    }
 }
 
 fn check(status: MaaStatus, what: &str) -> Result<()> {
@@ -99,30 +153,20 @@ impl Drop for Runner {
         if self.tasker.running() {
             let _ = self.tasker.post_stop();
         }
-        if self.await_idle(Duration::from_secs(15)) && self.sink_id > 0 {
-            self.tasker.remove_context_sink(self.sink_id);
+        if self.await_idle(Duration::from_secs(15)) {
+            if self.farming_screen && self.device_online() {
+                if let Err(err) = self.reset_farming_screen() {
+                    eprintln!("恢复默认分辨率失败: {err}");
+                }
+            }
+            if self.sink_id > 0 {
+                self.tasker.remove_context_sink(self.sink_id);
+            }
         }
     }
 }
 
 impl Runner {
-    /// Initialize MaaTouch against the final display size before farming.
-    /// Changing wm size on an existing controller leaves its input mapping stale.
-    pub fn connect_for_farming(assets: &Path, preferred: Option<&str>) -> Result<Self> {
-        let runner = Self::connect(assets, DeviceTarget::Adb, preferred)?;
-        let size = runner.shell("wm size")?;
-        let current = size.lines().rev().find_map(|line| {
-            line.strip_prefix("Override size:").or_else(|| line.strip_prefix("Physical size:"))
-        }).ok_or("无法读取设备分辨率")?.trim();
-        if current == crate::DEVICE_MATCH_SIZE {
-            return Ok(runner);
-        }
-        let address = runner.device_address().ok_or("当前设备不是 ADB 设备")?.to_owned();
-        runner.shell(&format!("wm size {}", crate::DEVICE_MATCH_SIZE))?;
-        drop(runner);
-        Self::connect(assets, DeviceTarget::Adb, Some(&address))
-    }
-
     pub fn connect(assets: &Path, target: DeviceTarget, preferred: Option<&str>) -> Result<Self> {
         if matches!(target, DeviceTarget::Headless) {
             let resource = Resource::new()?;
@@ -138,7 +182,7 @@ impl Runner {
             }
             return Ok(Self::assemble(None, resource, "无设备（仅试跑）".into(), storage_capacity));
         }
-        let (controller, label, adb_target) = match target {
+        let (adb, label) = match target {
             DeviceTarget::Headless => return Err("无设备模式不需要建立连接".into()),
             DeviceTarget::Adb => {
                 let mut devices: Vec<_> = crate::discover_adb_devices()?;
@@ -154,25 +198,11 @@ impl Runner {
                 };
                 let name = crate::device_model(&device).unwrap_or_else(|| device.name.clone());
                 let label = format!("{name} · {}", device.address);
-                let config = serde_json::to_string(&device.config)?;
-                let agent = agent_dir(assets)?;
-                let controller =
-                    AdbControllerBuilder::new(device.adb_path.to_str().ok_or("adb 路径无效")?, &device.address)
-                        // LongPress silently degrades to Click with AdbShell. Require
-                        // MaaTouch so a successful action really holds the contact.
-                        .input_methods(maa_framework::sys::MaaAdbInputMethod_Maatouch as _)
-                        .config(&config)
-                        .agent_path(agent.to_str().ok_or("MaaTouch 路径无效")?)
-                        .build()?;
-                (controller, label, (device.adb_path.clone(), device.address.clone()))
+                (AdbConnection { device, agent: agent_dir(assets)? }, label)
             }
         };
 
-        check(controller.wait(controller.post_connection()?), "连接设备")?;
-        if !controller.connected() {
-            return Err(format!("{} 未能建立连接", label).into());
-        }
-        let controller = Some(controller);
+        let controller = Some(adb.connect()?);
         let resource = Resource::new()?;
         let storage_capacity = crate::storage::register(&resource)?;
         crate::loot::register(&resource)?;
@@ -185,7 +215,7 @@ impl Runner {
             return Err("资源未就绪".into());
         }
         let mut runner = Self::assemble(controller, resource, label, storage_capacity);
-        runner.adb_target = Some(adb_target);
+        runner.adb = Some(adb);
         Ok(runner)
     }
 
@@ -208,7 +238,9 @@ impl Runner {
             label,
             army_read,
             storage_capacity,
-            adb_target: None,
+            adb: None,
+            farming_screen: false,
+            screen_geometry_stale: false,
         }
     }
 
@@ -232,11 +264,12 @@ impl Runner {
         &self.bus
     }
 
-    pub fn start(&self, entry: &str) -> Result<()> {
+    pub fn start(&mut self, entry: &str) -> Result<()> {
         self.start_with_strategy(entry, crate::Strategy::default())
     }
 
     pub fn start_read_army(&self, cards: &[crate::army::ArmyCard]) -> Result<()> {
+        self.check_screen_geometry()?;
         if self.running() {
             return Err("请先停止正在运行的流程".into());
         }
@@ -252,6 +285,7 @@ impl Runner {
     }
 
     pub fn start_army(&self, plan: &crate::army::ArmyPlan, cards: &[crate::army::ArmyCard]) -> Result<()> {
+        self.check_screen_geometry()?;
         if self.running() {
             return Err("请先停止挂机再配卡".into());
         }
@@ -262,6 +296,7 @@ impl Runner {
     }
 
     pub fn verify_army(&self, plan: &crate::army::ArmyPlan, cards: &[crate::army::ArmyCard]) -> Result<()> {
+        self.check_screen_geometry()?;
         if self.running() {
             return Err("请先停止挂机再配卡".into());
         }
@@ -271,16 +306,16 @@ impl Runner {
         Ok(())
     }
 
-    pub fn start_with_strategy(&self, entry: &str, strategy: crate::Strategy) -> Result<()> {
+    pub fn start_with_strategy(&mut self, entry: &str, strategy: crate::Strategy) -> Result<()> {
         self.start_farming(entry, strategy, true)
     }
 
-    pub fn start_farming(&self, entry: &str, strategy: crate::Strategy, stop_when_full: bool) -> Result<()> {
+    pub fn start_farming(&mut self, entry: &str, strategy: crate::Strategy, stop_when_full: bool) -> Result<()> {
         self.start_farming_with_loot(entry, strategy, stop_when_full, &crate::loot::LootFilter::default())
     }
 
     pub fn start_farming_with_loot(
-        &self,
+        &mut self,
         entry: &str,
         strategy: crate::Strategy,
         stop_when_full: bool,
@@ -290,7 +325,7 @@ impl Runner {
     }
 
     pub fn start_farming_with_tactics(
-        &self,
+        &mut self,
         entry: &str,
         strategy: crate::Strategy,
         stop_when_full: bool,
@@ -299,6 +334,9 @@ impl Runner {
     ) -> Result<()> {
         if !self.inited() {
             return Err("Tasker 未初始化（资源或控制器未绑定）".into());
+        }
+        if self.running() {
+            return Err("请先停止正在运行的流程".into());
         }
         loot.validate()?;
         tactics.validate()?;
@@ -313,9 +351,34 @@ impl Runner {
         );
         tactics.apply_override(&mut pipeline)?;
         crate::loot::apply_override(&mut pipeline, loot);
+        // The legacy C++ host still uses SetScreen; Rust prepares the controller
+        // before posting any task, including runs that start at a custom node.
+        pipeline["SetScreen"] = serde_json::json!({ "action": "DoNothing" });
+        self.farming_screen = self.adb.is_some();
+        if self.farming_screen {
+            if let Err(err) = self.set_screen_size(false) {
+                return Err(self.farming_start_error(err));
+            }
+        }
         // Never wait on the returned job: the battle loop is a resident task.
-        self.tasker.post_task(entry, &pipeline.to_string())?;
+        let posted = self.tasker.post_task(entry, &pipeline.to_string()).map_err(|err| err.into()).and_then(|job| {
+            if job.id <= 0 {
+                Err(format!("无法启动流水线入口 {entry}").into())
+            } else {
+                Ok(())
+            }
+        });
+        if let Err(err) = posted {
+            return Err(self.farming_start_error(err));
+        }
         Ok(())
+    }
+
+    fn farming_start_error(&mut self, err: crate::Error) -> crate::Error {
+        match self.restore_farming_screen() {
+            Ok(_) => err,
+            Err(restore) => format!("{err}。恢复默认分辨率失败: {restore}").into(),
+        }
     }
 
     pub fn stop(&self, timeout: Duration) {
@@ -377,13 +440,83 @@ impl Runner {
     /// Query the current ADB transport rather than the controller's cached
     /// connection flag. This does not send input or a shell command to the phone.
     pub fn device_online(&self) -> bool {
-        self.adb_target.as_ref().is_some_and(|(path, address)| {
-            adb_online(path, address, Duration::from_secs(2))
+        self.adb.as_ref().is_some_and(|adb| {
+            adb_online(&adb.device.adb_path, &adb.device.address, Duration::from_secs(2))
         })
     }
 
     pub fn device_address(&self) -> Option<&str> {
-        self.adb_target.as_ref().map(|(_, address)| address.as_str())
+        self.adb.as_ref().map(|adb| adb.device.address.as_str())
+    }
+
+    pub fn screen_size(&self) -> Result<ScreenSize> {
+        ScreenSize::parse(&self.shell("wm size")?)
+    }
+
+    fn check_screen_geometry(&self) -> Result<()> {
+        if self.screen_geometry_stale {
+            return Err("分辨率已变更，请重新连接手机后重试".into());
+        }
+        Ok(())
+    }
+
+    fn change_screen_size(&mut self, reset: bool) -> Result<()> {
+        if self.running() {
+            return Err("任务进行中，请先停止再改分辨率".into());
+        }
+        let size = self.screen_size()?;
+        if reset && size.override_size.is_none() || !reset && size.current() == crate::DEVICE_MATCH_SIZE {
+            return Ok(());
+        }
+        let command = if reset { "wm size reset".to_owned() } else { format!("wm size {}", crate::DEVICE_MATCH_SIZE) };
+        self.screen_geometry_stale = true;
+        self.shell(&command)?;
+        let size = self.screen_size()?;
+        if reset && size.override_size.is_some() || !reset && size.current() != crate::DEVICE_MATCH_SIZE {
+            return Err(format!("设备当前分辨率为 {}，未应用分辨率命令", size.current()).into());
+        }
+        Ok(())
+    }
+
+    fn refresh_screen_geometry(&mut self) -> Result<()> {
+        if self.screen_geometry_stale {
+            // MaaTouch caches geometry on connection. Keep the tasker, loaded
+            // resources and readings, and bind a fresh controller while idle.
+            let controller = self.adb.as_ref().ok_or("当前设备不是 ADB 设备")?.connect()?;
+            self.tasker.bind_controller(&controller)?;
+            self.controller = Some(controller);
+            self.screen_geometry_stale = false;
+        }
+        Ok(())
+    }
+
+    pub fn set_screen_size(&mut self, reset: bool) -> Result<()> {
+        self.change_screen_size(reset)?;
+        if reset {
+            self.farming_screen = false;
+        }
+        self.refresh_screen_geometry()
+    }
+
+    pub fn needs_farming_screen_reset(&self) -> bool {
+        self.farming_screen
+    }
+
+    fn reset_farming_screen(&mut self) -> Result<()> {
+        self.change_screen_size(true)?;
+        self.farming_screen = false;
+        Ok(())
+    }
+
+    /// Restore stock geometry after a farming task has finished, and keep
+    /// the connection ready for preview and the next task.
+    pub fn restore_farming_screen(&mut self) -> Result<bool> {
+        if !self.farming_screen {
+            return Ok(false);
+        }
+        self.reset_farming_screen()?;
+        self.refresh_screen_geometry()?;
+        Ok(true)
     }
 
     pub fn poll(&self) -> Vec<NodeEvent> {
@@ -409,6 +542,7 @@ impl Runner {
     }
 
     pub fn screencap_png(&self) -> Result<Vec<u8>> {
+        self.check_screen_geometry()?;
         let controller = self.controller.as_ref().ok_or("当前无设备，无法截图")?;
         let id = controller.post_screencap()?;
         let deadline = Instant::now() + Duration::from_secs(5);
@@ -441,8 +575,20 @@ impl Runner {
 
 #[cfg(test)]
 mod tests {
-    use super::{agent_dir, adb_online};
+    use super::{agent_dir, adb_online, ScreenSize};
     use std::{path::Path, time::{Duration, Instant}};
+
+    #[test]
+    fn distinguishes_stock_resolution_from_an_override() {
+        let native = ScreenSize::parse("Physical size: 1440x3200\r\n").unwrap();
+        assert_eq!(native.current(), "1440x3200");
+        assert!(native.override_size.is_none());
+        let overridden = ScreenSize::parse("Physical size: 1440x3200\nOverride size: 1080x1920\n").unwrap();
+        assert_eq!(overridden.current(), "1080x1920");
+        assert!(overridden.override_size.is_some());
+        assert!(ScreenSize::parse("Physical size: 1440x3200\nOverride size: 0x0").is_err());
+        assert!(ScreenSize::parse("Error: device offline").is_err());
+    }
 
     #[cfg(unix)]
     #[test]

@@ -223,7 +223,7 @@ fn battle(assets: &Path, args: &[String], preferred: Option<&str>) -> Result<(),
         Some(i) => serde_json::from_str(&std::fs::read_to_string(args.get(i+1).ok_or("--loot 缺少配置文件")?)?)?,
         None => Default::default(),
     };
-    let runner = Runner::connect_for_farming(assets, preferred)?;
+    let mut runner = Runner::connect(assets, DeviceTarget::Adb, preferred)?;
     let recorder = record_dir.as_ref().map(FrameStore::open);
     if recorder.is_some() {
         runner.set_debug_mode(true)?;
@@ -277,6 +277,7 @@ fn battle(assets: &Path, args: &[String], preferred: Option<&str>) -> Result<(),
         thread::sleep(Duration::from_millis(100));
     }
     runner.stop(Duration::from_secs(15));
+    runner.restore_farming_screen()?;
     println!(
         "完成: 开局 {starts} 次，事件 {total} 条，忽略 {} 条，丢弃 {} 条",
         runner.ignored_events(),
