@@ -392,6 +392,22 @@
     "preview": "Army/Unit/115_WitchGolem-preview.png"
   },
   {
+    "id": "Unit/116_FrostYeti",
+    "group": "Unit",
+    "name": "FrostYeti",
+    "template": "Army/Unit/116_FrostYeti.png",
+    "currentTemplate": "Army/Unit/116_FrostYeti-current.png",
+    "preview": "Army/Unit/116_FrostYeti-preview.png"
+  },
+  {
+    "id": "Unit/117_BashBuck",
+    "group": "Unit",
+    "name": "BashBuck",
+    "template": "Army/Unit/117_BashBuck.png",
+    "currentTemplate": "Army/Unit/117_BashBuck-current.png",
+    "preview": "Army/Unit/117_BashBuck-preview.png"
+  },
+  {
     "id": "Unit/SuperBarbarian",
     "group": "Unit",
     "name": "SuperBarbarian",
@@ -670,6 +686,14 @@
     "template": "Army/Spell/SpellAngry.png",
     "currentTemplate": "Army/Spell/SpellAngry-current.png",
     "preview": "Army/Spell/SpellAngry-preview.png"
+  },
+  {
+    "id": "Spell/SpellHeroic",
+    "group": "Spell",
+    "name": "SpellHeroic",
+    "template": "Army/Spell/SpellHeroic.png",
+    "currentTemplate": "Army/Spell/SpellHeroic-current.png",
+    "preview": "Army/Spell/SpellHeroic-preview.png"
   },
   {
     "id": "Siege/WallWrecker",

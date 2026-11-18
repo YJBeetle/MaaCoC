@@ -7,7 +7,7 @@ const STRATEGIES: Strategy[] = ["spells-first", "units-first", "left-spread", "a
 // These indices are part of the share format: append new names, never reorder.
 const NAMES: Record<string, string[]> = {
   e: ["SuperBarbarian", "SuperArcher", "SuperGiant", "SneakyGoblin", "SuperWallBreaker", "RocketBalloon", "SuperWizard", "SuperDragon", "InfernoDragon", "SuperMiner", "SuperYeti", "SuperMinion", "SuperHogRider", "SuperValkyrie", "SuperWitch", "IceHound", "SuperBowler"],
-  s: ["SpellLightning", "SpellHealing", "SpellRage", "SpellJump", "SpellFreeze", "SpellClone", "SpellInvisibility", "SpellRecall", "SpellRevive", "SpellPoison", "SpellEarthquake", "SpellSpeed", "SpellSkeleton", "SpellBat", "SpellTotem", "SpellOvergrowth", "SpellIceBlock", "SpellAngry"],
+  s: ["SpellLightning", "SpellHealing", "SpellRage", "SpellJump", "SpellFreeze", "SpellClone", "SpellInvisibility", "SpellRecall", "SpellRevive", "SpellPoison", "SpellEarthquake", "SpellSpeed", "SpellSkeleton", "SpellBat", "SpellTotem", "SpellOvergrowth", "SpellIceBlock", "SpellAngry", "SpellHeroic"],
   v: ["WallWrecker", "BattleBlimp", "StoneSlammer", "SiegeBarracks", "LogLauncher", "FlameFlinger", "BattleDrill", "TroopLauncher", "SkyWagon"],
 };
 
