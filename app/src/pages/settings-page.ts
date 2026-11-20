@@ -213,8 +213,8 @@ export class SettingsPage {
       "f-device",
       "设备",
       "仅一个设备时自动选中",
-      state.devices.map((d) => ({ value: d.address, label: d.label })),
-      state.settings.preferredDevice ?? state.devices[0]?.address ?? "",
+      [...(state.devices.length > 1 && !state.devices.some(d => d.address === state.settings.preferredDevice) ? [{ value: "", label: "请选择设备" }] : []), ...state.devices.map((d) => ({ value: d.address, label: d.label }))],
+      state.devices.find(d => d.address === state.settings.preferredDevice)?.address ?? (state.devices.length === 1 ? state.devices[0].address : ""),
       (value) => void this.persist({ preferredDevice: value || null }),
       "未检测到设备",
     );

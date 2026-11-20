@@ -173,13 +173,24 @@ async function persist(next: Partial<Settings>) {
   render();
 }
 
+async function refreshDevices() {
+  state.devices = await api.devices();
+  const preferred = state.settings.preferredDevice;
+  if (state.devices.length === 1 && preferred !== state.devices[0].address) {
+    state.settings = await api.saveSettings({ ...state.settings, preferredDevice: state.devices[0].address });
+  }
+}
+
 async function connect() {
   state.error = "";
   state.runError = "";
   render();
   try {
+    await refreshDevices();
+    if (state.devices.length > 1 && !state.devices.some(d => d.address === state.settings.preferredDevice)) {
+      throw new Error("请在设置中选择要连接的设备");
+    }
     state.status = await api.connect();
-    state.devices = await api.devices();
     state.nodes = await api.nodes();
   } catch (err) {
     state.error = String(err);
@@ -353,7 +364,7 @@ async function boot() {
   buildShell();
   window.addEventListener("pagehide", () => runPage.dispose(), { once: true });
   state.paths = await api.paths();
-  state.devices = await api.devices();
+  await refreshDevices();
   state.nodes = await api.nodes();
   state.cards = await api.armyCards();
   render();
