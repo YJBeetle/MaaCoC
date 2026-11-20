@@ -44,6 +44,7 @@ export interface Status {
   currentNode: string;
   /** Physical and current panel size, as `wm size` reports them. */
   panel: string;
+  latestLoot?: [number, number, number] | null;
   resources?: (ResourceReading | null)[];
 }
 

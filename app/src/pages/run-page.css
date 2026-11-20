@@ -48,3 +48,5 @@
   .resource-row strong { font-size: 16px; }
   .status-card > .battle-panel canvas { max-width: 680px; }
 }
+
+.opponent-loot { padding: 10px 18px; font-size: 13px; line-height: 1.6; font-variant-numeric: tabular-nums; }

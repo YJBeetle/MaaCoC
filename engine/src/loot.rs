@@ -2,7 +2,7 @@
 use maa_framework::{custom::FnRecognition, resource::Resource};
 use serde::{Deserialize, Serialize};
 use serde_json::{json, Value};
-use std::sync::Mutex;
+use std::sync::{Arc, Mutex};
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase", default)]
@@ -99,7 +99,11 @@ fn panel_loot(detail: &Value) -> Option<[u64; 3]> {
     (values.len() == 3).then(|| [values[0], values[1], values[2]])
 }
 
-pub fn register(resource: &Resource) -> crate::Result<()> {
+pub type LootReading = Arc<Mutex<Option<[u64; 3]>>>;
+
+pub fn register(resource: &Resource) -> crate::Result<LootReading> {
+    let reading = LootReading::default();
+    let latest = reading.clone();
     let skips = Mutex::new((0_i64, 0_u32, 0_u32));
     resource.register_custom_recognition(
         "AvailableLoot",
@@ -134,6 +138,9 @@ pub fn register(resource: &Resource) -> crate::Result<()> {
                 )
                 .ok()??;
             let loot = panel_loot(&panel.detail);
+            if let Some(values) = loot {
+                *latest.lock().ok()? = Some(values);
+            }
             let mut state = skips.lock().ok()?;
             if state.0 != args.task_id {
                 *state = (args.task_id, 0, 0);
@@ -170,7 +177,7 @@ pub fn register(resource: &Resource) -> crate::Result<()> {
             Some((*args.roi, json!({"loot":loot,"skips":state.1,"next":next}).to_string()))
         })),
     )?;
-    Ok(())
+    Ok(reading)
 }
 
 #[cfg(test)]

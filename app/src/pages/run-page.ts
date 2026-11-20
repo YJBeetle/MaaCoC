@@ -18,6 +18,7 @@ export class RunPage {
   private readonly battle = new BattlePanel();
   private state: RunPageState | null = null;
   private readonly preview = new DevicePreview(() => this.renderBattle());
+  private readonly loot = el("div", { class: "opponent-loot" });
   private readonly resources = el("div", { class: "resource-readings" });
   private readonly timeline = el("div", { class: "timeline", id: "timeline" });
   private readonly fab = el("md-filled-button", { id: "fab" });
@@ -94,6 +95,12 @@ export class RunPage {
     this.preview.render(state);
     this.renderBattle();
     this.renderTimeline(state);
+    const loot = state.status.latestLoot;
+    this.loot.hidden = !loot;
+    if (loot) {
+      const text = ["金币", "圣水", "黑油"].map((name, i) => name + " " + loot[i].toLocaleString("zh-CN")).join(" · ");
+      this.loot.textContent = "最近可掠夺资源　" + text;
+    }
     this.renderResources(state);
   }
 
@@ -110,7 +117,7 @@ export class RunPage {
 
     const right = el("div", { class: "run-right" });
     const summary = el("div", { class: "card bordered status-card" });
-    summary.append(this.overview, el("div", { class: "card-title", text: "资源 · 最近读取" }), this.resources, this.battle.element);
+    summary.append(this.overview, this.loot, el("div", { class: "card-title", text: "仓库 · 最近读取" }), this.resources, this.battle.element);
     right.append(summary, this.logs);
     grid.append(left, right);
     return grid;

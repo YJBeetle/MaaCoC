@@ -91,6 +91,7 @@ pub struct Status {
     pub current_node: String,
     /// The panel's physical and current size, as `wm size` reports them.
     pub panel: String,
+    pub latest_loot: Option<[u64; 3]>,
     pub resources: [Option<maacoc_engine::storage::ResourceReading>; 3],
 }
 
@@ -521,6 +522,7 @@ fn status_of(inner: &Inner) -> Status {
         uptime_ms: inner.started.map(|t| t.elapsed().as_millis() as u64).unwrap_or(0),
         current_node: inner.events.back().map(|e| e.label().to_string()).unwrap_or_default(),
         panel: inner.panel.clone(),
+        latest_loot: inner.runner.as_ref().and_then(|r| r.latest_loot()),
         resources: inner.runner.as_ref().map(|r| r.storage_readings()).unwrap_or([None; 3]),
     }
 }
