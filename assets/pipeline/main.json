@@ -140,7 +140,7 @@
     "FindUnit": {
         "focus": "FindUnit!",
         "recognition": "TemplateMatch",
-        "template": "Cards/Unit",
+        "template": ["Cards/Unit", "Cards/Squad"],
         "green_mask": true,
         "method": 10001,
         "roi": [46,584,1191,135],

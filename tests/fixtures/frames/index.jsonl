@@ -80,3 +80,4 @@
 {"file": "../storage/opaque-tooltip-dark.png", "node": "StorageFullDark", "width": 1280, "height": 720, "label": "新版带底色提示框：黑油未满仓", "expected_hit": false}
 {"file": "../storage/opaque-tooltip-dark.png", "node": "StorageUnknownDark", "width": 1280, "height": 720, "label": "新版带底色提示框：黑油容量可读", "expected_hit": false}
 {"file": "../army/village-compact.png", "node": "BattleReady", "width": 1280, "height": 720, "label": "村庄不得误判为战斗开局", "expected_hit": false}
+{"file":"0059-FindUnit-BarchSquad.png","node":"FindUnit","width":1280,"height":720,"label":"普通兵耗尽后仍可投放的小队卡","roi":[184,590,99,130]}
