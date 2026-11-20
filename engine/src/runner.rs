@@ -250,7 +250,7 @@ impl Runner {
         self.tasker.inited()
     }
 
-    pub fn latest_loot(&self) -> Option<[u64; 3]> {
+    pub fn latest_loot(&self) -> Option<crate::loot::OpponentLoot> {
         *self.loot_reading.lock().unwrap()
     }
 

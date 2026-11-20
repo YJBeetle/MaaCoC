@@ -44,7 +44,7 @@ export interface Status {
   currentNode: string;
   /** Physical and current panel size, as `wm size` reports them. */
   panel: string;
-  latestLoot?: [number, number, number] | null;
+  latestLoot?: { amounts: [number, number, number]; decision: "attack" | "skip" | "skipLimit"; skips: number; maxSkips: number } | null;
   resources?: (ResourceReading | null)[];
 }
 

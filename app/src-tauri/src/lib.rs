@@ -91,7 +91,7 @@ pub struct Status {
     pub current_node: String,
     /// The panel's physical and current size, as `wm size` reports them.
     pub panel: String,
-    pub latest_loot: Option<[u64; 3]>,
+    pub latest_loot: Option<maacoc_engine::loot::OpponentLoot>,
     pub resources: [Option<maacoc_engine::storage::ResourceReading>; 3],
 }
 

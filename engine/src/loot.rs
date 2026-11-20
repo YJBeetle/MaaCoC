@@ -99,7 +99,20 @@ fn panel_loot(detail: &Value) -> Option<[u64; 3]> {
     (values.len() == 3).then(|| [values[0], values[1], values[2]])
 }
 
-pub type LootReading = Arc<Mutex<Option<[u64; 3]>>>;
+#[derive(Clone, Copy, Debug, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub enum LootDecision { Attack, Skip, SkipLimit }
+
+#[derive(Clone, Copy, Debug, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct OpponentLoot {
+    pub amounts: [u64; 3],
+    pub decision: LootDecision,
+    pub skips: u32,
+    pub max_skips: u32,
+}
+
+pub type LootReading = Arc<Mutex<Option<OpponentLoot>>>;
 
 pub fn register(resource: &Resource) -> crate::Result<LootReading> {
     let reading = LootReading::default();
@@ -138,9 +151,6 @@ pub fn register(resource: &Resource) -> crate::Result<LootReading> {
                 )
                 .ok()??;
             let loot = panel_loot(&panel.detail);
-            if let Some(values) = loot {
-                *latest.lock().ok()? = Some(values);
-            }
             let mut state = skips.lock().ok()?;
             if state.0 != args.task_id {
                 *state = (args.task_id, 0, 0);
@@ -173,6 +183,16 @@ pub fn register(resource: &Resource) -> crate::Result<LootReading> {
             eprintln!("收益筛选: {loot:?}，连续跳过 {}，下一步 {next}", state.1);
             if !context.override_next(args.node_name, &[next]).ok()? {
                 return None;
+            }
+            if let Some(amounts) = loot {
+                let decision = match next {
+                    "LootSkip" => LootDecision::Skip,
+                    "LootSkipLimit" => LootDecision::SkipLimit,
+                    _ => LootDecision::Attack,
+                };
+                *latest.lock().ok()? = Some(OpponentLoot {
+                    amounts, decision, skips: state.1, max_skips: filter.max_skips,
+                });
             }
             Some((*args.roi, json!({"loot":loot,"skips":state.1,"next":next}).to_string()))
         })),

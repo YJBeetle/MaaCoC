@@ -98,8 +98,13 @@ export class RunPage {
     const loot = state.status.latestLoot;
     this.loot.hidden = !loot;
     if (loot) {
-      const text = ["金币", "圣水", "黑油"].map((name, i) => name + " " + loot[i].toLocaleString("zh-CN")).join(" · ");
-      this.loot.textContent = "最近可掠夺资源　" + text;
+      const text = ["金币", "圣水", "黑油"].map((name, i) => name + " " + loot.amounts[i].toLocaleString("zh-CN")).join(" · ");
+      const decision = {
+        attack: "条件满足，准备开战",
+        skip: `条件未满足，跳过对手（连续 ${loot.skips}/${loot.maxSkips}）`,
+        skipLimit: "条件未满足，达到跳过上限，停止搜索",
+      }[loot.decision];
+      this.loot.textContent = `最近对手 · 可掠夺资源　${text}　${decision}`;
     }
     this.renderResources(state);
   }
