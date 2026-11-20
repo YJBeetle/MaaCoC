@@ -3,7 +3,7 @@
 
     python3 scripts/refresh-cards/export_cards.py var/coc-unpack/sc/ui.sc
 
-产出 assets/image/Cards/{Unit,Hero,Spell,Siege}/<卡牌名>.png。
+产出 assets/image/Cards/{Unit,Squad,Hero,Spell,Siege}/<卡牌名>.png。
 """
 
 from __future__ import annotations
@@ -119,6 +119,20 @@ HERO_CARDS = (
     CardSpec("Mars", "icon_hero_warriorPrincess"),
     CardSpec("Duke", "icon_hero_dragonDuke"),
 )
+SQUAD_CARDS = (
+    CardSpec("BarchSquad", "icon_barcher_squad"),
+    CardSpec("GiantWizardSquad", "icon_giant_wizard_squad"),
+    CardSpec("WallBreakerSquad", "icon_wall_breaker_squad"),
+    CardSpec("MinionSquad", "icon_minion_squad"),
+    CardSpec("BalloonSquad", "icon_balloon_squad"),
+    CardSpec("GolemWitchSquad", "icon_golem_witch_squad"),
+    CardSpec("HogRiderSquad", "icon_hog_rider_squad"),
+    CardSpec("MinerSquad", "icon_miner_squad"),
+    CardSpec("HealerSquad", "icon_healer_squad"),
+    CardSpec("PekkaTitanSquad", "icon_pekka_etitan_squad"),
+    CardSpec("DragonSquad", "icon_dragon_squad"),
+    CardSpec("BabyDragonSquad", "icon_baby_dragon_squad"),
+)
 SPELL_CARDS = (
     CardSpec("SpellLightning", "icon_spell_lightning"),
     CardSpec("SpellHealing", "icon_spell_healing"),
@@ -172,6 +186,7 @@ SIEGE_MASKS = ((0.35, 0.1, 0.62, 0.61),
                (0.39, 0.64, 0.99, 0.96))
 CARD_GROUPS = (
     ("Unit", UNIT_CARDS, "unit_slot", "attack_button", UNIT_FACE_BOX, UNIT_MASKS),
+    ("Squad", SQUAD_CARDS, "unit_slot", "attack_button_5", UNIT_FACE_BOX, UNIT_MASKS),
     ("Hero", HERO_CARDS, "hero_slot", 2, HERO_FACE_BOX, HERO_MASKS),
     ("Spell", SPELL_CARDS, "spell_slot", 1, SPELL_FACE_BOX, SPELL_MASKS),
     ("Siege", SIEGE_CARDS, "siege_slot", 1, SIEGE_FACE_BOX, SIEGE_MASKS),
@@ -297,7 +312,7 @@ def render_cards(sc, out):
                 if group == "Siege" and card.name == "BattleBlimp":
                     face_bounds = BLIMP_ICON_BOUNDS
                     selected_face_box = BLIMP_FACE_BOX
-                elif group in ("Unit", "Siege"):
+                elif group in ("Unit", "Squad", "Siege"):
                     face_bounds = unit_icon_bounds(face_bounds)
                 elif group == "Hero":
                     face_bounds = HERO_ICON_BOUNDS

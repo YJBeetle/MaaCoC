@@ -1,6 +1,6 @@
 # 更新卡面
 
-游戏更新后，从 `.sc` 重新合成家乡战斗条的 Unit、Hero、Spell、Siege 卡牌模板。
+游戏更新后，从 `.sc` 重新合成家乡战斗条的 Unit、Hero、Spell、Siege 卡牌模板，并导出 Squad 小队预览。
 
 ## 为什么需要工具
 
@@ -8,6 +8,7 @@
 按顶点与 UV 直接绘制成卡牌：
 普通兵、活动兵和超级兵按实例名选择 `unit_slot` 的 `attack_button`、
 `attack_button_2` 和 `attack_button_3`，这样插入新图层后仍能取到原来的卡底。
+小队预览使用绿色的 `attack_button_5`，沿用普通兵的卡面位置和遮罩，待实机校准。
 英雄用 `hero_slot` 图层 2，法术用 `spell_slot` 图层 1，攻城机器用 `siege_slot` 图层 1。
 数量、等级及卡底 alpha 低于 50% 的边角填成纯绿，供 MAAFW 的
 `green_mask` 跳过。
@@ -65,8 +66,9 @@ scripts/refresh-cards/export_cards.py var/coc-unpack/sc/ui.sc
 scripts/refresh-cards/export_cards.py var/coc-unpack/sc/ui.sc --out /tmp/cards
 ```
 
-默认输出到 `assets/image/Cards/{Unit,Hero,Spell,Siege}/<卡牌名>.png`；
+默认输出到 `assets/image/Cards/{Unit,Squad,Hero,Spell,Siege}/<卡牌名>.png`；
 流水线中的 `FindUnit`、`FindHero`、`FindSpell`、`FindSiege` 从这四个目录读取模板。
+12 张小队模板单独放在 `Squad` 目录，供解锁后对照。
 当前内置 68 张 Unit、6 张 Hero、19 张 Spell、9 张 Siege 的元数据；以后可在 `export_cards.py` 的
 对应数组中追加卡牌及其 SC 符号，不扫描旧模板目录，也不导出建筑大师卡牌。
 Unit 文件名沿用原模板编号（如 `0_Barbarian.png`、`13_ElectroDragon.png`），
@@ -83,7 +85,7 @@ Unit 文件名沿用原模板编号（如 `0_Barbarian.png`、`13_ElectroDragon.
 
 | 参数 | 作用 |
 |---|---|
-| `--out /tmp/cards` | 将四类模板写到独立输出根目录 |
+| `--out /tmp/cards` | 将模板写到独立输出根目录 |
 
 重复导出会覆盖同名文件，但不会自动删除输出目录里本次未生成的旧 PNG。
 发布资源包前应检查这四个目录是否包含最新模板；`--out /tmp/cards` 只用于单独预览，
