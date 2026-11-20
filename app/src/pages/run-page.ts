@@ -19,6 +19,7 @@ export class RunPage {
   private state: RunPageState | null = null;
   private readonly preview = new DevicePreview(() => this.renderBattle());
   private readonly loot = el("div", { class: "opponent-loot" });
+  private lootKey = "";
   private readonly resources = el("div", { class: "resource-readings" });
   private readonly timeline = el("div", { class: "timeline", id: "timeline" });
   private readonly fab = el("md-filled-button", { id: "fab" });
@@ -97,14 +98,25 @@ export class RunPage {
     this.renderTimeline(state);
     const loot = state.status.latestLoot;
     this.loot.hidden = !loot;
-    if (loot) {
-      const text = ["金币", "圣水", "黑油"].map((name, i) => name + " " + loot.amounts[i].toLocaleString("zh-CN")).join(" · ");
+    const lootKey = JSON.stringify(loot);
+    if (loot && this.lootKey !== lootKey) {
+      this.lootKey = lootKey;
+      const amounts = el("dl", { class: "loot-amounts" });
+      ["金币", "圣水", "黑油"].forEach((name, i) => {
+        const group = el("div");
+        group.append(el("dt", { text: name }), el("dd", { text: loot.amounts[i].toLocaleString("zh-CN") }));
+        amounts.append(group);
+      });
       const decision = {
         attack: "条件满足，准备开战",
         skip: `条件未满足，跳过对手（连续 ${loot.skips}/${loot.maxSkips}）`,
         skipLimit: "条件未满足，达到跳过上限，停止搜索",
       }[loot.decision];
-      this.loot.textContent = `最近对手 · 可掠夺资源　${text}　${decision}`;
+      this.loot.replaceChildren(
+        el("div", { class: "loot-heading", text: "最近对手 · 可掠夺资源" }),
+        amounts,
+        el("div", { class: "loot-decision", text: decision }),
+      );
     }
     this.renderResources(state);
   }
