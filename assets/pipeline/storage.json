@@ -187,11 +187,6 @@
     },
     "StorageReadFailed": {
         "focus": "仓库容量读取失败，本轮继续刷资源",
-        "action": "Click",
-        "target": [
-            600,
-            150
-        ],
         "next": "StorageContinue"
     },
     "StorageFullCloseGold": {
@@ -218,8 +213,8 @@
         "focus": "仓库提示未读到，重新打开一次",
         "action": "Click",
         "target": [
-            600,
-            150
+            1200,
+            40
         ],
         "pre_delay": 0,
         "post_delay": 400,
@@ -302,8 +297,8 @@
         },
         "action": "Click",
         "target": [
-            600,
-            150
+            1200,
+            40
         ],
         "post_delay": 300,
         "next": "StorageCollectOpenElixir",
@@ -329,8 +324,8 @@
         },
         "action": "Click",
         "target": [
-            600,
-            150
+            1200,
+            87
         ],
         "post_delay": 300,
         "next": "StorageCollectOpenDark",
@@ -356,8 +351,8 @@
         },
         "action": "Click",
         "target": [
-            600,
-            150
+            1200,
+            136
         ],
         "post_delay": 300,
         "next": "StorageAfterCollectGate",

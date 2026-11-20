@@ -359,6 +359,7 @@ mod tests {
             assert_eq!(read["custom_recognition_param"], json!({"resource":index,"state":"read"}));
             assert_eq!(read["next"], ["StorageCollectOpenElixir", "StorageCollectOpenDark", "StorageAfterCollectGate"][index]);
             assert_eq!(read["on_error"], "StorageReadFailed");
+            assert_eq!(read["target"], pipeline[format!("StorageCollectOpen{name}")]["target"]);
         }
         // Collection cannot declare full or loop forever on an unread tooltip.
         // Re-enter the existing fresh full-confirmation path after collecting.
@@ -391,7 +392,7 @@ mod tests {
         assert_eq!(pipeline_override(false), json!({}));
     }
     #[test]
-    fn unknown_capacity_dismisses_tooltip_and_continues_farming() {
+    fn unknown_capacity_continues_without_tapping_the_village() {
         let pipeline: Value = serde_json::from_str(include_str!("../../assets/pipeline/storage.json")).unwrap();
         for resource in ["Elixir", "Dark"] {
             assert_eq!(pipeline[format!("StorageUnknown{resource}")]["next"], "StorageReadFailed");
@@ -401,7 +402,7 @@ mod tests {
         assert_eq!(pipeline["StorageReopenGoldRetry"]["next"], "StorageRetryGateGold");
         assert_eq!(pipeline["StorageRetryGateGold"]["next"], json!(["StorageFullGold", "StorageRetryUnknownGold", "StorageCloseGold"]));
         assert_eq!(pipeline["StorageRetryUnknownGold"]["next"], "StorageReadFailed");
-        assert_eq!(pipeline["StorageReadFailed"]["action"], "Click");
+        assert!(pipeline["StorageReadFailed"].get("action").is_none());
         assert_eq!(pipeline["StorageReadFailed"]["next"], "StorageContinue");
     }
 
