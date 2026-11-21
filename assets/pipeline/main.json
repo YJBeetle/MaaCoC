@@ -25,6 +25,7 @@
             "OpenBox",
             "OpenBoxSkipConfirm",
             "OpenBoxSkip",
+            "OpenBoxFirstTap",
             "OpenBoxContinue",
             "OpenBoxTap",
             "CloseDialog",
@@ -319,7 +320,7 @@
     },
 
     "TryReturnHome": {
-        "next": ["ReturnHome","OpenBox","OpenBoxSkipConfirm","OpenBoxSkip"],
+        "next": ["ReturnHome","OpenBox","OpenBoxSkipConfirm","OpenBoxSkip","OpenBoxFirstTap"],
         "timeout": 1000,
         "on_error": "AttackLoop",
     },
@@ -330,7 +331,7 @@
         "roi": [528,546,228,139],
         "threshold": 0.8,
         "action": "Click",
-        "next": ["RewardOkay","OpenBoxSkipConfirm","OpenBoxSkip","AttackStart"],
+        "next": ["RewardOkay","OpenBoxSkipConfirm","OpenBoxSkip","OpenBoxFirstTap","AttackStart"],
         "timeout": 10000,
         "on_error": "AttackLoop",
     },
@@ -350,7 +351,22 @@
         "roi": [500,546,300,139],
         "threshold": 0.8,
         "action": "Click",
-        "next": ["OpenBoxSkipConfirm","OpenBoxSkip","OpenBoxTap","OpenBoxContinue"],
+        "next": ["OpenBoxSkipConfirm","OpenBoxSkip","OpenBoxFirstTap","OpenBoxTap","OpenBoxContinue"],
+        "on_error": "AttackLoop",
+    },
+    "OpenBoxFirstTap": {
+        "focus": "点击宝箱以显示跳过按钮",
+        "recognition": "TemplateMatch",
+        "template": "OpenBoxFirstTap.png",
+        // 四个擀面杖都是金色时尚未开箱。第一次点击后改走跳过领取流程。
+        "method": 1,
+        "roi": [510,550,254,83],
+        "threshold": 0.055,
+        "action": "Click",
+        "target": [590,310,90,100],
+        "post_delay": 1000,
+        "next": ["OpenBoxSkipConfirm","OpenBoxSkip"],
+        "timeout": 5000,
         "on_error": "AttackLoop",
     },
     "OpenBoxSkip": {
@@ -385,7 +401,7 @@
         "threshold": 0.8,
         "action": "Click",
         "target": [525,290,214,200],
-        "next": ["OpenBoxSkipConfirm","OpenBoxSkip","OpenBoxTap","OpenBoxContinue"],
+        "next": ["OpenBoxSkipConfirm","OpenBoxSkip","OpenBoxFirstTap","OpenBoxTap","OpenBoxContinue"],
         "on_error": "AttackLoop",
     },
     "OpenBoxContinue": {

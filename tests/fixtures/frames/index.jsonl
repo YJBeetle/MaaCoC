@@ -90,3 +90,9 @@
 {"file":"0058-ConnectionLostEn.png","node":"OpenBoxSkipConfirm","width":1280,"height":720,"label":"连接中断弹窗不得误触宝箱确认","expected_hit":false}
 {"file":"0057-ReinforceDialog.png","node":"OpenBoxSkipConfirm","width":1280,"height":720,"label":"援军确认框不得误触宝箱确认","expected_hit":false}
 {"file":"0061-ChestSkipConfirm.png","node":"OpenBoxSkip","width":1280,"height":720,"label":"确认框后方压暗的跳过按钮不可再点","expected_hit":false}
+{"file":"0062-ChestFirstTap.png","node":"OpenBoxFirstTap","width":1280,"height":720,"label":"四个擀面杖都未用的新版宝箱","expected_hit":true}
+{"file":"0062-ChestFirstTap.png","node":"OpenBoxSkip","width":1280,"height":720,"label":"首次点击宝箱前还没有跳过按钮","expected_hit":false}
+{"file":"0060-ChestSkip.png","node":"OpenBoxFirstTap","width":1280,"height":720,"label":"点过一次的宝箱应直接走跳过","expected_hit":false}
+{"file":"0061-ChestSkipConfirm.png","node":"OpenBoxFirstTap","width":1280,"height":720,"label":"跳过确认框不可误触宝箱","expected_hit":false}
+{"file":"0040-VillageAttackStart.png","node":"OpenBoxFirstTap","width":1280,"height":720,"label":"村庄不可误触宝箱","expected_hit":false}
+{"file":"0041-BattleEndButton.png","node":"OpenBoxFirstTap","width":1280,"height":720,"label":"战斗中不可误触宝箱","expected_hit":false}
