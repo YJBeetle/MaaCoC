@@ -96,3 +96,4 @@
 {"file":"0061-ChestSkipConfirm.png","node":"OpenBoxFirstTap","width":1280,"height":720,"label":"跳过确认框不可误触宝箱","expected_hit":false}
 {"file":"0040-VillageAttackStart.png","node":"OpenBoxFirstTap","width":1280,"height":720,"label":"村庄不可误触宝箱","expected_hit":false}
 {"file":"0041-BattleEndButton.png","node":"OpenBoxFirstTap","width":1280,"height":720,"label":"战斗中不可误触宝箱","expected_hit":false}
+{"file":"0063-FindUnit-EventPekka.png","node":"FindUnit","width":1280,"height":720,"label":"活动皮卡援军卡，截图缩至 720p 卡牌尺寸并放入投放栏区域","expected_hit":true}

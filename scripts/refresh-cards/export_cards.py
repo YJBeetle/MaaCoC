@@ -178,6 +178,13 @@ BLIMP_ICON_BOUNDS = (-83, -128, 83, 52)
 BLIMP_FACE_BOX = (5.35, 12.85, 74.65, 82.15)
 # 数量、等级等动态内容由 MAAFW 的 green_mask 跳过。
 UNIT_MASKS = ((0.39, 0.03, 0.95, 0.2), (0.06, 0.68, 0.4, 0.91))
+# 活动援军的箱子、数量和蓝色等级徽章覆盖范围更大，窄边缘受缩放影响。
+BATTLE_ONLY_UNIT_CARDS = (
+    CardSpec("118_M.O.M.M.A", "icon_unit_momma",
+             extra_masks=((0.0, 0.0, 1.0, 0.23), (0.06, 0.62, 0.4, 0.93),
+                          (0.0, 0.0, 0.02, 1.0), (0.98, 0.0, 1.0, 1.0),
+                          (0.0, 0.98, 1.0, 1.0))),
+)
 HERO_MASKS = ((0.03, 0.06, 0.43, 0.36), (0.05, 0.68, 0.38, 0.93))
 SPELL_MASKS = ((0.39, 0.03, 0.95, 0.21), (0.05, 0.68, 0.38, 0.91))
 # 所有攻城机器共用感叹号、等级和底部状态按钮的遮罩。
@@ -185,7 +192,7 @@ SIEGE_MASKS = ((0.35, 0.1, 0.62, 0.61),
                (0.04, 0.67, 0.39, 0.95),
                (0.39, 0.64, 0.99, 0.96))
 CARD_GROUPS = (
-    ("Unit", UNIT_CARDS, "unit_slot", "attack_button", UNIT_FACE_BOX, UNIT_MASKS),
+    ("Unit", UNIT_CARDS + BATTLE_ONLY_UNIT_CARDS, "unit_slot", "attack_button", UNIT_FACE_BOX, UNIT_MASKS),
     ("Squad", SQUAD_CARDS, "unit_slot", "attack_button_5", UNIT_FACE_BOX, UNIT_MASKS),
     ("Hero", HERO_CARDS, "hero_slot", 2, HERO_FACE_BOX, HERO_MASKS),
     ("Spell", SPELL_CARDS, "spell_slot", 1, SPELL_FACE_BOX, SPELL_MASKS),
